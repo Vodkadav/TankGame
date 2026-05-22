@@ -1,0 +1,20 @@
+<Project Sdk="Godot.NET.Sdk/4.6.2">
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <EnableDynamicLoading>true</EnableDynamicLoading>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <AssemblyVersion>0.0.1</AssemblyVersion>
+    <InformationalVersion>0.0.1-m0</InformationalVersion>
+    <!-- Exclude test source from release exports -->
+    <DefaultItemExcludes Condition="'$(Configuration)' == 'ExportRelease'">
+      $(DefaultItemExcludes);tests/**/*
+    </DefaultItemExcludes>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Chickensoft.GoDotTest" Version="2.0.30" />
+    <PackageReference Include="Chickensoft.GodotTestDriver" Version="3.1.60" />
+    <PackageReference Include="Shouldly" Version="4.2.1" />
+  </ItemGroup>
+</Project>

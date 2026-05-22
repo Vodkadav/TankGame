@@ -1,2 +1,41 @@
-# Ephemeral /delegate orchestration plans — never committed.
+# Claude Code — local-only files, never committed.
 .claude/plans/
+.claude/settings.local.json
+
+# Godot
+.godot/
+*.import
+export.cfg
+*.translation
+*.mono/
+.mono/
+# export_presets.cfg is intentionally tracked — it defines the Android export and holds no secrets (the keystore is generated in CI).
+
+# .NET / C#
+bin/
+obj/
+*.user
+*.suo
+.vs/
+*.DotSettings.user
+
+# Node / pnpm
+node_modules/
+dist/
+.pnpm-store/
+pnpm-lock.yaml.bak
+
+# Cloudflare / Wrangler
+.wrangler/
+wrangler-dist/
+worker-dist/
+.dev.vars
+
+# Environment / secrets
+.env
+.env.*
+!.env.example
+
+# OS
+.DS_Store
+Thumbs.db

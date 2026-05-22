@@ -1,0 +1,19 @@
+{
+  "name": "tankgame-worker",
+  "version": "0.1.0",
+  "private": true,
+  "main": "src/index.ts",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "devDependencies": {
+    "@cloudflare/vitest-pool-workers": "^0.8.0",
+    "@cloudflare/workers-types": "^4.20241224.0",
+    "typescript": "^5.7.3",
+    "vitest": "^3.0.0",
+    "wrangler": "^3.109.0"
+  }
+}

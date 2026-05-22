@@ -1,0 +1,6 @@
+name = "tankgame-worker"
+main = "src/index.ts"
+compatibility_date = "2025-01-01"
+
+# Runtime secrets (DSNs, tokens) are set via `wrangler secret put` in CI/deploy.
+# Never commit secrets to this file.
