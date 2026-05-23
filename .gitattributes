@@ -1,0 +1,3 @@
+# Force LF line endings on shell scripts so the shebang is honored on Linux
+# and Git Bash, regardless of core.autocrlf on the developer's machine.
+*.sh text eol=lf
