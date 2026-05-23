@@ -1,5 +1,6 @@
 using Godot;
 using Sentry;
+using TankGame.Infrastructure;
 
 namespace TankGame.Presentation;
 
@@ -8,6 +9,7 @@ public partial class MainScene : Node2D
     public override void _Ready()
     {
         InitSentry();
+        TranslationLoader.EnsureLoaded();
 
         var version = System.Reflection.Assembly
             .GetExecutingAssembly()
@@ -16,7 +18,7 @@ public partial class MainScene : Node2D
 
         GetNode<CanvasLayer>("CanvasLayer")
             .GetNode<Label>("BootLabel")
-            .Text = $"TankGame M0 — build {version}";
+            .Text = $"{Tr("m0.boot_label")} — build {version}";
     }
 
     private static void InitSentry()
