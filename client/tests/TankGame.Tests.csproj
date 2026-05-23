@@ -1,0 +1,23 @@
+<Project Sdk="Godot.NET.Sdk/4.6.0">
+
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <RootNamespace>TankGame.Tests</RootNamespace>
+    <AssemblyName>TankGame.Tests</AssemblyName>
+    <Nullable>enable</Nullable>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="**/*.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../TankGame.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Chickensoft.GoDotTest" Version="1.1.0" />
+  </ItemGroup>
+
+</Project>
