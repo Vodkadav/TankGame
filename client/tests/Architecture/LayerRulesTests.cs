@@ -94,9 +94,14 @@ public class LayerRulesTests
     [Fact]
     public void EveryProductionType_LivesInOneOfTheFiveKnownNamespaces()
     {
+        // GodotPlugins.* is SDK-injected entry-point glue emitted by
+        // Godot.NET.Sdk, not application code we authored — excluded from
+        // coverage. Every type we write must still live in one of the 5
+        // known layer namespaces (R4 in development-plan.md §7).
         var untagged = ProductionAssembly.GetTypes()
             .Where(t => !t.IsNested)
             .Where(t => !IsCompilerGenerated(t))
+            .Where(t => !IsGodotSdkInjected(t.Namespace))
             .Where(t => !LivesInKnownLayer(t.Namespace))
             .Select(t => $"{t.FullName} (namespace: {t.Namespace ?? "<null>"})")
             .OrderBy(s => s)
@@ -128,6 +133,12 @@ public class LayerRulesTests
         return t.GetCustomAttributes(
             typeof(System.Runtime.CompilerServices.CompilerGeneratedAttribute),
             inherit: false).Length > 0;
+    }
+
+    private static bool IsGodotSdkInjected(string? ns)
+    {
+        return ns is not null
+            && ns.StartsWith("GodotPlugins", System.StringComparison.Ordinal);
     }
 
     private static string FormatFailure(string layer, System.Collections.Generic.IEnumerable<string>? failing)
