@@ -1,4 +1,4 @@
-#Requires -Modules Pester
+#Requires -Modules @{ ModuleName = 'Pester'; ModuleVersion = '5.0' }
 <#
 .SYNOPSIS
   Pester v5 scaffold-paths assertion for M0-T1.
@@ -6,11 +6,11 @@
   Run: Invoke-Pester -Path scripts/test-scaffold.ps1 -PassThru
 #>
 
-param(
-  [string]$Root = (Split-Path $PSScriptRoot -Parent)
-)
-
 Describe "M0-T1 monorepo scaffold" {
+
+  BeforeAll {
+    $script:Root = Split-Path $PSScriptRoot -Parent
+  }
 
   Context "required directories" {
     $requiredDirs = @(
@@ -30,10 +30,8 @@ Describe "M0-T1 monorepo scaffold" {
       "scripts"
     )
 
-    foreach ($dir in $requiredDirs) {
-      It "directory '$dir' exists" {
-        Test-Path (Join-Path $Root $dir) -PathType Container | Should -BeTrue
-      }
+    It "directory '<dir>' exists" -TestCases ($requiredDirs | ForEach-Object { @{ dir = $_ } }) {
+      Test-Path (Join-Path $script:Root $dir) -PathType Container | Should -BeTrue
     }
   }
 
@@ -45,10 +43,8 @@ Describe "M0-T1 monorepo scaffold" {
       ".gitignore"
     )
 
-    foreach ($file in $requiredFiles) {
-      It "file '$file' exists" {
-        Test-Path (Join-Path $Root $file) -PathType Leaf | Should -BeTrue
-      }
+    It "file '<file>' exists" -TestCases ($requiredFiles | ForEach-Object { @{ file = $_ } }) {
+      Test-Path (Join-Path $script:Root $file) -PathType Leaf | Should -BeTrue
     }
   }
 
@@ -68,10 +64,8 @@ Describe "M0-T1 monorepo scaffold" {
       "docs/licenses"
     )
 
-    foreach ($dir in $gitkeepDirs) {
-      It "'.gitkeep' exists in '$dir'" {
-        Test-Path (Join-Path $Root "$dir/.gitkeep") -PathType Leaf | Should -BeTrue
-      }
+    It "'.gitkeep' exists in '<dir>'" -TestCases ($gitkeepDirs | ForEach-Object { @{ dir = $_ } }) {
+      Test-Path (Join-Path $script:Root "$dir/.gitkeep") -PathType Leaf | Should -BeTrue
     }
   }
 }
