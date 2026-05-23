@@ -1,2 +1,28 @@
-# Ephemeral /delegate orchestration plans — never committed.
+# Godot
+.godot/
+*.import
+mono/
+
+# .NET
+bin/
+obj/
+*.user
+
+# Node / pnpm
+node_modules/
+.pnpm-store/
+dist/
+
+# Cloudflare
+.wrangler/
+.dev.vars
+
+# Environment
+.env
+.env.local
+
+# Sentry CLI
+.sentryclirc
+
+# Orchestration plans (ephemeral — never committed)
 .claude/plans/
