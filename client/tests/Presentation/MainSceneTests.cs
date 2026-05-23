@@ -1,11 +1,8 @@
 using Godot;
-using GoDotTest;
+using Chickensoft.GoDotTest;
 
 namespace TankGame.Tests.Presentation;
 
-/// <summary>
-/// Verifies that Main.tscn loads successfully and BootLabel text is set.
-/// </summary>
 public class MainSceneTests : TestClass
 {
     private Node _scene = default!;
@@ -31,7 +28,10 @@ public class MainSceneTests : TestClass
         var canvas = _scene.GetNode<CanvasLayer>("CanvasLayer");
         var label = canvas.GetNode<Label>("BootLabel");
 
-        Assert.That(label.Text, Does.StartWith("TankGame"),
-            "BootLabel must start with 'TankGame'");
+        if (!label.Text.StartsWith("TankGame"))
+        {
+            throw new System.Exception(
+                $"BootLabel must start with 'TankGame'; was '{label.Text}'");
+        }
     }
 }
