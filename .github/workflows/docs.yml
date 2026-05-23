@@ -1,0 +1,65 @@
+name: Docs CI
+
+# Validates the docs/ tree on every push and PR. Markdown lint, internal-link
+# resolution, and ADR template structural compliance.
+#
+# Scope: docs-only. The full M0-T5 ci.yml (Worker tests, Godot build, NetArchTest)
+# is a separate workflow and will land when M0-T5 dispatches.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  markdown-lint:
+    name: Markdown lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+      - uses: DavidAnson/markdownlint-cli2-action@v20
+        with:
+          globs: |
+            **/*.md
+            !node_modules
+
+  link-check:
+    name: Internal link check
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: lycheeverse/lychee-action@v2
+        with:
+          args: --offline --no-progress --verbose './**/*.md'
+          fail: true
+
+  adr-structure:
+    name: ADR template compliance
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify required ADR sections
+        shell: bash
+        run: |
+          set -euo pipefail
+          fail=0
+          shopt -s nullglob
+          for f in docs/adr/*.md; do
+            for section in "## Context" "## Decision" "## Consequences"; do
+              if ! grep -qF "$section" "$f"; then
+                echo "::error file=$f::Missing required section: $section"
+                fail=1
+              fi
+            done
+          done
+          if [ "$fail" -eq 0 ]; then
+            echo "All ADRs in docs/adr/ contain Context, Decision, Consequences."
+          fi
+          exit $fail

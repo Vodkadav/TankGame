@@ -279,6 +279,47 @@ Cadence target: M0 in days 1–2, M1 within a week of M0, M2–M3 within the fir
 
 ---
 
+### M5b — Limited Vision mode (opt-in, deferred)
+
+**Status:** Deferred — Proposed in `docs/adr/PROPOSAL-fog-of-war.md`; depends on M3 (authoritative sim) and M5 (powerup baseline).
+
+**Goal:** an opt-in lobby mode that turns the labyrinth into a tense hide-and-seek arena. Each player sees a roughly 2.5-tile bright radius around their tank with a one-tile penumbra of dimmed fog; everything beyond is opaque dark. Walls inside the radius are fully lit, and last-seen tile state (damaged bricks, broken cover) persists as a desaturated "memory" layer so the maze stays learnable. Enemy tanks, projectiles, and powerups only appear when they fall inside a player's current vision or memory — flanks, ambushes, and corridor stand-offs become the dominant tactic.
+
+**Definition of done:**
+- Lobby host can toggle "Limited Vision" on; the flag round-trips through the Worker and is reflected on every joined client before the match starts.
+- Match runs at the same 20 Hz tick; server emits a per-player culled `SnapshotFrame` so each client receives only entities its visibility (current radius ∪ memory) covers.
+- Fairness integration test: a scripted match with Players A and B in disjoint corridors asserts that Player A's raw inbound packets contain no `TankState` for Player B until line-of-sight overlaps — packet inspection cannot un-fog.
+- Client `FogOfWarOverlay` renders at 60 fps on the Galaxy A56 reference device with four tanks active; profiler trace attached to the PR.
+- Memory layer persists for the lifetime of the match: a brick damaged earlier still shows its damaged state (desaturated) when the player re-enters that tile's history, even if no enemy is currently visible there.
+- HUD chip "Limited Vision" visible while the mode is active, in EN+ES+DK.
+- Per-snapshot CPU benchmark gate (see R6) green on a synthetic 4-player worst-case tick.
+
+**What auto-deploys:** as before — every merge ships behind the `limited_vision` lobby flag; default off until M5b-T6 promotes the ADR.
+
+**Non-goals:** thermal scope, spotter drone, or other vision-altering powerups (separate M5c proposal); spectator-mode fog handling (spectators see full map for now); replay fog re-simulation; AI enemies adapting their behaviour to fog (M5 turret AI remains vision-agnostic this milestone).
+
+**Tickets:**
+
+| ID | Description | Owner | Size | Depends | Parallel-with |
+|---|---|---|---|---|---|
+| M5b-T1 | Define `IVisibilityFilter` in Domain — pure C# contract: `IReadOnlySet<CellCoord> ComputeVisible(TankState viewer, IWallGrid maze)` plus a `MergeWithMemory(prev, current)` helper signature. No Godot, no networking types. Test-first: contract tests on a mock impl assert determinism (same input → same set) and that walls block transitively across two corridors. | @architect | S | M3 done + M5 done | M5b-T3, M5b-T4a |
+| M5b-T2 | Server-side `VisibilityFilter` impl in TS inside `MatchSim`; snapshot path forks per-connected-player and emits a culled `SnapshotFrame`. Test-first: deterministic-tick Vitest test with Players A and B in disjoint corridors asserts A's outbound snapshot omits B's `TankState`; second test asserts that once B enters A's radius, B appears in the very next snapshot. | @domain | M | M5b-T1 | M5b-T3 |
+| M5b-T3 | Client `FogOfWarOverlay` Presentation node — `CanvasModulate` dark background + per-tank `Light2D` for the bright/penumbra falloff + a `RenderTexture`-backed memory layer that accumulates last-seen tiles per match. Test-first: GoDotTest scene-load asserts the overlay loads, the light follows the local tank's `ITank.PositionChanged` event, and the memory texture is non-empty after a scripted traversal of three cells. | @platform | M | M5b-T1 | M5b-T2, M5b-T4b |
+| M5b-T4a | Worker lobby route accepts `limited_vision: bool` on `POST /lobby` and persists it on the DO; `POST /lobby/:code/join` returns the flag to joining clients. Test-first: Vitest+Miniflare round-trip — create with `limited_vision: true`, join, assert payload contains the flag. | @devops | S | M3-T4 | M5b-T4b, M5b-T1 |
+| M5b-T4b | Client lobby UI toggle bound to the new flag; "Limited Vision" checkbox on the create-lobby scene plus a read-only indicator on the join-lobby scene. Test-first: GoDotTest exercises the toggle, asserts the outbound `POST /lobby` payload contains the flag and the indicator reflects the joined-lobby flag. | @platform | S | M5b-T4a | M5b-T3, M5b-T5 |
+| M5b-T5 | EN+ES+DK strings for the lobby toggle label, its tooltip, and the in-match "Limited Vision active" HUD chip. Test-first: GoDotTest forces each locale and asserts `tr()` returns the expected strings for all three keys. | @i18n | XS | M5b-T4b | — |
+| M5b-T6 | Promote `docs/adr/PROPOSAL-fog-of-war.md` to a numbered ADR (next free number after the M0–M7 reservations) with **Status: Accepted**; update cross-references in `development-plan.md` (this block) and in any ADRs that referenced the proposal path. Test-first: a docs-link sanity script (`scripts/check-adr-links.ps1`) asserts no surviving references to `PROPOSAL-fog-of-war.md` and that the numbered ADR exists with `Status: Accepted`. | @architect | XS | all M5b-T1..T5 merged + R6 benchmark gate green | — |
+
+**Parallelization map (M5b):**
+- Wave 1 (1 agent): M5b-T1 (@architect) — single-threaded by the interface-first rule; blocks T2, T3, T4a.
+- Wave 2 (3 agents in parallel after T1 merges): M5b-T2 (@domain, server filter), M5b-T3 (@platform, overlay), M5b-T4a (@devops, Worker lobby flag).
+- Wave 3 (2 agents in parallel after T4a merges): M5b-T4b (@platform, lobby UI), M5b-T5 (@i18n, strings) — T5 starts as soon as T4b lands the string keys.
+- Wave 4 (1 agent, gated): M5b-T6 (@architect, promote ADR) — held until all of T1..T5 merge **and** the R6 per-snapshot benchmark gate is green on the 4-player worst-case scenario.
+
+**Demo:** "I toggle Limited Vision on, drive into a corridor, my partner ambushes me from a side tunnel I couldn't see — we high-five."
+
+---
+
 ### M6 — Auth (anonymous-then-claim) + persistent progression schema
 
 **Goal:** Supabase wired in. Anonymous play continues to work. Player can claim their account via Discord/Google/magic-link. XP and unlock tables exist and are read/written server-side from the DO via a Worker→Supabase service-role binding.
@@ -580,6 +621,7 @@ A merge to main triggers an additional gate: a post-merge smoke test on prod. If
 | R3 | **Parallel agents write conflicting Domain interfaces** because @architect is a bottleneck. | Medium | Medium | Enforce the rule: only @architect creates files under `client/src/Domain/`. Other agents propose interface changes via an ADR amendment PR that @architect must approve first. |
 | R4 | **Architecture test rots into a no-op** because new namespaces aren't covered. | Medium | Medium | The arch test asserts a complete-coverage rule: every type in the assembly must be in one of the 5 known namespaces; an "untagged" type fails the build. Forces every new module to be classified explicitly. |
 | R5 | **i18n debt sneaks in via "I'll add the locale later"** despite the universal rule. | Low | Medium | CI job `i18n-completeness` greps the codebase for `tr(` calls and asserts every key has all three locale columns populated. |
+| R6 | **Fog of war snapshot CPU may push DO over its CPU budget under 4-player matches** (visibility computation runs per player per tick). See `docs/adr/PROPOSAL-fog-of-war.md` and M5b. | Medium | Medium | Per-snapshot benchmark gate is a release-blocker for M5b-T6 (promote-to-ADR). If the gate fails, drop tick rate for limited-vision lobbies to 15 Hz or precompute visibility on damage events only. |
 
 ### Open user decisions
 
