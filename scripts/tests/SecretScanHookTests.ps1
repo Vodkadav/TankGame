@@ -9,6 +9,20 @@
   Run: Invoke-Pester -Path scripts/tests/SecretScanHookTests.ps1 -Output Detailed
 #>
 
+# Resolved at discovery time so -Skip:(-not $BashAvailable) works correctly.
+$BashAvailable = $false
+$gitCmd = Get-Command git -ErrorAction SilentlyContinue
+if ($gitCmd) {
+  $dir = Split-Path $gitCmd.Source -Parent
+  for ($i = 0; $i -lt 4 -and $dir; $i++) {
+    foreach ($rel in @('bin/bash.exe', 'usr/bin/bash.exe')) {
+      if (Test-Path (Join-Path $dir $rel)) { $BashAvailable = $true; break }
+    }
+    if ($BashAvailable) { break }
+    $dir = Split-Path $dir -Parent
+  }
+}
+
 Describe "M0-T10 pre-commit secret-scan hook" {
 
   BeforeAll {
@@ -17,8 +31,8 @@ Describe "M0-T10 pre-commit secret-scan hook" {
     $script:PwshHook   = Join-Path $script:RepoRoot 'scripts/hooks/no-secrets-scan.ps1'
     $script:Installer  = Join-Path $script:RepoRoot 'scripts/install-hooks.ps1'
 
-    # Resolve bash from Git for Windows (Git Bash). Walk up the git.exe path
-    # looking for a sibling bash.exe under bin/ or usr/bin/.
+    # Resolve bash from Git for Windows. Same logic as the discovery-time
+    # walk above, but we need the actual path here for invocation.
     $script:Bash = $null
     $gitCmd = Get-Command git -ErrorAction SilentlyContinue
     if ($gitCmd) {
@@ -80,6 +94,16 @@ Describe "M0-T10 pre-commit secret-scan hook" {
         return $LASTEXITCODE
       } finally { Pop-Location }
     }
+
+    # Fixture strings assembled at runtime so the literal patterns never
+    # appear in this source file (the pre-commit hook would otherwise block
+    # any commit that touches this test). All values below are non-secrets —
+    # they are the canonical examples from the dev plan / public docs.
+    $q = '"'
+    $script:FxPassword = 'password = ' + $q + 'abc12345' + $q              # dev-plan fixture
+    $script:FxToken    = 'token = ' + $q + 'AKIA' + 'IOSFODNN7EXAMPLE' + '99' + $q
+    $script:FxBearer   = 'Authorization: Bearer ' + ('abcdef1234567890' * 2)
+    $script:FxSecret   = 'secret = ' + $q + 'hunter2' + 'hunter2' + $q
   }
 
   Context "hook scripts exist" {
@@ -107,8 +131,7 @@ Describe "M0-T10 pre-commit secret-scan hook" {
     It "blocks a staged file containing a password= assignment" {
       $repo = New-ScratchRepo
       try {
-        # fake credential — test fixture only
-        Stage-File -Repo $repo -Name 'bad.txt' -Content 'password = "abc12345"'
+        Stage-File -Repo $repo -Name 'bad.txt' -Content $script:FxPassword
         Invoke-PwshHook -Repo $repo | Should -Not -Be 0
       } finally { Remove-ScratchRepo $repo }
     }
@@ -116,8 +139,7 @@ Describe "M0-T10 pre-commit secret-scan hook" {
     It "blocks a staged file containing a token= assignment (16+ chars)" {
       $repo = New-ScratchRepo
       try {
-        # fake credential — test fixture only (24 chars)
-        Stage-File -Repo $repo -Name 'bad.cfg' -Content 'token = "AKIAIOSFODNN7EXAMPLE99"'
+        Stage-File -Repo $repo -Name 'bad.cfg' -Content $script:FxToken
         Invoke-PwshHook -Repo $repo | Should -Not -Be 0
       } finally { Remove-ScratchRepo $repo }
     }
@@ -125,8 +147,7 @@ Describe "M0-T10 pre-commit secret-scan hook" {
     It "blocks a staged file containing a Bearer token header" {
       $repo = New-ScratchRepo
       try {
-        # fake credential — test fixture only
-        Stage-File -Repo $repo -Name 'bad.http' -Content 'Authorization: Bearer abcdef1234567890ABCDEF1234567890'
+        Stage-File -Repo $repo -Name 'bad.http' -Content $script:FxBearer
         Invoke-PwshHook -Repo $repo | Should -Not -Be 0
       } finally { Remove-ScratchRepo $repo }
     }
@@ -134,8 +155,7 @@ Describe "M0-T10 pre-commit secret-scan hook" {
     It "blocks a staged file containing a secret= assignment (8+ chars)" {
       $repo = New-ScratchRepo
       try {
-        # fake credential — test fixture only
-        Stage-File -Repo $repo -Name 'bad.env' -Content 'secret = "hunter2hunter2"'
+        Stage-File -Repo $repo -Name 'bad.env' -Content $script:FxSecret
         Invoke-PwshHook -Repo $repo | Should -Not -Be 0
       } finally { Remove-ScratchRepo $repo }
     }
@@ -143,7 +163,7 @@ Describe "M0-T10 pre-commit secret-scan hook" {
 
   Context "bash hook (hooks/no-secrets-scan.sh)" {
 
-    It "exits 0 on a clean staged file" -Skip:(-not $script:Bash) {
+    It "exits 0 on a clean staged file" -Skip:(-not $BashAvailable) {
       $repo = New-ScratchRepo
       try {
         Stage-File -Repo $repo -Name 'clean.txt' -Content "All clean here.`n"
@@ -151,29 +171,26 @@ Describe "M0-T10 pre-commit secret-scan hook" {
       } finally { Remove-ScratchRepo $repo }
     }
 
-    It "blocks a staged file containing a password= assignment" -Skip:(-not $script:Bash) {
+    It "blocks a staged file containing a password= assignment" -Skip:(-not $BashAvailable) {
       $repo = New-ScratchRepo
       try {
-        # fake credential — test fixture only
-        Stage-File -Repo $repo -Name 'bad.txt' -Content 'password = "abc12345"'
+        Stage-File -Repo $repo -Name 'bad.txt' -Content $script:FxPassword
         Invoke-BashHook -Repo $repo | Should -Not -Be 0
       } finally { Remove-ScratchRepo $repo }
     }
 
-    It "blocks a staged file containing a token= assignment (16+ chars)" -Skip:(-not $script:Bash) {
+    It "blocks a staged file containing a token= assignment (16+ chars)" -Skip:(-not $BashAvailable) {
       $repo = New-ScratchRepo
       try {
-        # fake credential — test fixture only
-        Stage-File -Repo $repo -Name 'bad.cfg' -Content 'token = "AKIAIOSFODNN7EXAMPLE99"'
+        Stage-File -Repo $repo -Name 'bad.cfg' -Content $script:FxToken
         Invoke-BashHook -Repo $repo | Should -Not -Be 0
       } finally { Remove-ScratchRepo $repo }
     }
 
-    It "blocks a staged file containing a Bearer token header" -Skip:(-not $script:Bash) {
+    It "blocks a staged file containing a Bearer token header" -Skip:(-not $BashAvailable) {
       $repo = New-ScratchRepo
       try {
-        # fake credential — test fixture only
-        Stage-File -Repo $repo -Name 'bad.http' -Content 'Authorization: Bearer abcdef1234567890ABCDEF1234567890'
+        Stage-File -Repo $repo -Name 'bad.http' -Content $script:FxBearer
         Invoke-BashHook -Repo $repo | Should -Not -Be 0
       } finally { Remove-ScratchRepo $repo }
     }
