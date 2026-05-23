@@ -4,7 +4,7 @@ TankGame is a real-time multiplayer top-down tank arena built with Godot 4.6 (C#
 
 ## Repository map
 
-```
+```text
 TankGame/
 ├── client/                  Godot 4.6 C# project
 │   ├── src/
