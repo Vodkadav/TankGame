@@ -1,5 +1,6 @@
 using Godot;
 using Chickensoft.GoDotTest;
+using TankGame.Infrastructure;
 
 namespace TankGame.Tests.Presentation;
 
@@ -13,6 +14,7 @@ public class LocaleTests : TestClass
     public void Setup()
     {
         _originalLocale = TranslationServer.GetLocale();
+        TranslationLoader.EnsureLoaded();
     }
 
     [Cleanup]
