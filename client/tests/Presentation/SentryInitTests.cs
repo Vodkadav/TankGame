@@ -1,4 +1,3 @@
-using System;
 using Godot;
 using Chickensoft.GoDotTest;
 using Sentry;
@@ -28,20 +27,20 @@ public class SentryInitTests : TestClass
             SentrySdk.Close();
         }
 
-        Environment.SetEnvironmentVariable(EnvVarName, null);
+        System.Environment.SetEnvironmentVariable(EnvVarName, null);
     }
 
     [Test]
     public void SentrySdk_IsEnabled_WhenDsnEnvVarSet()
     {
-        Environment.SetEnvironmentVariable(EnvVarName, StubDsn);
+        System.Environment.SetEnvironmentVariable(EnvVarName, StubDsn);
 
         _scene = GD.Load<PackedScene>("res://Main.tscn").Instantiate();
         TestScene.AddChild(_scene);
 
         if (!SentrySdk.IsEnabled)
         {
-            throw new Exception(
+            throw new System.Exception(
                 "SentrySdk.IsEnabled must be true after MainScene._Ready when "
                 + $"{EnvVarName} is set.");
         }
@@ -50,14 +49,14 @@ public class SentryInitTests : TestClass
     [Test]
     public void SentrySdk_StaysDisabled_WhenDsnEnvVarMissing()
     {
-        Environment.SetEnvironmentVariable(EnvVarName, null);
+        System.Environment.SetEnvironmentVariable(EnvVarName, null);
 
         _scene = GD.Load<PackedScene>("res://Main.tscn").Instantiate();
         TestScene.AddChild(_scene);
 
         if (SentrySdk.IsEnabled)
         {
-            throw new Exception(
+            throw new System.Exception(
                 "SentrySdk.IsEnabled must be false after MainScene._Ready when "
                 + $"{EnvVarName} is absent.");
         }
