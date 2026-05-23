@@ -1,4 +1,3 @@
-import { defineConfig } from "vitest/config";
 import { defineWorkersProject } from "@cloudflare/vitest-pool-workers/config";
 
 export default defineWorkersProject({
@@ -6,6 +5,11 @@ export default defineWorkersProject({
     poolOptions: {
       workers: {
         wrangler: { configPath: "./wrangler.toml" },
+        miniflare: {
+          bindings: {
+            SENTRY_DSN_WORKER: "https://public@example.invalid/1",
+          },
+        },
       },
     },
   },
