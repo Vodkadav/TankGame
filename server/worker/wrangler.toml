@@ -1,3 +1,10 @@
 name = "tankgame-worker"
 main = "src/index.ts"
 compatibility_date = "2026-05-21"
+
+# Secrets — set at deploy time via `wrangler secret put` (M0-T6).
+# DO NOT commit a real DSN value here.
+#   wrangler secret put SENTRY_DSN_WORKER
+# Tests inject a stub value via miniflare bindings (see vitest.config.ts).
+[vars]
+SENTRY_DSN_WORKER = ""
