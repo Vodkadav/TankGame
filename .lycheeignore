@@ -1,0 +1,2 @@
+# Add patterns one-per-line to skip links during lychee CI checks.
+# Currently empty — all internal links in the docs/ tree should resolve.
