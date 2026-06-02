@@ -46,5 +46,11 @@ dev build; 60 fps on the Galaxy A56).
   Kenney CC0 — see `docs/credits/assets.md`).
 - **T5 — `TankView`** ✅ Node2D binding an `ITank`: node follows position, Body/Turret
   sprites rotate with chassis/aim; GoDotTest verifies load + model mirroring.
-- T6 ProjectileView + Arena scene · T7 keyboard/mouse input · T8 instructions overlay ·
-  T9 wire-up — pending. (T7+T9 touch the M0 boot scene / app-init — done next.)
+- **T7 — `KeyboardMouseInputSource`** ✅ WASD move, mouse aim (vs viewport centre),
+  click/space fire; pure `ReadMove`/`ComputeAim` helpers with xUnit tests.
+- **T9 — drivable wiring** ✅ `Arena.tscn`/`ArenaScene` builds input + `Tank` + `TankView`
+  + a following `Camera2D`. App-init (Sentry, translations) moved to `Bootstrap`; the M0
+  boot-label scene (`Main.tscn`/`MainScene`) is retired (Sentry test now targets
+  `SentryBootstrap`). **The tank is drivable** — launch via the desktop shortcut.
+- Remaining M1: projectile rendering (T4 view) + firing, Arena walls + collision (T6),
+  instructions overlay (T8).

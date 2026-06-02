@@ -14,7 +14,7 @@ public class LayerRulesTests
     private const string PresentationNs = "TankGame.Presentation";
 
     private static readonly Assembly ProductionAssembly =
-        typeof(TankGame.Presentation.MainScene).Assembly;
+        typeof(TankGame.Presentation.Bootstrap).Assembly;
 
     [Fact]
     public void Domain_DoesNotDependOnAnyOtherLayerOrGodot()
