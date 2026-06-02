@@ -41,5 +41,6 @@ dev build; 60 fps on the Galaxy A56).
 - **T3 — `Tank` (GameLogic)** ✅ moves at constant speed, faces movement, aims turret;
   9 xUnit tests in `client/tests/GameLogic/`.
 - **T4 — `Projectile` (GameLogic)** ✅ travels straight, dies on `IArena` hit (snaps to point).
-- T2 sprite import · T5/T6 views + arena scene · T7 keyboard/mouse input ·
-  T8 instructions overlay · T9 wire-up · T10 ADR-0003 — pending.
+- **T10 — ADR-0003** ✅ interface-first rule + `IServiceName` lives in Domain.
+- T2 sprite import (Kenney CC0 — needs the pack fetched into the repo) · T5/T6 views +
+  arena scene · T7 keyboard/mouse input · T8 instructions overlay · T9 wire-up — pending.
