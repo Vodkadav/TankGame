@@ -53,6 +53,8 @@ jobs:
         run: dotnet test client/tests/Architecture/TankGame.Tests.Architecture.csproj -c Debug
       - name: Domain tests
         run: dotnet test client/tests/Domain/TankGame.Tests.Domain.csproj -c Debug
+      - name: GameLogic tests
+        run: dotnet test client/tests/GameLogic/TankGame.Tests.GameLogic.csproj -c Debug
 
   # Compiles the client (fast-fail compile gate) and runs the GoDotTest scene
   # tests headless inside a real Godot process via the --run-tests entry in
