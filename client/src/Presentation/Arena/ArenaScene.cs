@@ -31,6 +31,7 @@ public partial class ArenaScene : Node2D
         _arena = new RectArena(ArenaMin, ArenaMax);
 
         AddChild(BuildWalls());
+        AddChild(BuildInstructionsOverlay());
 
         var view = GD.Load<PackedScene>("res://src/Presentation/Tank/TankView.tscn")
             .Instantiate<TankView>();
@@ -59,6 +60,19 @@ public partial class ArenaScene : Node2D
             .Instantiate<ProjectileView>();
         AddChild(view);
         view.Bind(projectile);
+    }
+
+    // Screen-space overlay so the "how to play" line stays put while the camera tracks
+    // the tank. The Label's text is the translation key; Godot auto-translates it via tr().
+    private static CanvasLayer BuildInstructionsOverlay()
+    {
+        var layer = new CanvasLayer { Name = "InstructionsLayer" };
+        var label = new Label { Name = "Instructions", Text = "m1.instructions" };
+        label.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.CenterTop);
+        label.HorizontalAlignment = HorizontalAlignment.Center;
+        label.GrowHorizontal = Control.GrowDirection.Both;
+        layer.AddChild(label);
+        return layer;
     }
 
     private static Line2D BuildWalls()

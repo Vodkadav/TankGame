@@ -31,7 +31,7 @@ T10 pre-commit secret-scan hook · T11 Sentry in Worker · T12 Sentry in Godot c
 - **GoDotTest scene-test runner** — `Bootstrap.cs` `--run-tests` entry runs the scene tests
   headless inside Godot and gates CI (GoDotTest 2.0.34, `Godot.NET.Sdk` 4.6.2).
 
-## In progress: M1 — one tank, empty arena, moves and shoots (local)
+## M1 complete — one tank, empty arena, moves and shoots (local)
 
 The web→Android plan revision is done, so M1 is unblocked (target: Android APK + desktop
 dev build; 60 fps on the Galaxy A56).
@@ -56,5 +56,7 @@ dev build; 60 fps on the Galaxy A56).
   raycast, GameLogic) bounds the arena; firing (rate-limited) spawns a `Projectile` +
   `ProjectileView` from the turret that travels and despawns on a wall hit; the arena
   draws its wall border. **The tank moves and shoots** — M1's core loop.
-- Remaining M1: instructions overlay (T8, i18n). (Tank↔wall collision is deferred to M2's
-  wall grid; M1's tank roams the open arena.)
+- **T8 — instructions overlay** ✅ `ArenaScene` builds a screen-space `CanvasLayer` + `Label`
+  ("WASD to move, mouse to aim, click to fire") wired to the `m1.instructions` key; EN/ES/DK
+  strings in `strings.csv`; GoDotTest forces each locale and asserts the rendered line.
+- M1 done. (Tank↔wall collision is deferred to M2's wall grid; M1's tank roams the open arena.)
