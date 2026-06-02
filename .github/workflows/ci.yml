@@ -37,7 +37,10 @@ jobs:
       - name: Lint workflows
         uses: raven-actions/actionlint@v2
 
-  arch-test:
+  # Pure-C# xUnit tests that need no Godot runtime: NetArchTest layer rules and the
+  # Domain/GameLogic contract + unit tests. Fast; the in-engine GoDotTest scene tests
+  # run in godot-tests below.
+  dotnet-tests:
     needs: changes
     if: needs.changes.outputs.client == 'true'
     runs-on: ubuntu-latest
@@ -48,6 +51,8 @@ jobs:
           dotnet-version: '9.0.x'
       - name: NetArchTest layer rules
         run: dotnet test client/tests/Architecture/TankGame.Tests.Architecture.csproj -c Debug
+      - name: Domain tests
+        run: dotnet test client/tests/Domain/TankGame.Tests.Domain.csproj -c Debug
 
   # Compiles the client (fast-fail compile gate) and runs the GoDotTest scene
   # tests headless inside a real Godot process via the --run-tests entry in
