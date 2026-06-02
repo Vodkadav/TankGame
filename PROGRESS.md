@@ -3,9 +3,11 @@
 Living status tracker. The full spec is `docs/research/development-plan.md`; this
 file records what is actually done and what is next.
 
-## Current status: **M0 complete** (2026-06-02)
+## Current status: **M1 complete** (2026-06-02) — entity-spine foundation (S1) in progress
 
-The CI/CD pipeline is live and every merge to `main` builds, tests, and deploys.
+The CI/CD pipeline is live and every merge to `main` builds, tests, and deploys. M1's core
+loop ships (drive + shoot + instructions overlay); next work is the S1 entity-spine
+refactor — see "In progress" below.
 
 ### Live surfaces
 
@@ -60,3 +62,33 @@ dev build; 60 fps on the Galaxy A56).
   ("WASD to move, mouse to aim, click to fire") wired to the `m1.instructions` key; EN/ES/DK
   strings in `strings.csv`; GoDotTest forces each locale and asserts the rendered line.
 - M1 done. (Tank↔wall collision is deferred to M2's wall grid; M1's tank roams the open arena.)
+
+---
+
+## In progress: extensibility foundation (roadmap S1)
+
+The expansion wishlist (new ammo types, tank upgrades, smart walls/doors, wormholes,
+droppables, drones, points of interest, hide spots) is catalogued in
+`docs/research/feature-roadmap.md`, which maps every idea to seven foundational system
+abstractions (**S1–S7**). Building the systems first makes the content cheap to add.
+
+**S1 — entity spine** (design: `docs/adr/PROPOSAL-entity-spine.md`): a `World` that owns
+and `Step`s many entities with spawn/despawn events, ending the `ArenaScene`
+hand-spawning. Decisions settled in the proposal: `ITank`/`IProjectile` **extend**
+`IEntity`; spawners get `IWorld` **injected at construction**; **tick ownership moves out
+of the views** (they call `model.Step` today).
+
+- **S1-T1 — `IEntity` + `IWorld` contracts** ✅ Domain interfaces (`Id`/`Position`/
+  `IsAlive`/`Step`; `Entities`/`Spawn`/`EntitySpawned`/`EntityDespawned`/`Step`) with
+  `EntityContractTests` + `WorldContractTests` (pure C#, no Godot). Scoped to contracts
+  only — `ITank`/`IProjectile` adopt `: IEntity` in S1-T3/T4 alongside the impl changes.
+- **Next → S1-T2** — `World` impl in `GameLogic` (owns entities; `Spawn`/`Step`/reap;
+  raises the events), verified against the S1-T1 contract semantics. Then **S1-T3**
+  (migrate `Tank`, move the fire/cooldown rule out of `ArenaScene` into `Tank` with an
+  injected `IWorld`), **S1-T4** (migrate `Projectile`), **S1-T5** (refactor `ArenaScene`
+  to spawn-event wiring + make the views pure mirrors), **S1-T6** (promote the proposal to
+  a numbered ADR + update this file).
+
+S1 is the systems-foundation slice and is **not** yet a numbered milestone in
+`development-plan.md`; **M2 — static labyrinth + destructible walls** remains the next
+numbered milestone. Sequencing S1 vs M2 is an open call (see `feature-roadmap.md` §6).
