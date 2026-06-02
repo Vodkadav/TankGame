@@ -384,6 +384,12 @@ Cadence target: M0 in days 1–2, M1 within a week of M0, M2–M3 within the fir
 - **M13 — Community challenges + prestige.**
 - **M14 — Federation hooks (community-hosted DO replacement) — long-term sustainability per `decisions.md` D20.**
 
+> **Content & systems beyond the MVP** — ammo types, tank upgrades, smart
+> walls/doors, wormholes, droppables, drones, vision/stealth, points of interest —
+> are catalogued in [`feature-roadmap.md`](feature-roadmap.md), which maps each idea
+> to the seven foundational system abstractions (S1–S7) that make it cheap to build.
+> Items there are aspirational until promoted into a numbered milestone here.
+
 ---
 
 ## 3. First-fortnight concrete tickets
