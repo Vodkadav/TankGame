@@ -1,10 +1,13 @@
 name: Deploy
 
-# Production only. Pull requests run CI (build/test) but never deploy, so there
-# are no live side effects until a change lands on main.
+# Production only — runs on merge to main (and manual dispatch). PRs never deploy,
+# so there are no live side effects until a change lands on main. Both targets are
+# cheap and idempotent, so we deploy unconditionally rather than path-filtering
+# (a docs/workflow-only merge still refreshes the landing-page build SHA).
 on:
   push:
     branches: [main]
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -14,26 +17,7 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  changes:
-    runs-on: ubuntu-latest
-    outputs:
-      client: ${{ steps.filter.outputs.client }}
-      worker: ${{ steps.filter.outputs.worker }}
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dorny/paths-filter@v3
-        id: filter
-        with:
-          filters: |
-            client:
-              - 'client/**'
-            worker:
-              - 'server/worker/**'
-              - 'shared/protocol/**'
-
   deploy-worker:
-    needs: changes
-    if: needs.changes.outputs.worker == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -61,8 +45,6 @@ jobs:
           SENTRY_DSN_WORKER: ${{ secrets.SENTRY_DSN_WORKER }}
 
   deploy-pages:
-    needs: changes
-    if: needs.changes.outputs.client == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
