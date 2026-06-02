@@ -1,6 +1,8 @@
 name = "tankgame-worker"
 main = "src/index.ts"
 compatibility_date = "2026-05-21"
+# Required by @sentry/cloudflare (AsyncLocalStorage).
+compatibility_flags = ["nodejs_compat"]
 
 # Secrets — set at deploy time via `wrangler secret put` (M0-T6).
 # DO NOT commit a real DSN value here.

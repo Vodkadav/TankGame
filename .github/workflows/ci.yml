@@ -1,0 +1,95 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+# NOTE: the GoDotTest scene tests (client/tests/TankGame.Tests.csproj:
+# MainSceneTests / LocaleTests / SentryInitTests) are NOT run here yet. They live
+# in a separate assembly that Godot does not load at runtime, and that assembly
+# references TankGame (so the game project cannot reference it back). Running them
+# headless needs a test-layout change (single project + a --run-tests entry, the
+# Chickensoft pattern) — tracked as a follow-up. NetArchTest below DOES run.
+
+jobs:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      client: ${{ steps.filter.outputs.client }}
+      worker: ${{ steps.filter.outputs.worker }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            client:
+              - 'client/**'
+            worker:
+              - 'server/worker/**'
+              - 'shared/protocol/**'
+
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Lint workflows
+        uses: raven-actions/actionlint@v2
+
+  arch-test:
+    needs: changes
+    if: needs.changes.outputs.client == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0.x'
+      - name: NetArchTest layer rules
+        run: dotnet test client/tests/Architecture/TankGame.Tests.Architecture.csproj -c Debug
+
+  # Compile check only. The Android APK export is deferred: Godot 4.6 treats
+  # .NET→Android export as experimental and blocks the prebuilt-template path
+  # ("Exporting to Android when using C#/.NET is experimental"). Producing the APK
+  # needs the Gradle custom-build path (Android SDK/NDK + `dotnet workload android`
+  # + an in-project android/build template) — tracked as a follow-up.
+  client-build:
+    needs: changes
+    if: needs.changes.outputs.client == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0.x'
+      - name: Build client
+        run: dotnet build client/TankGame.csproj -c Debug
+
+  worker-test:
+    needs: changes
+    if: needs.changes.outputs.worker == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: server/worker/pnpm-lock.yaml
+      - name: Install
+        run: pnpm install --frozen-lockfile
+        working-directory: server/worker
+      - name: Test
+        run: pnpm test
+        working-directory: server/worker

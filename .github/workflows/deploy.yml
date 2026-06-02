@@ -1,0 +1,101 @@
+name: Deploy
+
+# Production only. Pull requests run CI (build/test) but never deploy, so there
+# are no live side effects until a change lands on main.
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-main
+  cancel-in-progress: false
+
+jobs:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      client: ${{ steps.filter.outputs.client }}
+      worker: ${{ steps.filter.outputs.worker }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            client:
+              - 'client/**'
+            worker:
+              - 'server/worker/**'
+              - 'shared/protocol/**'
+
+  deploy-worker:
+    needs: changes
+    if: needs.changes.outputs.worker == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: server/worker/pnpm-lock.yaml
+      - name: Install
+        run: pnpm install --frozen-lockfile
+        working-directory: server/worker
+      - name: Deploy Worker
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CF_API_TOKEN }}
+          accountId: ${{ secrets.CF_ACCOUNT_ID }}
+          workingDirectory: server/worker
+          command: deploy
+          secrets: |
+            SENTRY_DSN_WORKER
+        env:
+          SENTRY_DSN_WORKER: ${{ secrets.SENTRY_DSN_WORKER }}
+
+  deploy-pages:
+    needs: changes
+    if: needs.changes.outputs.client == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build landing page
+        run: |
+          mkdir -p public
+          {
+            echo '<!doctype html><html lang="en"><head><meta charset="utf-8">'
+            echo '<title>TankGame</title></head><body>'
+            echo '<h1>TankGame</h1>'
+            echo "<p>Build: ${GITHUB_SHA}</p>"
+            echo "<p><a href=\"https://github.com/${GITHUB_REPOSITORY}/releases/latest\">Latest Android APK</a></p>"
+            echo '</body></html>'
+          } > public/index.html
+      - name: Deploy to Cloudflare Pages
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CF_API_TOKEN }}
+          accountId: ${{ secrets.CF_ACCOUNT_ID }}
+          command: pages deploy public --project-name=${{ secrets.CF_PAGES_PROJECT }} --branch=main
+
+  # NOTE: the Android APK GitHub Release is deferred until the .NET→Android Gradle
+  # export path is set up (see the client-build note in ci.yml). Until then no APK
+  # is published; the landing page's "Latest APK" link will 404 until the first
+  # release exists.
+
+  smoke-test:
+    needs: deploy-worker
+    if: needs.deploy-worker.result == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Worker /healthz responds 200
+        run: |
+          code=$(curl -s -o /dev/null -w '%{http_code}' https://tankgame-worker.vodkadav.workers.dev/healthz)
+          echo "healthz -> $code"
+          test "$code" = "200"

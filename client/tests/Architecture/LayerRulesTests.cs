@@ -77,13 +77,17 @@ public class LayerRulesTests
     }
 
     [Fact]
-    public void Presentation_DependsOnlyOnGameLogicAndDomain()
+    public void Presentation_DoesNotDependOnData()
     {
+        // Presentation (Godot scene scripts) is the composition root: it may wire
+        // Infrastructure implementations (TranslationLoader, input sources, the
+        // network transport) into the scene tree. It must still NOT reach the raw
+        // Data layer directly — persistence is consumed via GameLogic. See ADR-0001.
         var result = Types.InAssembly(ProductionAssembly)
             .That()
             .ResideInNamespaceStartingWith(PresentationNs)
             .ShouldNot()
-            .HaveDependencyOnAny(DataNs, InfrastructureNs)
+            .HaveDependencyOnAny(DataNs)
             .GetResult();
 
         Assert.True(
