@@ -7,6 +7,10 @@
 *.import
 export.cfg
 *.translation
+# i18n resources are referenced directly by project.godot and are not regenerated
+# by a plain `godot --path` run (the playtest shortcut), so keep them tracked.
+!client/i18n/strings.csv.import
+!client/i18n/*.translation
 *.mono/
 .mono/
 # export_presets.cfg is intentionally tracked — it defines the Android export and holds no secrets (the keystore is generated in CI).

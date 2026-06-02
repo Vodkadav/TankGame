@@ -37,7 +37,7 @@ public partial class MainScene : CanvasLayer
         var version = Assembly.GetExecutingAssembly()
             .GetCustomAttribute<AssemblyInformationalVersionAttribute>()
             ?.InformationalVersion ?? "0.0.1";
-        label.Text = "TankGame M0 — build " + version;
+        label.Text = Tr("m0.boot_label") + " — build " + version;
     }
 
 #if DEBUG
