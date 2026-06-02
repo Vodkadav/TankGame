@@ -1,0 +1,42 @@
+using System;
+using TankGame.Infrastructure;
+using Xunit;
+using NVector2 = System.Numerics.Vector2;
+
+namespace TankGame.Tests.Infrastructure;
+
+// Exercises the pure helpers behind KeyboardMouseInputSource without a Godot runtime.
+public class InputHelperTests
+{
+    [Fact]
+    public void ReadMove_Up_IsNegativeY()
+        => Assert.Equal(new NVector2(0f, -1f), KeyboardMouseInputSource.ReadMove(up: true, down: false, left: false, right: false));
+
+    [Fact]
+    public void ReadMove_DownAndRight_CombinesAxes()
+        => Assert.Equal(new NVector2(1f, 1f), KeyboardMouseInputSource.ReadMove(up: false, down: true, left: false, right: true));
+
+    [Fact]
+    public void ReadMove_OpposingKeys_Cancel()
+        => Assert.Equal(NVector2.Zero, KeyboardMouseInputSource.ReadMove(up: true, down: true, left: true, right: true));
+
+    [Fact]
+    public void ReadMove_NothingPressed_IsZero()
+        => Assert.Equal(NVector2.Zero, KeyboardMouseInputSource.ReadMove(false, false, false, false));
+
+    [Fact]
+    public void ComputeAim_MouseRightOfCentre_IsZeroRadians()
+    {
+        // viewport 200x100 -> centre (100,50); mouse to the right on the same row.
+        var aim = KeyboardMouseInputSource.ComputeAim(new NVector2(180f, 50f), new NVector2(200f, 100f));
+        Assert.Equal(0f, aim, precision: 4);
+    }
+
+    [Fact]
+    public void ComputeAim_MouseBelowCentre_IsHalfPi()
+    {
+        // +Y is down in screen space, so straight below centre is +π/2.
+        var aim = KeyboardMouseInputSource.ComputeAim(new NVector2(100f, 90f), new NVector2(200f, 100f));
+        Assert.Equal(MathF.PI / 2f, aim, precision: 4);
+    }
+}

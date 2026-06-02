@@ -1,4 +1,5 @@
 using Godot;
+using TankGame.Infrastructure;
 #if DEBUG
 using System.Reflection;
 using Chickensoft.GoDotTest;
@@ -27,9 +28,14 @@ public partial class Bootstrap : Node
             return;
         }
 #endif
+        // App init happens once here (the composition root), then the play scene loads.
+        SentryBootstrap.Init();
+        TranslationLoader.EnsureLoaded();
+
         // Deferred: the scene tree is mid-add during _Ready and rejects an
         // immediate scene swap ("parent node is busy adding/removing children").
-        GetTree().CallDeferred(SceneTree.MethodName.ChangeSceneToFile, "res://Main.tscn");
+        GetTree().CallDeferred(
+            SceneTree.MethodName.ChangeSceneToFile, "res://src/Presentation/Arena/Arena.tscn");
     }
 
 #if DEBUG
