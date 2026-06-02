@@ -31,9 +31,12 @@ T10 pre-commit secret-scan hook · T11 Sentry in Worker · T12 Sentry in Godot c
 - **GoDotTest scene-test runner** — `Bootstrap.cs` `--run-tests` entry runs the scene tests
   headless inside Godot and gates CI (GoDotTest 2.0.34, `Godot.NET.Sdk` 4.6.2).
 
-## Next: M1 — one tank, empty arena, moves and shoots (local)
+## In progress: M1 — one tank, empty arena, moves and shoots (local)
 
-**Blocked on a prerequisite:** M1–M8 in the plan still describe a web/HTML5 product, but
-Godot 4.6 .NET cannot export to web — M0 retargeted to Android/desktop. An architect
-web→Android revision pass over the M1–M8 definitions of done is **due before M1 kickoff**
-(see the banner above the M1 section in `docs/research/development-plan.md`).
+The web→Android plan revision is done, so M1 is unblocked (target: Android APK + desktop
+dev build; 60 fps on the Galaxy A56).
+
+- **T1 — Domain interfaces** ✅ `ITank`, `IProjectile`, `IInputSource`, `IArena` (pure C#,
+  `System.Numerics`, no Godot) with xUnit contract tests in `client/tests/Domain/`.
+- T2 sprite import · T3 `Tank` (GameLogic) · T4 `Projectile` · T5/T6 views + arena scene ·
+  T7 keyboard/mouse input · T8 instructions overlay · T9 wire-up · T10 ADR-0003 — pending.
