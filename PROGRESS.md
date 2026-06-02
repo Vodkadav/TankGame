@@ -42,5 +42,9 @@ dev build; 60 fps on the Galaxy A56).
   9 xUnit tests in `client/tests/GameLogic/`.
 - **T4 — `Projectile` (GameLogic)** ✅ travels straight, dies on `IArena` hit (snaps to point).
 - **T10 — ADR-0003** ✅ interface-first rule + `IServiceName` lives in Domain.
-- T2 sprite import (Kenney CC0 — needs the pack fetched into the repo) · T5/T6 views +
-  arena scene · T7 keyboard/mouse input · T8 instructions overlay · T9 wire-up — pending.
+- **T2 — tank sprite** ✅ **placeholder** body+turret PNGs (PIL-generated; to be replaced by
+  Kenney CC0 — see `docs/credits/assets.md`).
+- **T5 — `TankView`** ✅ Node2D binding an `ITank`: node follows position, Body/Turret
+  sprites rotate with chassis/aim; GoDotTest verifies load + model mirroring.
+- T6 ProjectileView + Arena scene · T7 keyboard/mouse input · T8 instructions overlay ·
+  T9 wire-up — pending. (T7+T9 touch the M0 boot scene / app-init — done next.)
