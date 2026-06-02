@@ -1,0 +1,5 @@
+#!/bin/sh
+# TankGame pre-commit hook: block hardcoded secrets in staged files.
+# Installed by scripts/install-hooks.ps1 (sets core.hooksPath to this folder).
+dir=$(dirname "$0")
+exec "$dir/no-secrets-scan.sh"
