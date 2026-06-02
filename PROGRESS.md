@@ -1,0 +1,39 @@
+# TankGame — Progress
+
+Living status tracker. The full spec is `docs/research/development-plan.md`; this
+file records what is actually done and what is next.
+
+## Current status: **M0 complete** (2026-06-02)
+
+The CI/CD pipeline is live and every merge to `main` builds, tests, and deploys.
+
+### Live surfaces
+
+| Surface | State |
+|---------|-------|
+| Worker `tankgame-worker.vodkadav.workers.dev/healthz` | ✅ 200 (Sentry-wrapped) |
+| Cloudflare Pages landing page | ✅ deployed (per `CF_PAGES_PROJECT`) |
+| Android debug APK | ✅ published to the rolling [`canary`](https://github.com/Vodkadav/TankGame/releases/tag/canary) GitHub Release (~79 MB, arm64-v8a) |
+
+### M0 tickets (all done)
+
+T1 monorepo scaffold · T2 Worker skeleton (`/healthz`) · T3 Godot C# client skeleton ·
+T4 NetArchTest five-layer rules · T5 `ci.yml` (lint, arch, build + **headless GoDotTest**, worker) ·
+T6 `deploy.yml` (Worker + Pages + **Android APK release**) · T7 i18n (en/es/dk) ·
+T8 ADR-0001 (layered architecture) · T9 ADR-0002 (monorepo + CI/CD) ·
+T10 pre-commit secret-scan hook · T11 Sentry in Worker · T12 Sentry in Godot client.
+
+### Deferrals resolved
+
+- **Android APK export** — built via the .NET→Android Gradle custom-build path; debug-signed
+  with an in-job keystore (no secret). Required enabling `gradle_build/use_gradle_build`,
+  dropping `armeabi-v7a` (.NET targets arm64/x86_64), and ETC2/ASTC VRAM compression.
+- **GoDotTest scene-test runner** — `Bootstrap.cs` `--run-tests` entry runs the scene tests
+  headless inside Godot and gates CI (GoDotTest 2.0.34, `Godot.NET.Sdk` 4.6.2).
+
+## Next: M1 — one tank, empty arena, moves and shoots (local)
+
+**Blocked on a prerequisite:** M1–M8 in the plan still describe a web/HTML5 product, but
+Godot 4.6 .NET cannot export to web — M0 retargeted to Android/desktop. An architect
+web→Android revision pass over the M1–M8 definitions of done is **due before M1 kickoff**
+(see the banner above the M1 section in `docs/research/development-plan.md`).
