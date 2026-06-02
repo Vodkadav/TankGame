@@ -1,0 +1,140 @@
+name: Deploy
+
+# Production only. Pull requests run CI (build/test) but never deploy, so there
+# are no live side effects until a change lands on main.
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-main
+  cancel-in-progress: false
+
+jobs:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      client: ${{ steps.filter.outputs.client }}
+      worker: ${{ steps.filter.outputs.worker }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            client:
+              - 'client/**'
+            worker:
+              - 'server/worker/**'
+              - 'shared/protocol/**'
+
+  deploy-worker:
+    needs: changes
+    if: needs.changes.outputs.worker == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+          cache-dependency-path: server/worker/pnpm-lock.yaml
+      - name: Install
+        run: pnpm install --frozen-lockfile
+        working-directory: server/worker
+      - name: Deploy Worker
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CF_API_TOKEN }}
+          accountId: ${{ secrets.CF_ACCOUNT_ID }}
+          workingDirectory: server/worker
+          command: deploy
+          secrets: |
+            SENTRY_DSN_WORKER
+        env:
+          SENTRY_DSN_WORKER: ${{ secrets.SENTRY_DSN_WORKER }}
+
+  deploy-pages:
+    needs: changes
+    if: needs.changes.outputs.client == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build landing page
+        run: |
+          mkdir -p public
+          {
+            echo '<!doctype html><html lang="en"><head><meta charset="utf-8">'
+            echo '<title>TankGame</title></head><body>'
+            echo '<h1>TankGame</h1>'
+            echo "<p>Build: ${GITHUB_SHA}</p>"
+            echo "<p><a href=\"https://github.com/${GITHUB_REPOSITORY}/releases/latest\">Latest Android APK</a></p>"
+            echo '</body></html>'
+          } > public/index.html
+      - name: Deploy to Cloudflare Pages
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CF_API_TOKEN }}
+          accountId: ${{ secrets.CF_ACCOUNT_ID }}
+          command: pages deploy public --project-name=${{ secrets.CF_PAGES_PROJECT }} --branch=main
+
+  release-apk:
+    needs: changes
+    if: needs.changes.outputs.client == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: chickensoft-games/setup-godot@v2
+        with:
+          version: 4.6.0
+          use-dotnet: true
+          include-templates: true
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Generate Android debug keystore
+        run: |
+          keytool -keyalg RSA -genkeypair -alias androiddebugkey \
+            -keypass android -keystore debug.keystore -storepass android \
+            -dname "CN=Android Debug,O=Android,C=US" -validity 9999 -deststoretype pkcs12
+      - name: Export Android debug APK
+        env:
+          GODOT_ANDROID_KEYSTORE_DEBUG_PATH: ${{ github.workspace }}/debug.keystore
+          GODOT_ANDROID_KEYSTORE_DEBUG_USER: androiddebugkey
+          GODOT_ANDROID_KEYSTORE_DEBUG_PASSWORD: android
+        run: |
+          mkdir -p build
+          godot --headless --path client --import
+          godot --headless --path client --export-debug "Android" "${{ github.workspace }}/build/tankgame.apk"
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag="build-$(echo "${GITHUB_SHA}" | cut -c1-7)"
+          if gh release view "$tag" >/dev/null 2>&1; then
+            gh release upload "$tag" build/tankgame.apk --clobber
+          else
+            gh release create "$tag" build/tankgame.apk \
+              --title "TankGame $tag" \
+              --notes "Automated build from ${GITHUB_SHA}"
+          fi
+
+  smoke-test:
+    needs: deploy-worker
+    if: needs.deploy-worker.result == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Worker /healthz responds 200
+        run: |
+          code=$(curl -s -o /dev/null -w '%{http_code}' https://tankgame-worker.vodkadav.workers.dev/healthz)
+          echo "healthz -> $code"
+          test "$code" = "200"
