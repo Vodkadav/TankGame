@@ -38,5 +38,8 @@ dev build; 60 fps on the Galaxy A56).
 
 - **T1 — Domain interfaces** ✅ `ITank`, `IProjectile`, `IInputSource`, `IArena` (pure C#,
   `System.Numerics`, no Godot) with xUnit contract tests in `client/tests/Domain/`.
-- T2 sprite import · T3 `Tank` (GameLogic) · T4 `Projectile` · T5/T6 views + arena scene ·
-  T7 keyboard/mouse input · T8 instructions overlay · T9 wire-up · T10 ADR-0003 — pending.
+- **T3 — `Tank` (GameLogic)** ✅ moves at constant speed, faces movement, aims turret;
+  9 xUnit tests in `client/tests/GameLogic/`.
+- **T4 — `Projectile` (GameLogic)** ✅ travels straight, dies on `IArena` hit (snaps to point).
+- T2 sprite import · T5/T6 views + arena scene · T7 keyboard/mouse input ·
+  T8 instructions overlay · T9 wire-up · T10 ADR-0003 — pending.
