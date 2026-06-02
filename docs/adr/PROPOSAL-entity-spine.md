@@ -215,4 +215,4 @@ Interface-first (ADR-0003): the architect defines the Domain contracts first; **
 
 ---
 
-_This proposal is aspirational until S1 is scheduled into a numbered milestone in `development-plan.md` and tracked in `PROGRESS.md`. It refines `feature-roadmap.md` §3 (S1) and §7._
+*This proposal is aspirational until S1 is scheduled into a numbered milestone in `development-plan.md` and tracked in `PROGRESS.md`. It refines `feature-roadmap.md` §3 (S1) and §7.*

@@ -79,6 +79,7 @@ public interface IWorld {
     void Step(float dt);                   // steps all, reaps the dead, resolves combat
 }
 ```
+
 Presentation subscribes once: `EntitySpawned → look up a view scene by entity type →
 instance + bind`. After this, **no new feature edits `ArenaScene`** to appear on
 screen. `Tank` and `Projectile` become `IEntity`s; `ArenaScene` shrinks to "build the
@@ -95,6 +96,7 @@ public interface IProjectileBehaviour {           // one per movement/impact sty
     void Step(ProjectileState s, IArena arena, IWorld world, float dt);
 }
 ```
+
 `StraightBehaviour` (today's logic), `BouncingBehaviour` (reflect on the hit
 **normal**, decrement `Bounces`), `ZigZagBehaviour` (sine offset across travel
 axis), `PiercingBehaviour` (pass through up to `Pierce` walls, damaging each),
@@ -110,6 +112,7 @@ Introduce HP and a single authoritative place where "X damages Y" resolves.
 public interface IDamageable { float Health { get; } void ApplyDamage(in DamageEvent d); }
 public readonly record struct DamageEvent(float Amount, Vector2 Source, DamageKind Kind, Guid? Attacker);
 ```
+
 `World.Step` runs a combat pass: projectile/blast/mine/spike → overlap query →
 `ApplyDamage` → death raises `EntityDespawned`. Everything lethal (ammo, traps,
 drones, turrets, crushers) funnels through this one pass. Foundational for *any*
@@ -123,6 +126,7 @@ expiring modifiers.
 public sealed class Stats { float Base(StatKind k); float Current(StatKind k); }   // base ∘ modifiers
 public sealed record StatusEffect(StatKind Stat, float Mult, float AddFlat, float Seconds);
 ```
+
 Speed boost, over-shield (a temporary `MaxHealth`/damage-absorb modifier), "bigger
 tank" (radius + HP + slower as a tradeoff), EMP (speed→0 for N s), incendiary
 (damage-over-time effect on a `IDamageable`). Powerups become "apply a
@@ -135,6 +139,7 @@ don't reach into reactors. Keep it boring and synchronous.
 ```csharp
 public interface IGameEvents { void Publish<T>(in T e); IDisposable Subscribe<T>(Action<T> h); }
 ```
+
 Drives: button pressed → door opens / drone wave spawns; tank entered wormhole →
 teleport; sensor expired → revoke vision; pickup taken → apply effect + telemetry.
 Also the natural carrier for the `PositionChanged`-style events the fog-of-war work
@@ -150,6 +155,7 @@ public interface IVisionSource { Vector2 Position { get; } float Radius { get; }
 // Tank radius, deployed Sensor (≈10 s), Lookout Tower (large, while occupied),
 // Scout Drone (mobile). Per player, visible = ⋃ sources ∪ memory, minus occluders.
 ```
+
 Hide spots and smoke are **occluders** that *suppress* an entity's visibility to
 others (you vanish from radar/drones while inside, LoL-bush style) unless an enemy
 vision source overlaps you. Thermal-scope / spotter powerups are the counterplay
@@ -163,6 +169,7 @@ feature that updates per tick and can intercept movement, raycasts, or teleports
 ```csharp
 public interface ITerrainFeature { void Step(float dt); }   // door, moving wall, wormhole, conveyor, crusher
 ```
+
 Doors (open on adjacent occupancy or a button event), moving/crusher walls (mutate
 `IWallGrid` blocked-cells over time), wormholes (a linked-pair feature that
 teleports an entity crossing cell A to cell B), conveyor/ice/mud (modify the mover's
@@ -186,7 +193,7 @@ genuinely new *behaviour* needs code in both places — backed by a **shared
 test-vector suite** (same inputs → same outputs, run in both CI jobs) to catch
 drift. The alternative (dual hand-coded impls) is faster for the first three
 features and quietly lethal by the thirtieth. This deserves its own ADR before M5
-content work starts in earnest. _Flagged, not decided._
+content work starts in earnest. *Flagged, not decided.*
 
 ---
 
@@ -322,5 +329,5 @@ S1–S7 exist — that's the whole point of front-loading the systems.
 
 ---
 
-_This roadmap is aspirational. Nothing here is committed until it appears as
-scheduled tickets in `development-plan.md` and as status in `PROGRESS.md`._
+*This roadmap is aspirational. Nothing here is committed until it appears as
+scheduled tickets in `development-plan.md` and as status in `PROGRESS.md`.*
