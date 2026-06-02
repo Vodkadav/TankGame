@@ -42,7 +42,7 @@ jobs:
           version: 11
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: pnpm
           cache-dependency-path: server/worker/pnpm-lock.yaml
       - name: Install
@@ -84,49 +84,10 @@ jobs:
           accountId: ${{ secrets.CF_ACCOUNT_ID }}
           command: pages deploy public --project-name=${{ secrets.CF_PAGES_PROJECT }} --branch=main
 
-  release-apk:
-    needs: changes
-    if: needs.changes.outputs.client == 'true'
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-    steps:
-      - uses: actions/checkout@v4
-      - uses: chickensoft-games/setup-godot@v2
-        with:
-          version: 4.6.0
-          use-dotnet: true
-          include-templates: true
-      - uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: '17'
-      - name: Generate Android debug keystore
-        run: |
-          keytool -keyalg RSA -genkeypair -alias androiddebugkey \
-            -keypass android -keystore debug.keystore -storepass android \
-            -dname "CN=Android Debug,O=Android,C=US" -validity 9999 -deststoretype pkcs12
-      - name: Export Android debug APK
-        env:
-          GODOT_ANDROID_KEYSTORE_DEBUG_PATH: ${{ github.workspace }}/debug.keystore
-          GODOT_ANDROID_KEYSTORE_DEBUG_USER: androiddebugkey
-          GODOT_ANDROID_KEYSTORE_DEBUG_PASSWORD: android
-        run: |
-          mkdir -p build
-          godot --headless --path client --import
-          godot --headless --path client --export-debug "Android" "${{ github.workspace }}/build/tankgame.apk"
-      - name: Publish GitHub Release
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          tag="build-$(echo "${GITHUB_SHA}" | cut -c1-7)"
-          if gh release view "$tag" >/dev/null 2>&1; then
-            gh release upload "$tag" build/tankgame.apk --clobber
-          else
-            gh release create "$tag" build/tankgame.apk \
-              --title "TankGame $tag" \
-              --notes "Automated build from ${GITHUB_SHA}"
-          fi
+  # NOTE: the Android APK GitHub Release is deferred until the .NET→Android Gradle
+  # export path is set up (see the client-build note in ci.yml). Until then no APK
+  # is published; the landing page's "Latest APK" link will 404 until the first
+  # release exists.
 
   smoke-test:
     needs: deploy-worker

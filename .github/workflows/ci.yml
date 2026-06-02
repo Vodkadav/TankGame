@@ -56,40 +56,22 @@ jobs:
       - name: NetArchTest layer rules
         run: dotnet test client/tests/Architecture/TankGame.Tests.Architecture.csproj -c Debug
 
+  # Compile check only. The Android APK export is deferred: Godot 4.6 treats
+  # .NET→Android export as experimental and blocks the prebuilt-template path
+  # ("Exporting to Android when using C#/.NET is experimental"). Producing the APK
+  # needs the Gradle custom-build path (Android SDK/NDK + `dotnet workload android`
+  # + an in-project android/build template) — tracked as a follow-up.
   client-build:
     needs: changes
     if: needs.changes.outputs.client == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: chickensoft-games/setup-godot@v2
+      - uses: actions/setup-dotnet@v4
         with:
-          version: 4.6.0
-          use-dotnet: true
-          include-templates: true
-      - uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: '17'
-      - name: Generate Android debug keystore
-        run: |
-          keytool -keyalg RSA -genkeypair -alias androiddebugkey \
-            -keypass android -keystore debug.keystore -storepass android \
-            -dname "CN=Android Debug,O=Android,C=US" -validity 9999 -deststoretype pkcs12
-      - name: Export Android debug APK
-        env:
-          GODOT_ANDROID_KEYSTORE_DEBUG_PATH: ${{ github.workspace }}/debug.keystore
-          GODOT_ANDROID_KEYSTORE_DEBUG_USER: androiddebugkey
-          GODOT_ANDROID_KEYSTORE_DEBUG_PASSWORD: android
-        run: |
-          mkdir -p build
-          godot --headless --path client --import
-          godot --headless --path client --export-debug "Android" "${{ github.workspace }}/build/tankgame.apk"
-      - uses: actions/upload-artifact@v4
-        with:
-          name: client-apk
-          path: build/tankgame.apk
-          if-no-files-found: error
+          dotnet-version: '9.0.x'
+      - name: Build client
+        run: dotnet build client/TankGame.csproj -c Debug
 
   worker-test:
     needs: changes
@@ -102,7 +84,7 @@ jobs:
           version: 11
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: pnpm
           cache-dependency-path: server/worker/pnpm-lock.yaml
       - name: Install
