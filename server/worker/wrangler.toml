@@ -4,9 +4,8 @@ compatibility_date = "2026-05-21"
 # Required by @sentry/cloudflare (AsyncLocalStorage).
 compatibility_flags = ["nodejs_compat"]
 
-# Secrets — set at deploy time via `wrangler secret put` (M0-T6).
-# DO NOT commit a real DSN value here.
+# SENTRY_DSN_WORKER is a Worker SECRET, set at deploy time (M0-T6):
 #   wrangler secret put SENTRY_DSN_WORKER
-# Tests inject a stub value via miniflare bindings (see vitest.config.ts).
-[vars]
-SENTRY_DSN_WORKER = ""
+# It is intentionally NOT declared as a [vars] binding — a var and a secret of the
+# same name collide ("Binding name already in use"). Tests inject a stub value via
+# miniflare bindings (see vitest.config.ts).

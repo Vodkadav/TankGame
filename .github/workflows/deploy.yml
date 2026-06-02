@@ -32,6 +32,9 @@ jobs:
       - name: Install
         run: pnpm install --frozen-lockfile
         working-directory: server/worker
+      # Deploy first: with SENTRY_DSN_WORKER no longer a [vars] binding, this
+      # clears any stale var of that name, so the secret upload below cannot
+      # collide with it.
       - name: Deploy Worker
         uses: cloudflare/wrangler-action@v3
         with:
@@ -39,10 +42,14 @@ jobs:
           accountId: ${{ secrets.CF_ACCOUNT_ID }}
           workingDirectory: server/worker
           command: deploy
-          secrets: |
-            SENTRY_DSN_WORKER
+      - name: Set Worker secret
+        working-directory: server/worker
         env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
           SENTRY_DSN_WORKER: ${{ secrets.SENTRY_DSN_WORKER }}
+        run: |
+          printf '%s' "$SENTRY_DSN_WORKER" | pnpm exec wrangler secret put SENTRY_DSN_WORKER
 
   deploy-pages:
     runs-on: ubuntu-latest
