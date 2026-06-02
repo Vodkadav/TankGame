@@ -106,6 +106,7 @@ public class LayerRulesTests
             .Where(t => !t.IsNested)
             .Where(t => !IsCompilerGenerated(t))
             .Where(t => !IsGodotSdkInjected(t.Namespace))
+            .Where(t => !IsTestType(t.Namespace))
             .Where(t => !LivesInKnownLayer(t.Namespace))
             .Select(t => $"{t.FullName} (namespace: {t.Namespace ?? "<null>"})")
             .OrderBy(s => s)
@@ -143,6 +144,16 @@ public class LayerRulesTests
     {
         return ns is not null
             && ns.StartsWith("GodotPlugins", System.StringComparison.Ordinal);
+    }
+
+    // GoDotTest scene tests (TankGame.Tests.*) are compiled into the game assembly
+    // for debug/editor builds so GoDotTest can reflect over them at runtime (see
+    // Bootstrap.cs and ADR-0001). They are test code, not production types, and are
+    // excluded from ExportRelease — so they are exempt from the layer taxonomy.
+    private static bool IsTestType(string? ns)
+    {
+        return ns is not null
+            && ns.StartsWith("TankGame.Tests", System.StringComparison.Ordinal);
     }
 
     private static string FormatFailure(string layer, System.Collections.Generic.IEnumerable<string>? failing)

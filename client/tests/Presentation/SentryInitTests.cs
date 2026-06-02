@@ -27,13 +27,15 @@ public class SentryInitTests : TestClass
             SentrySdk.Close();
         }
 
-        System.Environment.SetEnvironmentVariable(EnvVarName, null);
+        OS.UnsetEnvironment(EnvVarName);
     }
 
     [Test]
     public void SentrySdk_IsEnabled_WhenDsnEnvVarSet()
     {
-        System.Environment.SetEnvironmentVariable(EnvVarName, StubDsn);
+        // Godot's OS env API, not System.Environment: MainScene reads via
+        // OS.GetEnvironment, and the two stores are not shared on Linux.
+        OS.SetEnvironment(EnvVarName, StubDsn);
 
         _scene = GD.Load<PackedScene>("res://Main.tscn").Instantiate();
         TestScene.AddChild(_scene);
@@ -49,7 +51,7 @@ public class SentryInitTests : TestClass
     [Test]
     public void SentrySdk_StaysDisabled_WhenDsnEnvVarMissing()
     {
-        System.Environment.SetEnvironmentVariable(EnvVarName, null);
+        OS.UnsetEnvironment(EnvVarName);
 
         _scene = GD.Load<PackedScene>("res://Main.tscn").Instantiate();
         TestScene.AddChild(_scene);
