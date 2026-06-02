@@ -56,11 +56,9 @@ jobs:
       - name: NetArchTest layer rules
         run: dotnet test client/tests/Architecture/TankGame.Tests.Architecture.csproj -c Debug
 
-  # Compile check only. The Android APK export is deferred: Godot 4.6 treats
-  # .NET→Android export as experimental and blocks the prebuilt-template path
-  # ("Exporting to Android when using C#/.NET is experimental"). Producing the APK
-  # needs the Gradle custom-build path (Android SDK/NDK + `dotnet workload android`
-  # + an in-project android/build template) — tracked as a follow-up.
+  # Compile check only on PRs (fast). The full Android debug APK export runs on
+  # merge to main in deploy.yml (release-apk) via the Gradle custom-build path —
+  # too slow to run on every PR. This job catches compile breakage before merge.
   client-build:
     needs: changes
     if: needs.changes.outputs.client == 'true'

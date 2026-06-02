@@ -2,6 +2,8 @@
 .godot/
 *.import
 mono/
+# Gradle custom-build template — installed fresh per-build (CI: --install-android-build-template)
+client/android/
 
 # .NET
 bin/
