@@ -48,8 +48,8 @@ dev build; 60 fps on the Galaxy A56).
   sprites rotate with chassis/aim; GoDotTest verifies load + model mirroring.
 - **T7 — `KeyboardMouseInputSource`** ✅ WASD move, mouse aim (vs viewport centre),
   click/space fire; pure `ReadMove`/`ComputeAim` helpers with xUnit tests.
-- **T9 — drivable wiring** ✅ `Arena.tscn`/`ArenaScene` builds input + `Tank` + `TankView`
-  + a following `Camera2D`. App-init (Sentry, translations) moved to `Bootstrap`; the M0
+- **T9 — drivable wiring** ✅ `Arena.tscn`/`ArenaScene` builds the input source, a `Tank`,
+  a `TankView`, and a following `Camera2D`. App-init (Sentry, translations) moved to `Bootstrap`; the M0
   boot-label scene (`Main.tscn`/`MainScene`) is retired (Sentry test now targets
   `SentryBootstrap`). **The tank is drivable** — launch via the desktop shortcut.
 - Remaining M1: projectile rendering (T4 view) + firing, Arena walls + collision (T6),
