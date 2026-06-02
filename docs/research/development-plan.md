@@ -5,7 +5,7 @@ Date: 2026-05-21
 Owner: @architect
 Inputs: signed-off `decisions.md` + research slices A–E
 Audience: solo dev + parallelised specialist agents
-Revision: **2026-05-22** — M0 retargeted web→Android (Godot 4.6 .NET has no web/HTML5 export). M1–M8 web assumptions flagged **superseded** — see the banner before the M1 section; an `@architect` web→Android revision pass is due before M1 kickoff.
+Revision: **2026-06-02** — web→Android revision pass complete. M0 shipped (CI/CD live; Worker + Pages + Android `canary` APK). M1–M8 definitions of done retargeted from web/HTML5 to **Android APK + desktop dev build** (see the note before the M1 section); the C# architecture and milestone sequence are unchanged. (Prior: 2026-05-22 — M0 web→Android retarget.)
 
 ## User answers to the 7 F2 open items (2026-05-21)
 
@@ -33,7 +33,7 @@ Revision: **2026-05-22** — M0 retargeted web→Android (Godot 4.6 .NET has no 
 
 This plan translates the user-signed-off decisions matrix into a parallelisable, CI/CD-first roadmap. Every milestone after M0 produces something the user can play. Every ticket is PR-sized (XS/S/M/L), independently mergeable, and auto-deploys on merge.
 
-The core operational rule: **main = prod. Every merge ships. Every PR gets a preview URL.** If a ticket cannot be shipped behind a feature flag in under a day, it is too big — split it.
+The core operational rule: **main = prod. Every merge ships** (the Worker + Pages landing page deploy; the Android APK publishes to the `canary` release). **Every PR gets a Pages landing-page preview and a downloadable APK build artifact.** If a ticket cannot be shipped behind a feature flag in under a day, it is too big — split it.
 
 ---
 
@@ -45,17 +45,17 @@ The core operational rule: **main = prod. Every merge ships. Every PR gets a pre
 
 No netcode. No labyrinth. No enemies. No UI beyond "press WASD". No menu. The Godot project boots, a 64-px tank sprite is on screen, it moves, it fires, the projectile collides. That's the end of M1.
 
-This is opinionated on purpose: the user has a hard "send a link to friends" goal, and the cheapest way to validate the engine + asset + build + deploy stack end-to-end is a single-tank single-player demo on the live URL. Multiplayer joins at M3, not M1 — premature netcode is the single biggest schedule risk in this kind of project.
+This is opinionated on purpose: the user has a hard "send a link to friends" goal, and the cheapest way to validate the engine + asset + build + deploy stack end-to-end is a single-tank single-player demo shipped as the canary Android APK (installable on the Galaxy A56, also runnable as a desktop dev build). Multiplayer joins at M3, not M1 — premature netcode is the single biggest schedule risk in this kind of project.
 
 ### Next 5 minimum increments after MVP
 
-Each is independently demoable on the live URL:
+Each is independently demoable from the latest build (canary APK on the Galaxy A56, or the desktop dev build):
 
 1. **Static labyrinth** — replace empty arena with a hand-authored TileMapLayer maze. Player navigates corridors. Projectile collides with tilemap.
 2. **Destructible walls** — brick tiles take N hits then break and turn into floor. Steel tiles do not break. (Battle City legibility model.)
 3. **Second local player on same keyboard (couch co-op)** — proves the Player abstraction is generic before netcode forces it. Throwaway-but-cheap.
 4. **Networked 2-player same-arena via one Durable Object** — first online milestone. Lobby code hardcoded for now.
-5. **Lobby code + invite link flow** — friend opens URL, types code, joins. The "send a URL" promise is now live.
+5. **Lobby code + invite link flow** — friend installs the APK (shared via the release link), types the code, joins. The "send a link to friends" promise is now live.
 
 After increment 5, all subsequent work (powerups, enemies, auth, progression, ranked) is additive — the core loop is proven, the deploy pipeline is live, and the architecture has been stress-tested by real netcode.
 
@@ -94,7 +94,7 @@ Cadence target: M0 in days 1–2, M1 within a week of M0, M2–M3 within the fir
 | M0-T4 | NetArchTest project (`client/tests/Architecture/`) asserting layer rules: Domain → no deps; GameLogic → Domain only; Data → Domain only; Infrastructure → Domain+GameLogic+Data; Presentation → GameLogic+Domain. Test-first: write five failing tests then create the empty namespaces. | @architect | S | M0-T3 | M0-T5, M0-T6 |
 | M0-T5 | GitHub Actions workflow `ci.yml` — triggered on PR and push to main; jobs: `worker-test` (path filter `server/worker/**`), `client-build` (path filter `client/**`, exports a Godot Android debug APK), `arch-test` (path filter `client/**`). Test-first: workflow lint via `actionlint`. | @devops | M | M0-T2, M0-T3, M0-T4 | M0-T6, M0-T7 |
 | M0-T6 | GitHub Actions workflow `deploy.yml` — on push to main and PR sync: deploys the Worker via `wrangler deploy`; deploys a static Cloudflare Pages landing page; publishes the Android APK to a GitHub Release on main (Actions artifact on PRs). Secrets via `secrets.CF_API_TOKEN` / `secrets.CF_ACCOUNT_ID` (GitHub Actions secrets — per `sec-no-hardcoded-secrets`); the APK release uses the built-in `GITHUB_TOKEN`. | @devops | M | M0-T5 | M0-T7 |
-| M0-T7 | i18n bootstrap — `client/i18n/strings.csv` with three columns (`en`, `es`, `dk`), one row (`m0.boot_label = "TankGame M0" / "TankGame M0" / "TankGame M0"`), Godot translation import config, language autoselect from browser locale. Test-first: GoDotTest asserts `tr("m0.boot_label")` returns the right string when locale is forced. | @i18n | S | M0-T3 | M0-T4, M0-T5, M0-T6 |
+| M0-T7 | i18n bootstrap — `client/i18n/strings.csv` with three columns (`en`, `es`, `dk`), one row (`m0.boot_label = "TankGame M0" / "TankGame M0" / "TankGame M0"`), Godot translation import config, language autoselect from the device/OS locale. Test-first: GoDotTest asserts `tr("m0.boot_label")` returns the right string when locale is forced. | @i18n | S | M0-T3 | M0-T4, M0-T5, M0-T6 |
 | M0-T8 | ADR-0001 `docs/adr/0001-layered-architecture.md` recording the layered-client decision. Use `templates/adr-template.md`. | @architect | XS | M0-T4 | all others |
 | M0-T9 | ADR-0002 `docs/adr/0002-monorepo-and-cicd.md` recording the monorepo + GitHub Actions + Cloudflare deploy decision. | @architect | XS | M0-T6 | all others |
 | M0-T10 | Pre-commit hook `hooks/no-secrets-scan.sh` wired via `scripts/install-hooks.ps1`. Test-first: bats test confirms a staged file containing `password = "abc"` is rejected. | @security | S | M0-T1 | M0-T2..T9 |
@@ -112,14 +112,16 @@ Cadence target: M0 in days 1–2, M1 within a week of M0, M2–M3 within the fir
 
 ---
 
-> **⚠ Superseded — web→Android (2026-05-22).** Godot 4.6 stable's .NET build cannot
-> export to web/HTML5 (the mono export templates ship no web template; see Godot issue
-> #70796 — .NET web export is prototype-only). M0 above was revised to deploy an Android
-> APK. **M1–M8 below still describe a browser/HTML5 product** — "open the prod URL",
-> "Chromium browser", "60 fps on a laptop browser", the cross-device tests in M3, the
-> invite-link flow in M4, and risk R1 (HTML5 cold-load) are all **superseded** pending an
-> `@architect` web→Android revision pass due before M1 kickoff. Until that pass lands,
-> treat M1–M8 DoDs (and §1's "live URL" language) as Android/desktop targets, not web.
+> **Revised — web→Android (revision pass 2026-06-02).** Godot 4.6 stable's .NET build
+> cannot export to web/HTML5 (the mono export templates ship no web template; see Godot
+> issue #70796 — .NET web export is prototype-only). The product target is an **Android
+> APK** (installed on the Galaxy A56) plus a **desktop dev build** for fast local
+> iteration. The M1–M8 definitions of done below have been retargeted accordingly:
+> "open the prod URL" → "install the canary APK / launch the desktop build"; "laptop
+> browser, 60 fps" → "60 fps on the Galaxy A56"; "two browsers" → "two devices"; the M4
+> invite flow shares the APK/lobby code rather than a playable web URL; risk R1 is
+> replaced by the APK-size / on-device-fps risk. The Cloudflare Pages URL remains real
+> as the **landing page** (build SHA + APK download link), not a playable game surface.
 > The C# layered architecture and the milestone *sequence* are unaffected.
 
 ### M1 — One tank, empty arena, moves and shoots (local)
@@ -127,12 +129,12 @@ Cadence target: M0 in days 1–2, M1 within a week of M0, M2–M3 within the fir
 **Goal:** the ASAP-MVP artifact. A single locally-controlled tank in an empty room with placeholder walls. Press WASD to move, mouse to aim, space/click to fire one projectile that collides and despawns.
 
 **Definition of done:**
-- Open prod URL → see arena → drive tank → fire projectile → projectile hits wall and despawns.
-- 60 fps on a mid-tier laptop browser (Chromium-based).
+- Install the canary APK (or launch the desktop dev build) → see arena → drive tank → fire projectile → projectile hits wall and despawns.
+- 60 fps on the Galaxy A56 (the target device); the desktop build is for fast iteration only.
 - All inputs go through an `IInputSource` interface (Domain) so we can swap a network input source later without touching tank code.
 - All UI strings (instructions overlay) exist in EN+ES+DK.
 
-**What auto-deploys:** Every merge auto-ships. The live URL becomes the demo from this milestone onward.
+**What auto-deploys:** Every merge auto-ships. The `canary` APK becomes the playable demo from this milestone onward (the Pages landing page links to it).
 
 **Non-goals:** Labyrinth tiling, destructible walls, multiplayer, audio, menus, scoreboards, multiple tanks.
 
@@ -166,8 +168,8 @@ Cadence target: M0 in days 1–2, M1 within a week of M0, M2–M3 within the fir
 **Goal:** replace the empty box with a hand-authored maze. Brick walls take 3 hits and break; steel walls don't break.
 
 **Definition of done:**
-- Open prod URL → enter a corridor maze → shoot a brick wall, hear nothing (audio is M5), see the wall progress through damage states and turn into floor → shoot steel, it doesn't break.
-- 60 fps with the full tilemap rendered.
+- Launch the build (canary APK / desktop) → enter a corridor maze → shoot a brick wall, hear nothing (audio is M5), see the wall progress through damage states and turn into floor → shoot steel, it doesn't break.
+- 60 fps on the Galaxy A56 with the full tilemap rendered.
 - Maze is loaded from a single hand-authored TileMap resource — no procedural generation yet.
 
 **What auto-deploys:** as before — every merge ships.
@@ -199,10 +201,10 @@ Cadence target: M0 in days 1–2, M1 within a week of M0, M2–M3 within the fir
 
 ### M3 — 2-player real-time via a single Durable Object
 
-**Goal:** two browsers, same maze, both tanks moving in real time over WebSocket with server-authoritative simulation, client prediction, and reconciliation.
+**Goal:** two devices, same maze, both tanks moving in real time over WebSocket with server-authoritative simulation, client prediction, and reconciliation.
 
 **Definition of done:**
-- User opens prod URL on laptop → clicks "Host" → gets hardcoded lobby `TEST01` → opens prod URL on phone → types `TEST01` → both tanks visible to each other → both can move and shoot → walls break for both.
+- User launches the build on a desktop → clicks "Host" → gets hardcoded lobby `TEST01` → launches the APK on the phone → types `TEST01` → both tanks visible to each other → both can move and shoot → walls break for both.
 - Server tick 20 Hz. Snapshot delta + client prediction. Reconciliation snaps on disagreement.
 - One Durable Object per lobby code; KV maps code→DO id.
 - Cheat surface: server clamps speed and fire-rate; XP is unused this milestone but the structure for "server-only" awards is in.
@@ -233,7 +235,7 @@ Cadence target: M0 in days 1–2, M1 within a week of M0, M2–M3 within the fir
 - Wave 3: M3-T4 (@devops), M3-T5 (@domain) — sequential within domain but parallel with each other.
 - Wave 4: M3-T7 (@domain), M3-T8 (@platform), M3-T9 (@i18n).
 
-**Demo:** "I can play against my partner from the next room — different browsers, same maze, real-time, walls breaking for both."
+**Demo:** "I can play against my partner from the next room — different devices (her phone, my desktop), same maze, real-time, walls breaking for both."
 
 ---
 
@@ -243,8 +245,8 @@ Cadence target: M0 in days 1–2, M1 within a week of M0, M2–M3 within the fir
 
 **Definition of done:**
 - Home screen has "Create lobby" + "Join with code" + region selector (EU/US/AP).
-- Creating a lobby shows a 6-char code and an invite link `tankgame.example/j/ABCDEF`.
-- Opening the invite link in a fresh browser prefills the code.
+- Creating a lobby shows a 6-char code and a shareable invite link `tankgame.example/j/ABCDEF`.
+- Opening the invite link on a device with the app installed deep-links straight into the lobby (Android App Link) with the code prefilled; without the app, the link's landing page offers the APK download.
 - Codes expire after 24 h (KV TTL).
 
 **What auto-deploys:** as before.
@@ -255,7 +257,7 @@ Cadence target: M0 in days 1–2, M1 within a week of M0, M2–M3 within the fir
 
 **Parallelization map (M4):** @platform owns UI scenes (3 tickets in parallel by different agents on different scenes); @devops owns Worker routing; @i18n owns strings; @architect owns the ADR.
 
-**Demo:** "Send my partner the URL on Discord, she clicks, she joins."
+**Demo:** "Send my partner the invite link on Discord — she taps it, the app opens straight into my lobby (or offers the APK if she hasn't installed it yet), she joins."
 
 ---
 
@@ -616,7 +618,7 @@ A merge to main triggers an additional gate: a post-merge smoke test on prod. If
 
 | # | Risk | Likelihood | Impact | Mitigation |
 |---|---|---|---|---|
-| R1 | **[SUPERSEDED 2026-05-22 — web→Android pivot; see the banner before M1]** Godot HTML5 cold-load is unacceptable on mobile (raised in `tech-stack.md`'s "one realistic risk"). If a 25-40 MB gzipped bundle takes 15 s on a 4G phone, the "send a link to friends" flow dies. | Medium | High | Streamed-bundle cold-load no longer applies to an installed APK. The `@architect` revision pass replaces R1 with the equivalent APK-download-size / on-device-fps risk; M1-T9 keeps the on-device measurement step on the Galaxy A56. |
+| R1 | **APK size / on-device performance** (replaces the retired HTML5 cold-load risk, 2026-06-02). The .NET game ships as an installed APK, so streamed cold-load no longer applies; the M0 debug APK is already ~79 MB. Risks now: download/install friction over mobile data, and sustaining 60 fps on the Galaxy A56. | Medium | Medium | Track APK size each release (debug is inflated; an ExportRelease + R8/trim pass shrinks it later); keep the on-device fps measurement step in M1-T9 on the Galaxy A56; the "send a link to friends" flow is the invite-link → install-or-deep-link path (M4). |
 | R2 | **DO request quota blown by inefficient tick batching** (multiplayer-hosting.md §4). At 1M DO requests/month free and 1200 req/min/match, a few enthusiastic days of testing can chew through the budget. | Medium | High | M3-T11 lands the budget alarm before M3-T8 hits prod. Default tick is 20 Hz on M3 staging; if alarm fires, drop to 10 Hz on prod and raise an ADR. |
 | R3 | **Parallel agents write conflicting Domain interfaces** because @architect is a bottleneck. | Medium | Medium | Enforce the rule: only @architect creates files under `client/src/Domain/`. Other agents propose interface changes via an ADR amendment PR that @architect must approve first. |
 | R4 | **Architecture test rots into a no-op** because new namespaces aren't covered. | Medium | Medium | The arch test asserts a complete-coverage rule: every type in the assembly must be in one of the 5 known namespaces; an "untagged" type fails the build. Forces every new module to be classified explicitly. |
