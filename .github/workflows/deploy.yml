@@ -77,6 +77,14 @@ jobs:
             echo "<p><a href=\"https://github.com/${GITHUB_REPOSITORY}/releases/latest\">Latest Android APK</a></p>"
             echo '</body></html>'
           } > public/index.html
+      - name: Ensure the Pages project exists (idempotent)
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
+          PROJECT: ${{ secrets.CF_PAGES_PROJECT }}
+        run: |
+          # create-on-first-run; a no-op (non-zero, ignored) once it exists.
+          npx --yes wrangler@3 pages project create "$PROJECT" --production-branch=main || true
       - name: Deploy to Cloudflare Pages
         uses: cloudflare/wrangler-action@v3
         with:
