@@ -1,4 +1,4 @@
-<Project Sdk="Godot.NET.Sdk/4.6.0">
+<Project Sdk="Godot.NET.Sdk/4.6.2">
 
   <PropertyGroup>
     <TargetFramework>net9.0</TargetFramework>
@@ -7,6 +7,11 @@
     <Nullable>enable</Nullable>
     <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
     <Version>0.1.0</Version>
+    <!-- Debug only: copy NuGet runtime deps (GoDotTest, Sentry) into the build output
+         so Godot's .NET host loads them when running headless tests. Without this only
+         TankGame.dll is emitted and dependent assemblies fail to load at runtime. The
+         Export* configs bundle deps via Godot's export, so leave them untouched. -->
+    <CopyLocalLockFileAssemblies Condition="'$(Configuration)' == 'Debug'">true</CopyLocalLockFileAssemblies>
   </PropertyGroup>
 
   <ItemGroup>
@@ -15,6 +20,14 @@
 
   <ItemGroup>
     <PackageReference Include="Sentry" Version="6.5.0" />
+  </ItemGroup>
+
+  <!-- GoDotTest scene tests run inside the game assembly (GoDotTest reflects over
+       the executing assembly), so they compile in for editor/debug builds and are
+       excluded from ExportRelease. The runner entry is Bootstrap.cs (#if DEBUG). -->
+  <ItemGroup Condition="'$(Configuration)' != 'ExportRelease'">
+    <PackageReference Include="Chickensoft.GoDotTest" Version="2.0.34" />
+    <Compile Include="tests/Presentation/**/*.cs" />
   </ItemGroup>
 
 </Project>

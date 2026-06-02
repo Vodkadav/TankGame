@@ -28,7 +28,10 @@ one-directional dependency rule:
 
 The rule is enforced by NetArchTest in `client/tests/Architecture/LayerRulesTests.cs`,
 with a coverage guard asserting every `TankGame.*` type lives in one of the five
-layers.
+layers. `TankGame.Tests.*` types are exempt from the guard: the GoDotTest scene
+tests are compiled into the game assembly for debug/editor builds (so GoDotTest can
+reflect over them via the `--run-tests` entry in `Bootstrap.cs`) and excluded from
+`ExportRelease` — they are test code, not production types.
 
 **Composition root.** Presentation (the Godot scene scripts) is the composition
 root: it MAY reference Infrastructure to wire concrete implementations — e.g.

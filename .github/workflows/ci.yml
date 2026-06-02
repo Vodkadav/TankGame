@@ -12,13 +12,6 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
-# NOTE: the GoDotTest scene tests (client/tests/TankGame.Tests.csproj:
-# MainSceneTests / LocaleTests / SentryInitTests) are NOT run here yet. They live
-# in a separate assembly that Godot does not load at runtime, and that assembly
-# references TankGame (so the game project cannot reference it back). Running them
-# headless needs a test-layout change (single project + a --run-tests entry, the
-# Chickensoft pattern) — tracked as a follow-up. NetArchTest below DOES run.
-
 jobs:
   changes:
     runs-on: ubuntu-latest
@@ -56,10 +49,12 @@ jobs:
       - name: NetArchTest layer rules
         run: dotnet test client/tests/Architecture/TankGame.Tests.Architecture.csproj -c Debug
 
-  # Compile check only on PRs (fast). The full Android debug APK export runs on
-  # merge to main in deploy.yml (release-apk) via the Gradle custom-build path —
-  # too slow to run on every PR. This job catches compile breakage before merge.
-  client-build:
+  # Compiles the client (fast-fail compile gate) and runs the GoDotTest scene
+  # tests headless inside a real Godot process via the --run-tests entry in
+  # Bootstrap.cs. --quit-on-finish makes GoDotTest set the process exit code from
+  # the result, so a failing test fails the job. The full Android APK export runs
+  # only on merge to main (deploy.yml) — too slow for every PR.
+  godot-tests:
     needs: changes
     if: needs.changes.outputs.client == 'true'
     runs-on: ubuntu-latest
@@ -68,8 +63,17 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '9.0.x'
+      - uses: chickensoft-games/setup-godot@v2
+        with:
+          version: 4.6.2
+          use-dotnet: true
+          include-templates: true
       - name: Build client
         run: dotnet build client/TankGame.csproj -c Debug
+      - name: Import resources
+        run: godot --headless --path client --import
+      - name: Run GoDotTest scene tests
+        run: godot --headless --path client --run-tests --quit-on-finish
 
   worker-test:
     needs: changes
