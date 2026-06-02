@@ -20,12 +20,13 @@ We keep a single monorepo with top-level `client/`, `server/`, `shared/`, `docs/
 
 - A Docs CI (`.github/workflows/docs.yml`) validates markdown, internal links, and
   ADR section structure on every push and PR.
-- A build/test CI (`ci.yml`, M0-T5) runs path-filtered jobs: lint, NetArchTest,
-  Godot client tests (headless GoDotTest), the Android debug APK export, and Worker
-  tests.
+- A build/test CI (`ci.yml`, M0-T5) runs path-filtered jobs: lint, NetArchTest, a
+  Godot client compile check, and Worker tests. The Android APK export is too slow
+  for every PR, so PRs get the compile check and the full export runs on `main`.
 - A deploy workflow (`deploy.yml`, M0-T6) ships on merge to `main`: the Worker via
-  Wrangler, a static landing page via Cloudflare Pages, and the Android APK to a
-  GitHub Release. Pull requests get a Pages preview.
+  Wrangler, a static landing page via Cloudflare Pages, and the Android debug APK
+  (built via the Gradle custom-build path, debug-signed) to a rolling `canary`
+  GitHub Release.
 
 All secrets live in GitHub Actions secrets (and `wrangler secret` for Worker
 runtime); none are committed. A pre-commit hook scans staged files for secrets.

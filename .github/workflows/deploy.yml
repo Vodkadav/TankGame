@@ -81,10 +81,84 @@ jobs:
           accountId: ${{ secrets.CF_ACCOUNT_ID }}
           command: pages deploy public --project-name=${{ secrets.CF_PAGES_PROJECT }} --branch=main
 
-  # NOTE: the Android APK GitHub Release is deferred until the .NET→Android Gradle
-  # export path is set up (see the client-build note in ci.yml). Until then no APK
-  # is published; the landing page's "Latest APK" link will 404 until the first
-  # release exists.
+  # Builds the Android debug APK via the .NET→Android Gradle custom-build path and
+  # publishes it to a rolling "canary" GitHub Release (the landing page links to
+  # releases/latest). Debug-signed with a generated standard debug keystore, so no
+  # signing secret is needed. arm64-v8a only — C#/.NET Android supports arm64/x86_64
+  # (the preset drops armeabi-v7a, which .NET cannot target).
+  release-apk:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0.x'
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+      - name: Install Android SDK packages
+        run: |
+          sdkmanager --install \
+            "platform-tools" \
+            "build-tools;35.0.1" \
+            "platforms;android-35" \
+            "ndk;28.1.13356709" \
+            "cmake;3.10.2.4988404"
+      - name: Set up Godot (.NET) + export templates
+        uses: chickensoft-games/setup-godot@v2
+        with:
+          version: 4.6.2
+          use-dotnet: true
+          include-templates: true
+      - name: Generate debug keystore
+        run: |
+          mkdir -p "$HOME/.android"
+          "$JAVA_HOME/bin/keytool" -keyalg RSA -genkeypair \
+            -alias androiddebugkey -keypass android \
+            -keystore "$HOME/.android/debug.keystore" -storepass android \
+            -dname "CN=Android Debug,O=Android,C=US" -validity 9999
+      - name: Configure Godot Android editor settings
+        run: |
+          mkdir -p "$HOME/.config/godot"
+          cat > "$HOME/.config/godot/editor_settings-4.6.tres" <<EOF
+          [gd_resource type="EditorSettings" format=3]
+
+          [resource]
+          export/android/android_sdk_path = "$ANDROID_SDK_ROOT"
+          export/android/java_sdk_path = "$JAVA_HOME"
+          export/android/debug_keystore = "$HOME/.android/debug.keystore"
+          export/android/debug_keystore_user = "androiddebugkey"
+          export/android/debug_keystore_pass = "android"
+          EOF
+      - name: Import resources
+        run: godot --headless --path client --import
+      - name: Export debug APK
+        run: |
+          mkdir -p build
+          godot --headless --path client \
+            --install-android-build-template \
+            --export-debug "Android" "$GITHUB_WORKSPACE/build/tankgame-debug.apk"
+      - name: Verify APK
+        run: |
+          test -f build/tankgame-debug.apk
+          size=$(stat -c%s build/tankgame-debug.apk)
+          echo "APK size: ${size} bytes"
+          test "$size" -gt 1000000
+          unzip -l build/tankgame-debug.apk | grep -q AndroidManifest.xml
+      - name: Publish to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: canary
+          name: Canary (latest main)
+          body: Automated Android debug build from main @ ${{ github.sha }}.
+          files: build/tankgame-debug.apk
+          make_latest: true
+          fail_on_unmatched_files: true
 
   smoke-test:
     needs: deploy-worker
