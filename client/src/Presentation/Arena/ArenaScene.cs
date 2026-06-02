@@ -1,3 +1,4 @@
+using System;
 using Godot;
 using TankGame.GameLogic;
 using TankGame.Infrastructure;
@@ -5,27 +6,69 @@ using NVector2 = System.Numerics.Vector2;
 
 namespace TankGame.Presentation;
 
-/// <summary>M1 play scene root and composition root for gameplay: builds a keyboard/mouse
-/// input source and a <see cref="Tank"/>, instances a <see cref="TankView"/> to render it,
-/// and parents a camera to the view so the tank stays centred.</summary>
+/// <summary>M1 play scene root and gameplay composition root: builds the input source, a
+/// <see cref="Tank"/>, and a bounding <see cref="RectArena"/>; renders the tank with a
+/// following camera; draws the arena walls; and on fire-input spawns a <see cref="Projectile"/>
+/// (rate-limited) with a <see cref="ProjectileView"/> that despawns when it hits a wall.</summary>
 public partial class ArenaScene : Node2D
 {
     private const float TankSpeed = 200f;
+    private const float ProjectileSpeed = 600f;
+    private const double FireInterval = 0.3;
+
+    private static readonly NVector2 ArenaMin = new(-400f, -300f);
+    private static readonly NVector2 ArenaMax = new(400f, 300f);
+
+    private KeyboardMouseInputSource _input = null!;
+    private Tank _tank = null!;
+    private RectArena _arena = null!;
+    private double _fireCooldown;
 
     public override void _Ready()
     {
-        var input = new KeyboardMouseInputSource(GetViewport());
-        var tank = new Tank(input, NVector2.Zero, TankSpeed);
+        _input = new KeyboardMouseInputSource(GetViewport());
+        _tank = new Tank(_input, NVector2.Zero, TankSpeed);
+        _arena = new RectArena(ArenaMin, ArenaMax);
+
+        AddChild(BuildWalls());
 
         var view = GD.Load<PackedScene>("res://src/Presentation/Tank/TankView.tscn")
             .Instantiate<TankView>();
         AddChild(view);
-        view.Bind(tank);
-
-        // A lone enabled Camera2D becomes current automatically on entering the tree,
-        // so it follows the view (tank) and keeps it centred — no MakeCurrent() needed.
-        // Physics process callback matches the project's physics interpolation (avoids
-        // Godot auto-overriding it and logging a warning).
+        view.Bind(_tank);
         view.AddChild(new Camera2D { ProcessCallback = Camera2D.Camera2DProcessCallback.Physics });
+    }
+
+    public override void _Process(double delta)
+    {
+        _fireCooldown -= delta;
+        if (_fireCooldown <= 0d && _input.Read().Fire)
+        {
+            _fireCooldown = FireInterval;
+            FireProjectile();
+        }
+    }
+
+    private void FireProjectile()
+    {
+        var aim = _tank.TurretRotation;
+        var direction = new NVector2(MathF.Cos(aim), MathF.Sin(aim));
+        var projectile = new Projectile(_arena, _tank.Position, direction, ProjectileSpeed);
+
+        var view = GD.Load<PackedScene>("res://src/Presentation/Projectile/ProjectileView.tscn")
+            .Instantiate<ProjectileView>();
+        AddChild(view);
+        view.Bind(projectile);
+    }
+
+    private static Line2D BuildWalls()
+    {
+        var line = new Line2D { Width = 4f, DefaultColor = new Color(0.5f, 0.5f, 0.55f) };
+        line.AddPoint(new Vector2(ArenaMin.X, ArenaMin.Y));
+        line.AddPoint(new Vector2(ArenaMax.X, ArenaMin.Y));
+        line.AddPoint(new Vector2(ArenaMax.X, ArenaMax.Y));
+        line.AddPoint(new Vector2(ArenaMin.X, ArenaMax.Y));
+        line.AddPoint(new Vector2(ArenaMin.X, ArenaMin.Y));
+        return line;
     }
 }

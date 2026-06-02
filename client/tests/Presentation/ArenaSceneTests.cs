@@ -51,4 +51,22 @@ public class ArenaSceneTests : TestClass
             throw new System.Exception("The TankView must have a Camera2D so the tank stays centred.");
         }
     }
+
+    [Test]
+    public void Arena_DrawsItsWalls()
+    {
+        var hasWalls = false;
+        foreach (var child in _arena.GetChildren())
+        {
+            if (child is Line2D line && line.GetPointCount() >= 4)
+            {
+                hasWalls = true;
+            }
+        }
+
+        if (!hasWalls)
+        {
+            throw new System.Exception("Arena must draw a wall boundary (a closed Line2D).");
+        }
+    }
 }

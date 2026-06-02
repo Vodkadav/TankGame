@@ -52,5 +52,9 @@ dev build; 60 fps on the Galaxy A56).
   a `TankView`, and a following `Camera2D`. App-init (Sentry, translations) moved to `Bootstrap`; the M0
   boot-label scene (`Main.tscn`/`MainScene`) is retired (Sentry test now targets
   `SentryBootstrap`). **The tank is drivable** — launch via the desktop shortcut.
-- Remaining M1: projectile rendering (T4 view) + firing, Arena walls + collision (T6),
-  instructions overlay (T8).
+- **T4-view / T6 — firing + projectile + walls** ✅ `RectArena` (analytic rectangle
+  raycast, GameLogic) bounds the arena; firing (rate-limited) spawns a `Projectile` +
+  `ProjectileView` from the turret that travels and despawns on a wall hit; the arena
+  draws its wall border. **The tank moves and shoots** — M1's core loop.
+- Remaining M1: instructions overlay (T8, i18n). (Tank↔wall collision is deferred to M2's
+  wall grid; M1's tank roams the open arena.)
