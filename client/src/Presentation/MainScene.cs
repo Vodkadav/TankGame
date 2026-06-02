@@ -1,5 +1,6 @@
 using System.Reflection;
 using Godot;
+using Sentry;
 
 #if DEBUG
 using Chickensoft.GoDotTest;
@@ -28,7 +29,27 @@ public partial class MainScene : CanvasLayer
             return;
         }
 #endif
+        InitializeCrashReporting(OS.GetEnvironment("SENTRY_DSN_CLIENT"));
         ShowBootLabel();
+    }
+
+    // Initialises Sentry crash reporting. The DSN is injected via the
+    // SENTRY_DSN_CLIENT environment variable (set at build time in CI), so it is
+    // never committed. Returns true when a DSN was supplied and Sentry enabled.
+    public static bool InitializeCrashReporting(string? dsn)
+    {
+        if (string.IsNullOrWhiteSpace(dsn))
+        {
+            return false;
+        }
+
+        SentrySdk.Init(options =>
+        {
+            options.Dsn = dsn;
+            options.AutoSessionTracking = false;
+            options.TracesSampleRate = 0.0;
+        });
+        return SentrySdk.IsEnabled;
     }
 
     private void ShowBootLabel()
