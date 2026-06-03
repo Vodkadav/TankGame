@@ -11,9 +11,11 @@ public class TankContractTests
     // turret at the input's Aim — just enough to exercise the contract.
     private sealed class StubTank(IInputSource input, float speed) : ITank
     {
+        public Guid Id { get; } = Guid.NewGuid();
         public Vector2 Position { get; private set; }
         public float Rotation { get; private set; }
         public float TurretRotation { get; private set; }
+        public bool IsAlive => true;
 
         public void Step(float deltaSeconds)
         {
