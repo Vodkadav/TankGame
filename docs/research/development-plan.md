@@ -203,7 +203,7 @@ Cadence target: M0 in days 1–2, M1 within a week of M0, M2–M3 within the fir
 
 > **DEFERRED (2026-06-03):** after playtesting M2, the developer chose a **local-first combat
 > arc** first — single-player vs AI, then local 2-player (shared device) — with networked play
-> coming after. See `docs/adr/PROPOSAL-local-first-combat.md` and `PROGRESS.md`. M3 below is
+> coming after. See `docs/adr/0011-local-first-combat.md` and `PROGRESS.md`. M3 below is
 > unchanged and resumes once that arc lands; the `IInputSource` intent seam and deterministic
 > GameLogic combat introduced by the arc are designed to keep this milestone tractable.
 
