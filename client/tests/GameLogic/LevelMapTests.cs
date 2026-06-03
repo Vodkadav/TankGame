@@ -48,6 +48,19 @@ public class LevelMapTests
         Assert.Throws<FormatException>(() => LevelMap.Parse(text));
     }
 
+    [Fact]
+    public void Parse_TreatsBushAsPassableFloorThatIsFlaggedConcealing()
+    {
+        var map = LevelMap.Parse(
+            "##\n" +
+            "@b");
+
+        Assert.Equal(CellMaterial.Floor, map.Materials[1, 1]); // a bush does not block
+        Assert.False(map.BuildGrid().IsBlocked(1, 1));         // …in the wall grid either
+        Assert.True(map.Bushes[1, 1]);                          // but it is recorded as a bush
+        Assert.False(map.Bushes[0, 1]);                         // plain floor is not
+    }
+
     // --- Battlefield01 sanity (the hand-authored open arena the game ships) ---
 
     [Fact]
@@ -85,6 +98,23 @@ public class LevelMapTests
         Assert.InRange(map.SpawnX, 1, map.Width - 2);
         Assert.InRange(map.SpawnY, 1, map.Height - 2);
         Assert.Equal(CellMaterial.Floor, map.Materials[map.SpawnX, map.SpawnY]);
+    }
+
+    [Fact]
+    public void Battlefield01_HasBushesToHideIn()
+    {
+        var map = LevelMap.Parse(Battlefield01.Text);
+
+        var bushes = 0;
+        foreach (var b in map.Bushes)
+        {
+            if (b)
+            {
+                bushes++;
+            }
+        }
+
+        Assert.True(bushes >= 4, $"the battlefield should have hide-spots; found {bushes} bush cells");
     }
 
     [Fact]

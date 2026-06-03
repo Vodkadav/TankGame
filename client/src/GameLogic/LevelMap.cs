@@ -5,14 +5,15 @@ using TankGame.Domain;
 namespace TankGame.GameLogic;
 
 /// <summary>A hand-authored level parsed from a text map: <c>#</c> steel, <c>x</c> brick,
-/// <c>.</c> floor, <c>@</c> the player spawn (a floor cell). Pure C# — produces a
-/// <see cref="WallGrid"/> model the arena and view consume. The map is the single source of
-/// the level layout; no procedural generation.</summary>
+/// <c>.</c> floor, <c>b</c> bush (passable, concealing), <c>@</c> the player spawn (a floor
+/// cell). Pure C# — produces a <see cref="WallGrid"/> model the arena and view consume. The
+/// map is the single source of the level layout; no procedural generation.</summary>
 public sealed class LevelMap
 {
-    private LevelMap(CellMaterial[,] materials, int spawnX, int spawnY)
+    private LevelMap(CellMaterial[,] materials, bool[,] bushes, int spawnX, int spawnY)
     {
         Materials = materials;
+        Bushes = bushes;
         Width = materials.GetLength(0);
         Height = materials.GetLength(1);
         SpawnX = spawnX;
@@ -21,6 +22,10 @@ public sealed class LevelMap
 
     /// <summary>Cell materials indexed <c>[x, y]</c>.</summary>
     public CellMaterial[,] Materials { get; }
+
+    /// <summary>Which cells are bushes (passable floor that conceals a tank standing on it),
+    /// indexed <c>[x, y]</c>. A bush cell is <see cref="CellMaterial.Floor"/> for collision.</summary>
+    public bool[,] Bushes { get; }
 
     public int Width { get; }
     public int Height { get; }
@@ -44,6 +49,7 @@ public sealed class LevelMap
         var width = rows[0].Length;
         var height = rows.Count;
         var materials = new CellMaterial[width, height];
+        var bushes = new bool[width, height];
         int? spawnX = null;
         var spawnY = 0;
 
@@ -71,6 +77,13 @@ public sealed class LevelMap
                     continue;
                 }
 
+                if (c == 'b')
+                {
+                    materials[x, y] = CellMaterial.Floor; // a bush is passable floor…
+                    bushes[x, y] = true;                  // …that conceals whoever stands on it
+                    continue;
+                }
+
                 materials[x, y] = c switch
                 {
                     '#' => CellMaterial.Steel,
@@ -86,7 +99,7 @@ public sealed class LevelMap
             throw new FormatException("level map has no spawn ('@')");
         }
 
-        return new LevelMap(materials, spawnX.Value, spawnY);
+        return new LevelMap(materials, bushes, spawnX.Value, spawnY);
     }
 
     /// <summary>Builds the <see cref="WallGrid"/> for this level (brick starts at full hp).</summary>
