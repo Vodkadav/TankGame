@@ -23,6 +23,7 @@ public partial class ArenaScene : Node2D
     private const float ProjectileSpeed = 600f;
     private const float FireInterval = 0.3f;
     private const float TileSize = 64f;
+    private const float CombatHitRadius = 28f;
 
     private static readonly NVector2 GridOrigin = NVector2.Zero;
 
@@ -39,7 +40,7 @@ public partial class ArenaScene : Node2D
         var grid = maze.BuildGrid();
         _arena = new GridArena(grid, TileSize, GridOrigin);
 
-        _world = new World();
+        _world = new World(new CombatResolver(CombatHitRadius));
         _world.EntitySpawned += OnEntitySpawned;
         _world.EntityDespawned += OnEntityDespawned;
 
