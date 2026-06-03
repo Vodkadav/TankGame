@@ -49,6 +49,38 @@ public class ArenaSceneTests : TestClass
     }
 
     [Test]
+    public void VersusMode_SpawnsTwoPlayerTanks_AndNoAi()
+    {
+        var original = GameSetup.Mode;
+        try
+        {
+            GameSetup.Mode = GameMode.TwoPlayerVersus;
+            var arena = GD.Load<PackedScene>("res://src/Presentation/Arena/Arena.tscn").Instantiate();
+            TestScene.AddChild(arena); // _Ready reads the mode and spawns
+
+            var tankViews = 0;
+            foreach (var child in arena.GetChildren())
+            {
+                if (child is TankView)
+                {
+                    tankViews++;
+                }
+            }
+
+            arena.QueueFree();
+
+            if (tankViews != 2)
+            {
+                throw new System.Exception($"Versus must spawn exactly two tanks (P1, P2); saw {tankViews}.");
+            }
+        }
+        finally
+        {
+            GameSetup.Mode = original;
+        }
+    }
+
+    [Test]
     public void Arena_RendersTheMazeWallGrid()
     {
         WallGridView? walls = null;
