@@ -207,6 +207,72 @@ public class TankTests
         Assert.True(tank.Position.Y > 90f, "tank should keep sliding along +Y");
     }
 
+    // A grid whose column x=2 is the given destructible/indestructible material.
+    private static (WallGrid grid, GridArena arena) ColumnArena(CellMaterial wall, int height = 16)
+    {
+        var materials = new CellMaterial[4, height];
+        for (var x = 0; x < 4; x++)
+        {
+            for (var y = 0; y < height; y++)
+            {
+                materials[x, y] = x == 2 ? wall : CellMaterial.Floor;
+            }
+        }
+
+        var grid = WallGrid.FromMaterials(materials);
+        return (grid, new GridArena(grid, tileSize: 64f, origin: Vector2.Zero));
+    }
+
+    [Fact]
+    public void Step_PushingIntoBrick_DemolishesIt_AndTheTankRollsThrough()
+    {
+        var (grid, arena) = ColumnArena(CellMaterial.Brick);
+        var tank = new Tank(
+            new ScriptedInput(new TankInput(new Vector2(1f, 0f), Aim: 0f, Fire: false)),
+            new World(), arena, new Vector2(32f, 32f), Speed, FireInterval, ProjectileSpeed);
+
+        for (var i = 0; i < 60; i++)
+        {
+            tank.Step(0.1f); // shove +X into the brick at cell (2,0) for ~6s
+        }
+
+        Assert.Equal(CellMaterial.Floor, grid.GetCell(2, 0).Material); // demolished
+        Assert.True(tank.Position.X > 150f, "tank should roll into the freed cell");
+    }
+
+    [Fact]
+    public void Step_PushingIntoSteel_NeverBreaksThrough()
+    {
+        var (grid, arena) = ColumnArena(CellMaterial.Steel);
+        var tank = new Tank(
+            new ScriptedInput(new TankInput(new Vector2(1f, 0f), Aim: 0f, Fire: false)),
+            new World(), arena, new Vector2(32f, 32f), Speed, FireInterval, ProjectileSpeed);
+
+        for (var i = 0; i < 60; i++)
+        {
+            tank.Step(0.1f);
+        }
+
+        Assert.Equal(CellMaterial.Steel, grid.GetCell(2, 0).Material);
+        Assert.True(tank.Position.X + Tank.CollisionRadius <= 128f, "steel must stay solid");
+    }
+
+    [Fact]
+    public void Step_BriefPush_BelowTheInterval_DoesNotDamageTheWall()
+    {
+        var (grid, arena) = ColumnArena(CellMaterial.Brick);
+        // Start jammed against the wall so pushing counts from the first step.
+        var tank = new Tank(
+            new ScriptedInput(new TankInput(new Vector2(1f, 0f), Aim: 0f, Fire: false)),
+            new World(), arena, new Vector2(100f, 32f), Speed, FireInterval, ProjectileSpeed);
+
+        tank.Step(0.1f);
+        tank.Step(0.1f);
+        tank.Step(0.1f); // 0.3s of pushing, below the 0.4s interval
+
+        Assert.Equal(WallGrid.DefaultBrickHp, grid.GetCell(2, 0).Hp); // not yet chipped
+    }
+
     [Fact]
     public void Step_FiresAlongTheTurretAim()
     {
