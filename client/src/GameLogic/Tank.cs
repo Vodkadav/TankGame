@@ -96,39 +96,43 @@ public sealed class Tank : ITank
 
         var desired = Position + (move * _speed * deltaSeconds);
 
-        // Resolve each axis independently so the tank slides along a wall instead of
-        // sticking. A move is allowed only if the leading edge (centre + radius) stays clear.
-        var blockedX = false;
+        // Resolve each axis independently so the tank slides along a wall instead of sticking.
+        // A move is allowed only if the leading edge (centre + radius) clears walls and the new
+        // centre does not overlap another tank. Only wall blocks feed push-to-demolish — bumping
+        // a tank must never chip a wall behind it, so wall and tank blocks are tracked apart.
+        var wallX = false;
         var nextX = Position.X;
         if (move.X != 0f)
         {
-            if (!_arena.IsBlocked(new Vector2(desired.X + (MathF.Sign(move.X) * CollisionRadius), Position.Y)))
+            var hitWall = _arena.IsBlocked(new Vector2(desired.X + (MathF.Sign(move.X) * CollisionRadius), Position.Y));
+            if (!hitWall && !OverlapsAnotherTank(new Vector2(desired.X, Position.Y)))
             {
                 nextX = desired.X;
             }
             else
             {
-                blockedX = true;
+                wallX = hitWall;
             }
         }
 
-        var blockedY = false;
+        var wallY = false;
         var nextY = Position.Y;
         if (move.Y != 0f)
         {
-            if (!_arena.IsBlocked(new Vector2(nextX, desired.Y + (MathF.Sign(move.Y) * CollisionRadius))))
+            var hitWall = _arena.IsBlocked(new Vector2(nextX, desired.Y + (MathF.Sign(move.Y) * CollisionRadius)));
+            if (!hitWall && !OverlapsAnotherTank(new Vector2(nextX, desired.Y)))
             {
                 nextY = desired.Y;
             }
             else
             {
-                blockedY = true;
+                wallY = hitWall;
             }
         }
 
         Position = new Vector2(nextX, nextY);
 
-        PushAgainstWall(blockedX, blockedY, move, deltaSeconds);
+        PushAgainstWall(wallX, wallY, move, deltaSeconds);
 
         if (move != Vector2.Zero)
         {
@@ -150,9 +154,9 @@ public sealed class Tank : ITank
     // it is pushing into, accumulate time and chip that wall once per PushInterval. DamageAt
     // only affects brick, so steel and the border shrug it off. Releasing the stick or
     // breaking through resets the timer, so demolition needs sustained pressure, not a tap.
-    private void PushAgainstWall(bool blockedX, bool blockedY, Vector2 move, float deltaSeconds)
+    private void PushAgainstWall(bool wallX, bool wallY, Vector2 move, float deltaSeconds)
     {
-        if (!blockedX && !blockedY)
+        if (!wallX && !wallY)
         {
             _pushTimer = 0f;
             return;
@@ -166,12 +170,31 @@ public sealed class Tank : ITank
 
         _pushTimer -= PushInterval;
 
-        var (point, direction) = blockedX
+        var (point, direction) = wallX
             ? (new Vector2(Position.X + (MathF.Sign(move.X) * CollisionRadius), Position.Y),
                 new Vector2(MathF.Sign(move.X), 0f))
             : (new Vector2(Position.X, Position.Y + (MathF.Sign(move.Y) * CollisionRadius)),
                 new Vector2(0f, MathF.Sign(move.Y)));
 
         _arena.DamageAt(point, direction, PushDamage);
+    }
+
+    // A tank is a circle of CollisionRadius; two tanks may not overlap. Scans the world for any
+    // other live tank whose centre is within a tank-diameter of this candidate centre. Order is
+    // tick-order-dependent (the tank that steps first claims the ground), which is fine for a
+    // body block — no momentum is transferred, the mover simply stops.
+    private bool OverlapsAnotherTank(Vector2 candidateCentre)
+    {
+        var minDistance = CollisionRadius * 2f;
+        foreach (var entity in _world.Entities)
+        {
+            if (entity is ITank other && !ReferenceEquals(other, this) && other.IsAlive &&
+                Vector2.DistanceSquared(candidateCentre, other.Position) < minDistance * minDistance)
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 }

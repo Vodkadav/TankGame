@@ -323,6 +323,54 @@ public class TankTests
     }
 
     [Fact]
+    public void Step_StopsBeforeOverlappingAnotherTank()
+    {
+        var world = new World();
+        var blocker = new Tank(
+            new ScriptedInput(new TankInput(Vector2.Zero, Aim: 0f, Fire: false)),
+            world, new OpenArena(), new Vector2(200f, 32f), Speed, FireInterval, ProjectileSpeed);
+        var mover = new Tank(
+            new ScriptedInput(new TankInput(new Vector2(1f, 0f), Aim: 0f, Fire: false)),
+            world, new OpenArena(), new Vector2(32f, 32f), Speed, FireInterval, ProjectileSpeed);
+        world.Spawn(blocker);
+        world.Spawn(mover);
+
+        for (var i = 0; i < 40; i++)
+        {
+            mover.Step(0.1f); // drive +X straight into the stationary blocker
+        }
+
+        Assert.True(mover.Position.X > 32f, "mover should advance toward the other tank");
+        var gap = blocker.Position.X - mover.Position.X;
+        Assert.True(gap >= (2f * Tank.CollisionRadius) - 0.5f, $"tanks overlap: centre gap {gap}");
+        Assert.Equal(32f, mover.Position.Y, precision: 3); // no drift on the free axis
+    }
+
+    [Fact]
+    public void Step_PushingIntoAnotherTank_DoesNotDamageWallsBehindIt()
+    {
+        var (grid, arena) = ColumnArena(CellMaterial.Brick);
+        var world = new World();
+        // A blocker sits just in front of the brick column; the mover jams into the blocker,
+        // never reaching the wall, so no demolition should occur.
+        var blocker = new Tank(
+            new ScriptedInput(new TankInput(Vector2.Zero, Aim: 0f, Fire: false)),
+            world, arena, new Vector2(80f, 32f), Speed, FireInterval, ProjectileSpeed);
+        var mover = new Tank(
+            new ScriptedInput(new TankInput(new Vector2(1f, 0f), Aim: 0f, Fire: false)),
+            world, arena, new Vector2(32f, 32f), Speed, FireInterval, ProjectileSpeed);
+        world.Spawn(blocker);
+        world.Spawn(mover);
+
+        for (var i = 0; i < 60; i++)
+        {
+            mover.Step(0.1f);
+        }
+
+        Assert.Equal(WallGrid.DefaultBrickHp, grid.GetCell(2, 0).Hp); // wall untouched
+    }
+
+    [Fact]
     public void Step_FiresAlongTheTurretAim()
     {
         var world = new World();
