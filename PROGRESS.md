@@ -3,14 +3,14 @@
 Living status tracker. The full spec is `docs/research/development-plan.md`; this
 file records what is actually done and what is next.
 
-## Current status: **M1 + S1 + M2 complete** (2026-06-03) — building the local-first combat arc
+## Current status: **M1 + S1 + M2 + local-first combat arc complete** (2026-06-03)
 
 The CI/CD pipeline is live and every merge to `main` builds, tests, and deploys. M1's core
-loop ships (drive + shoot + instructions overlay); the S1 entity spine (ADR-0010) is done
-(the world owns and steps every entity, nothing hand-spawns); M2 (ADR-0004) ships the
-destructible maze; and a post-M2 pass added tank↔wall collision + push-to-demolish. After
-playtesting, the developer pivoted to a **local-first combat arc** (single-player vs AI →
-local 2-player → networked later); the networked M3 is deferred. See "Next" below.
+loop ships; the S1 entity spine (ADR-0010) is done; M2 (ADR-0004) ships the destructible maze
+with tank↔wall collision + push-to-demolish; and the **local-first combat arc** (ADR-0011) is
+complete — single-player vs AI, plus local 2-player co-op and versus chosen from a title
+screen, with health, win/lose, and restart. The networked M3 is deferred (needs a Cloudflare
+Durable Object + secrets + two-device testing). See the arc section and "Deferred: M3" below.
 
 ### Live surfaces
 
@@ -156,33 +156,32 @@ to floor) and steel (indestructible) walls. Design + as-built record:
 
 ---
 
-## Next: Local-first combat arc (networked M3 deferred)
+## Done: Local-first combat arc — ADR-0011 (networked M3 deferred)
 
 After playtesting M2, the developer chose to grow the game locally before networking:
-**single-player vs computer adversaries → local 2-player (P1 WASD+Space, P2 arrows+left
-click) → networked later.** Design + MP-safety rationale + ticket table:
-`docs/adr/PROPOSAL-local-first-combat.md`. The guarantee: `IInputSource` is the universal
-"intent" seam (human / AI / future network player all drive a tank the same way) and combat
-is a deterministic GameLogic pass — so this arc does not make networked MP harder.
+**single-player vs computer adversaries → local 2-player → networked later.** Design +
+MP-safety rationale + as-built record: `docs/adr/0011-local-first-combat.md`. The guarantee:
+`IInputSource` is the universal "intent" seam (human / AI / future network player all drive a
+tank the same way) and combat is a deterministic GameLogic pass — so this arc does not make
+networked MP harder.
 
-Sequence (each a shippable TDD slice):
-
-- **C1 — tank health + death** ✅ `IDamageable` (Hp/MaxHp/TakeDamage); `Tank` has `MaxHp`
-  (default 3) and HP-driven `IsAlive` (resolves the S1 stub); dead tanks reaped.
-- **C2 — teams + projectile ownership** ✅ `Team` on `ITank`/`IProjectile`; a tank stamps its
-  team on shots, so a shot never hurts its own team.
+- **C1 — tank health + death** ✅ `IDamageable` (Hp/MaxHp/TakeDamage); HP-driven `IsAlive`
+  (resolves the S1 stub); dead tanks reaped.
+- **C2 — teams + projectile ownership** ✅ `Team` on `ITank`/`IProjectile`; a shot never
+  hurts its own team.
 - **C3 — projectile↔tank combat pass** ✅ `ICombatResolver`/`CombatResolver`: enemy shots
   damage tanks and expire; the `World` runs it each step between advancing and reaping.
 - **C4 — computer adversaries** ✅ `AiInputSource` (seek/aim/fire-with-LOS) drives three
-  enemy tanks; `ArenaScene` spawns player (team 0) + AI (team 1), camera on the player only,
-  adversaries tinted red. **Single-player vs AI playable.**
-- **C5 — local 2-player**: a second keyboard+mouse input source — couch versus playable.
-- **C6 — HUD + round flow + ADR**: health bars, win/lose (EN/ES/DK), promote the proposal.
+  enemy tanks, tinted red. Single-player vs AI playable.
+- **C5 — local 2-player** ✅ `Player2InputSource` (arrows + drive-aim + click/Enter);
+  `GameMode` (1P / co-op / versus) via a title screen; mode-aware spawning, camera, and
+  win/lose text. **Co-op and versus playable.** (C5a input, C5b modes, C5c title screen.)
+- **C6 — HUD + round flow** ✅ `MatchTracker` (last team standing); game-over overlay
+  (win/lose/draw, EN/ES/DK) + Play-again restart; scene-level camera that survives player
+  death; per-tank health bars. Proposal promoted to **ADR-0011**.
 
-**Known rough edge after C4 (addressed in C6 / round-flow):** when the player tank dies it is
-reaped and its view (which carries the camera) is freed — so there is no health display, no
-"you win / you lose", and no restart yet. The single-player loop is playable but its win/lose
-ending is unbuilt.
+Test counts on `main`: GameLogic 78, Domain 22, Infrastructure 8, Architecture 6, 26 GoDotTest
+scene tests.
 
 ### Deferred: M3 — 2-player real-time via a single Durable Object
 
