@@ -1,3 +1,4 @@
+using System;
 using System.Numerics;
 using TankGame.Domain;
 
@@ -18,6 +19,7 @@ public sealed class Projectile : IProjectile
     /// <param name="speed">Travel speed in units per second.</param>
     public Projectile(IArena arena, Vector2 spawn, Vector2 direction, float speed)
     {
+        Id = Guid.NewGuid();
         _arena = arena;
         Position = spawn;
         _direction = Vector2.Normalize(direction);
@@ -25,6 +27,7 @@ public sealed class Projectile : IProjectile
         IsAlive = true;
     }
 
+    public Guid Id { get; }
     public Vector2 Position { get; private set; }
     public bool IsAlive { get; private set; }
 

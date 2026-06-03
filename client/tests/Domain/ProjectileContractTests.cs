@@ -1,3 +1,4 @@
+using System;
 using System.Numerics;
 using TankGame.Domain;
 using Xunit;
@@ -16,6 +17,7 @@ public class ProjectileContractTests
 
         public StubProjectile(IArena arena, Vector2 origin, Vector2 direction, float speed)
         {
+            Id = Guid.NewGuid();
             _arena = arena;
             Position = origin;
             _direction = Vector2.Normalize(direction);
@@ -23,6 +25,7 @@ public class ProjectileContractTests
             IsAlive = true;
         }
 
+        public Guid Id { get; }
         public Vector2 Position { get; private set; }
         public bool IsAlive { get; private set; }
 

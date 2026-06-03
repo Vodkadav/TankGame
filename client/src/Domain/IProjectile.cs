@@ -1,18 +1,10 @@
-using System.Numerics;
-
 namespace TankGame.Domain;
 
-/// <summary>A fired projectile. The implementation (GameLogic) is constructed with a spawn
-/// position/direction and an <see cref="IArena"/>; it advances on <see cref="Step"/> and dies
-/// when it hits something.</summary>
-public interface IProjectile
+/// <summary>A fired projectile — a world <see cref="IEntity"/>. The implementation
+/// (GameLogic) is constructed with a spawn position/direction and an <see cref="IArena"/>;
+/// it advances on <see cref="IEntity.Step"/> and dies (<see cref="IEntity.IsAlive"/> goes
+/// false) when it hits something. The entity surface (Id/Position/IsAlive/Step) is the
+/// whole contract — a projectile adds no members of its own today.</summary>
+public interface IProjectile : IEntity
 {
-    /// <summary>Current world-space position.</summary>
-    Vector2 Position { get; }
-
-    /// <summary>False once the projectile has hit an obstacle (or otherwise expired).</summary>
-    bool IsAlive { get; }
-
-    /// <summary>Advances the projectile by <paramref name="deltaSeconds"/>, resolving any hit.</summary>
-    void Step(float deltaSeconds);
 }
