@@ -37,6 +37,12 @@ public class AiInputSourceTests
         public bool IsBlocked(Vector2 point) => false;
     }
 
+    // Concealment everywhere — isolates the AI's "spot a bushed target only up close" rule.
+    private sealed class AllConcealing : IConcealment
+    {
+        public bool ConcealsAt(Vector2 point) => true;
+    }
+
     private static AiInputSource AiDriving(StubTank self, IWorld world, IArena? arena = null)
     {
         var ai = new AiInputSource(world, arena ?? new OpenArena());
@@ -190,5 +196,36 @@ public class AiInputSourceTests
 
         Assert.True(intent.Move.Y > 0f, "AI should chase the visible enemy below, not the hidden one");
         Assert.True(MathF.Abs(intent.Move.X) < 0.01f);
+    }
+
+    [Fact]
+    public void DoesNotTargetADistantTankHidingInABush()
+    {
+        var world = new World();
+        var self = new StubTank(Vector2.Zero, team: 1);
+        world.Spawn(self);
+        world.Spawn(new StubTank(new Vector2(300f, 0f), team: 0)); // in the open ground… but bushed
+        var ai = new AiInputSource(world, new OpenArena(), new AllConcealing());
+        ai.Bind(self);
+
+        var intent = ai.Read();
+
+        Assert.Equal(Vector2.Zero, intent.Move); // can't pick it out of the foliage from afar
+        Assert.False(intent.Fire);
+    }
+
+    [Fact]
+    public void SpotsATankInABush_WhenRightOnTopOfIt()
+    {
+        var world = new World();
+        var self = new StubTank(Vector2.Zero, team: 1);
+        world.Spawn(self);
+        world.Spawn(new StubTank(new Vector2(60f, 0f), team: 0)); // within the bush-reveal range
+        var ai = new AiInputSource(world, new OpenArena(), new AllConcealing());
+        ai.Bind(self);
+
+        var intent = ai.Read();
+
+        Assert.True(intent.Fire); // brushing the bush — the hidden tank is revealed and engaged
     }
 }

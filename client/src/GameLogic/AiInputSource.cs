@@ -19,18 +19,24 @@ public sealed class AiInputSource : IInputSource
     private const float StandoffDistance = 160f;
 
     // Generous sight (≈18 tiles) so enemies engage across the open battlefield's clear
-    // sightlines and the game stays lively — while line-of-sight gating means walls (and,
-    // later, bushes) still break the AI's view and enable ambush. A tunable balance knob.
+    // sightlines and the game stays lively — while line-of-sight gating means walls and bushes
+    // still break the AI's view and enable ambush. A tunable balance knob.
     private const float VisionRange = 1200f;
+
+    // A tank hiding in a bush is only spotted from within about a tile and a half — close
+    // enough to brush the foliage. Beyond that the AI cannot pick it out of the cover.
+    private const float BushRevealRange = 96f;
 
     private readonly IWorld _world;
     private readonly IArena _arena;
+    private readonly IConcealment? _concealment;
     private ITank? _self;
 
-    public AiInputSource(IWorld world, IArena arena)
+    public AiInputSource(IWorld world, IArena arena, IConcealment? concealment = null)
     {
         _world = world;
         _arena = arena;
+        _concealment = concealment;
     }
 
     /// <summary>Links this controller to the tank it drives (resolves the construction cycle:
@@ -82,6 +88,12 @@ public sealed class AiInputSource : IInputSource
             }
 
             if (!HasLineOfSight(_self.Position, tank.Position, distance))
+            {
+                continue;
+            }
+
+            // A target lurking in a bush is hidden unless the AI is right on top of it.
+            if (distance > BushRevealRange && _concealment?.ConcealsAt(tank.Position) == true)
             {
                 continue;
             }

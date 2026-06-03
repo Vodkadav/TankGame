@@ -204,9 +204,15 @@ Catalogue and ordering: `docs/research/local-backlog.md`.
   walls: `NearestVisibleEnemy` only acquires an enemy within `VisionRange` (≈18 tiles) with a
   clear line of sight, so an enemy that breaks line of sight (behind steel, and later a bush)
   is no longer hunted — the AI holds until it sees something. Foundation for the fog/stealth
-  cluster (LP2–LP4). `VisionRange` is a tunable balance knob.
+  cluster. `VisionRange` is a tunable balance knob.
+- **LP4 — bushes / hide spots** ✅ a new `IConcealment` Domain seam: a tank standing on a bush
+  cell is hidden from the AI unless it is within `BushRevealRange` (≈1.5 tiles). `LevelMap`
+  parses `b` as passable floor flagged concealing; `BushField` answers `ConcealsAt`;
+  `AiInputSource` skips a far bushed target; `BushOverlay` draws translucent green patches
+  (code-built, no art). `Battlefield01` gained four bush patches. Bushes never block movement
+  or shots — concealment only. (Fog of war LP3 still to come.)
 
-Test counts on `main`: GameLogic 85, Domain 22, Infrastructure 8, Architecture 6, 26 GoDotTest
+Test counts on `main`: GameLogic 92, Domain 22, Infrastructure 8, Architecture 6, 28 GoDotTest
 scene tests.
 
 ### Deferred: M3 — 2-player real-time via a single Durable Object

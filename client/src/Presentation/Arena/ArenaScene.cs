@@ -42,6 +42,7 @@ public partial class ArenaScene : Node2D
     private readonly MatchTracker _matchTracker = new();
     private World _world = null!;
     private GridArena _arena = null!;
+    private BushField _bushes = null!;
     private Camera2D _camera = null!;
     private ITank _player = null!;
     private GameMode _mode;
@@ -54,6 +55,7 @@ public partial class ArenaScene : Node2D
         var level = LevelMap.Parse(Battlefield01.Text);
         var grid = level.BuildGrid();
         _arena = new GridArena(grid, TileSize, GridOrigin);
+        _bushes = new BushField(level.Bushes, TileSize, GridOrigin);
 
         _world = new World(new CombatResolver(CombatHitRadius));
         _world.EntitySpawned += OnEntitySpawned;
@@ -61,7 +63,12 @@ public partial class ArenaScene : Node2D
 
         var wallView = new WallGridView { Name = "WallGridView", RenderTileSize = (int)TileSize };
         AddChild(wallView);     // runs _Ready (builds the atlas TileSet)
-        wallView.Bind(grid);    // then draw the maze and track damage
+        wallView.Bind(grid);    // then draw the walls and track damage
+
+        var bushView = new BushOverlay { Name = "BushOverlay" };
+        AddChild(bushView);     // beneath the tanks so a hidden tank shows over its bush
+        bushView.Bind(level.Bushes, TileSize);
+
         AddChild(BuildInstructionsOverlay());
 
         var brickCounter = new BrickCounterOverlay { Name = "BrickCounterOverlay" };
@@ -99,7 +106,7 @@ public partial class ArenaScene : Node2D
         {
             foreach (var (ex, ey) in EnemySpawns)
             {
-                var ai = new AiInputSource(_world, _arena);
+                var ai = new AiInputSource(_world, _arena, _bushes);
                 var enemy = new Tank(ai, _world, _arena, CellCentre(ex, ey),
                     EnemySpeed, FireInterval, ProjectileSpeed, maxHp: 3, team: EnemyTeam);
                 ai.Bind(enemy); // resolve the input-source ↔ tank construction cycle
