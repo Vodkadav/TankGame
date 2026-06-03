@@ -195,8 +195,13 @@ Catalogue and ordering: `docs/research/local-backlog.md`.
   intent — interior is ≥80% open floor and every floor cell is reachable from the spawn
   (no walled-off pockets), while single-cell cover is now allowed. Camera/spawns unchanged
   (still 28×16).
+- **LP6 — tank↔tank body collision** ✅ tanks are circles of `CollisionRadius` and may not
+  overlap: each axis of a tank's move is rejected if the new centre would come within a
+  tank-diameter of another live tank (`Tank.OverlapsAnotherTank` over `World.Entities`). The
+  mover stops; no momentum is transferred. Wall and tank blocks are tracked separately so
+  bumping a tank never chips a wall behind it (push-to-demolish still needs a wall).
 
-Test counts on `main`: GameLogic 80, Domain 22, Infrastructure 8, Architecture 6, 26 GoDotTest
+Test counts on `main`: GameLogic 82, Domain 22, Infrastructure 8, Architecture 6, 26 GoDotTest
 scene tests.
 
 ### Deferred: M3 — 2-player real-time via a single Durable Object
