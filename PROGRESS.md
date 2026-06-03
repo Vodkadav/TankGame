@@ -210,9 +210,16 @@ Catalogue and ordering: `docs/research/local-backlog.md`.
   parses `b` as passable floor flagged concealing; `BushField` answers `ConcealsAt`;
   `AiInputSource` skips a far bushed target; `BushOverlay` draws translucent green patches
   (code-built, no art). `Battlefield01` gained four bush patches. Bushes never block movement
-  or shots — concealment only. (Fog of war LP3 still to come.)
+  or shots — concealment only.
+- **LP3 — fog of war (local)** ✅ a dark `CanvasModulate` over the field with a `PointLight2D`
+  per player-team ally that follows them (`SetUpFog` in `ArenaScene`), so the team sees a lit
+  circle (radius ≈ AI fire range) and the rest is dark. The light texture is a code-built
+  radial `GradientTexture2D` (no art). On in one-player and co-op (allies share the reveal),
+  off in versus (one shared screen can't fairly fog rivals). `FogAmbient`/`FogLightRadius` are
+  tunable; no wall shadows yet (a soft circular reveal). Visual darkness/radius awaits a
+  playtest pass. **Headline vision cluster (battlefield + fog + bushes) complete.**
 
-Test counts on `main`: GameLogic 92, Domain 22, Infrastructure 8, Architecture 6, 28 GoDotTest
+Test counts on `main`: GameLogic 92, Domain 22, Infrastructure 8, Architecture 6, 30 GoDotTest
 scene tests.
 
 ### Deferred: M3 — 2-player real-time via a single Durable Object
