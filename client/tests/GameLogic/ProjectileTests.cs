@@ -1,3 +1,4 @@
+using System;
 using System.Numerics;
 using TankGame.Domain;
 using TankGame.GameLogic;
@@ -57,6 +58,27 @@ public class ProjectileTests
 
         Assert.False(shot.IsAlive);
         Assert.Equal(new Vector2(10f, 0f), shot.Position);
+    }
+
+    [Fact]
+    public void Id_IsAssignedAndStableAcrossSteps()
+    {
+        var shot = new Projectile(new OpenArena(), Vector2.Zero, new Vector2(1f, 0f), Speed);
+        var id = shot.Id;
+
+        shot.Step(0.1f);
+
+        Assert.NotEqual(Guid.Empty, id);
+        Assert.Equal(id, shot.Id); // identity is stable for the entity's lifetime
+    }
+
+    [Fact]
+    public void Id_IsUniquePerProjectile()
+    {
+        var a = new Projectile(new OpenArena(), Vector2.Zero, new Vector2(1f, 0f), Speed);
+        var b = new Projectile(new OpenArena(), Vector2.Zero, new Vector2(1f, 0f), Speed);
+
+        Assert.NotEqual(a.Id, b.Id);
     }
 
     [Fact]
