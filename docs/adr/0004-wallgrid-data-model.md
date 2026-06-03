@@ -93,11 +93,15 @@ later (see `docs/credits/assets.md`).
 
 **Forecloses / defers:**
 
-- **Tank↔wall collision is not implemented.** M2's ticket scope is projectile↔wall only; the
-  tank drives freely over walls. Blocking the tank is a small follow-up over
-  `IWallGrid.IsBlocked` and is the most likely next enhancement.
-- No procedural generation, no per-material variable damage, no multi-hit steel — all
-  deliberately out of M2 scope.
+- ~~**Tank↔wall collision is not implemented.**~~ **Resolved (2026-06-03, post-M2):** added
+  `IArena.IsBlocked(point)` and axis-separated movement in `Tank.Step` (collision radius on
+  the leading edge, slides along walls), plus a **push-to-demolish** mechanic — sustained
+  driving into a brick wall chips it once per `Tank.PushInterval` through the same HP/crack
+  pipeline as gunfire, then the tank rolls through (steel/border are immune). Shooting and
+  shoving share one damage path.
+- No procedural generation, no per-material variable damage curves, no multi-hit steel — all
+  deliberately out of M2 scope. A dust/particle puff on demolition is deferred to the art pass
+  (particles are an M5 concern).
 
 **Revisit triggers:**
 
