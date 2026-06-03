@@ -46,7 +46,8 @@ public class TankViewTests : TestClass
     public void UpdateFromModel_MovesNodeAndRotatesSpritesToMatchTank()
     {
         var input = new FixedInput(new TankInput(new NVector2(1f, 0f), Aim: 0.75f, Fire: false));
-        var tank = new Tank(input, NVector2.Zero, speed: 100f);
+        var arena = new RectArena(new NVector2(-500f, -500f), new NVector2(500f, 500f));
+        var tank = new Tank(input, new World(), arena, NVector2.Zero, speed: 100f, fireInterval: 0.3f, projectileSpeed: 600f);
         _view.Bind(tank);
 
         _view.UpdateFromModel(0.1f); // 100 u/s * 0.1s = 10 units along +X

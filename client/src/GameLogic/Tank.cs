@@ -4,27 +4,54 @@ using TankGame.Domain;
 
 namespace TankGame.GameLogic;
 
-/// <summary>A locally-driven tank. Pure C#: reads an <see cref="IInputSource"/> each
-/// <see cref="Step"/>, moves at a constant speed, faces its movement direction, and aims
-/// its turret at the input. No Godot — the Presentation layer renders this state.</summary>
+/// <summary>A locally-driven tank — a world <see cref="IEntity"/>. Pure C#: reads an
+/// <see cref="IInputSource"/> each <see cref="Step"/>, moves at a constant speed, faces its
+/// movement direction, aims its turret at the input, and (rate-limited) spawns a
+/// <see cref="Projectile"/> into the <see cref="IWorld"/> when fire is held. No Godot — the
+/// Presentation layer renders this state.</summary>
 public sealed class Tank : ITank
 {
     private readonly IInputSource _input;
+    private readonly IWorld _world;
+    private readonly IArena _arena;
     private readonly float _speed;
+    private readonly float _fireInterval;
+    private readonly float _projectileSpeed;
+    private float _fireCooldown;
 
     /// <param name="input">Per-frame intent source.</param>
+    /// <param name="world">The world the tank spawns its shots into.</param>
+    /// <param name="arena">Collision source handed to spawned projectiles.</param>
     /// <param name="startPosition">Initial world-space position.</param>
     /// <param name="speed">Movement speed in units per second.</param>
-    public Tank(IInputSource input, Vector2 startPosition, float speed)
+    /// <param name="fireInterval">Minimum seconds between shots.</param>
+    /// <param name="projectileSpeed">Speed of spawned projectiles, units per second.</param>
+    public Tank(
+        IInputSource input,
+        IWorld world,
+        IArena arena,
+        Vector2 startPosition,
+        float speed,
+        float fireInterval,
+        float projectileSpeed)
     {
+        Id = Guid.NewGuid();
         _input = input;
+        _world = world;
+        _arena = arena;
         Position = startPosition;
         _speed = speed;
+        _fireInterval = fireInterval;
+        _projectileSpeed = projectileSpeed;
     }
 
+    public Guid Id { get; }
     public Vector2 Position { get; private set; }
     public float Rotation { get; private set; }
     public float TurretRotation { get; private set; }
+
+    // No health yet — a tank is always alive until S3 introduces damage.
+    public bool IsAlive => true;
 
     public void Step(float deltaSeconds)
     {
@@ -44,5 +71,13 @@ public sealed class Tank : ITank
         }
 
         TurretRotation = input.Aim;
+
+        _fireCooldown -= deltaSeconds;
+        if (_fireCooldown <= 0f && input.Fire)
+        {
+            _fireCooldown = _fireInterval;
+            var direction = new Vector2(MathF.Cos(TurretRotation), MathF.Sin(TurretRotation));
+            _world.Spawn(new Projectile(_arena, Position, direction, _projectileSpeed));
+        }
     }
 }
