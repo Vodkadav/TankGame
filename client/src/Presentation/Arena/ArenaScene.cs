@@ -8,10 +8,10 @@ using NVector2 = System.Numerics.Vector2;
 
 namespace TankGame.Presentation;
 
-/// <summary>M2 play scene root and gameplay composition root: loads the hand-authored
-/// <see cref="Maze01"/> into a <see cref="WallGrid"/>, builds a <see cref="GridArena"/> over
-/// it, renders it with a <see cref="WallGridView"/>, then spawns the player
-/// <see cref="Tank"/> into the <see cref="World"/> at the maze's spawn cell. It subscribes
+/// <summary>Play scene root and gameplay composition root: loads the hand-authored
+/// <see cref="Battlefield01"/> into a <see cref="WallGrid"/>, builds a <see cref="GridArena"/>
+/// over it, renders it with a <see cref="WallGridView"/>, then spawns the player
+/// <see cref="Tank"/> into the <see cref="World"/> at the level's spawn cell. It subscribes
 /// once to the world's spawn/despawn events and maps each entity to its Godot view via a
 /// type-switch (the tank to a <see cref="TankView"/> with a following camera, a projectile
 /// to a <see cref="ProjectileView"/>), freeing the view when the world reaps the entity. The
@@ -30,12 +30,12 @@ public partial class ArenaScene : Node2D
 
     private static readonly NVector2 GridOrigin = NVector2.Zero;
 
-    // Floor cells in Maze01, spread away from the player spawns.
+    // Floor cells in Battlefield01, spread away from the player spawns.
     private static readonly (int X, int Y)[] EnemySpawns = { (25, 2), (25, 14), (13, 13) };
     private static readonly (int X, int Y) Player2Spawn = (25, 7);
 
-    // Two-player uses a static camera framing the whole maze so both tanks stay on screen.
-    private static readonly Vector2 MazeCentre = new(GridOrigin.X + (28 * TileSize / 2f), GridOrigin.Y + (16 * TileSize / 2f));
+    // Two-player uses a static camera framing the whole field so both tanks stay on screen.
+    private static readonly Vector2 ArenaCentre = new(GridOrigin.X + (28 * TileSize / 2f), GridOrigin.Y + (16 * TileSize / 2f));
     private static readonly Vector2 TwoPlayerZoom = new(0.55f, 0.55f);
 
     private readonly Dictionary<Guid, Node2D> _views = new();
@@ -51,8 +51,8 @@ public partial class ArenaScene : Node2D
     {
         _mode = GameSetup.Mode;
 
-        var maze = MazeDefinition.Parse(Maze01.Text);
-        var grid = maze.BuildGrid();
+        var level = LevelMap.Parse(Battlefield01.Text);
+        var grid = level.BuildGrid();
         _arena = new GridArena(grid, TileSize, GridOrigin);
 
         _world = new World(new CombatResolver(CombatHitRadius));
@@ -71,19 +71,19 @@ public partial class ArenaScene : Node2D
         _camera = new Camera2D { Name = "GameCamera", ProcessCallback = Camera2D.Camera2DProcessCallback.Physics };
         AddChild(_camera);
 
-        SpawnTanks(maze);
+        SpawnTanks(level);
     }
 
     // Spawn through the world so each tank reaches the screen by the same event path as every
     // other entity — no hand-wiring. EntitySpawned fires synchronously. Player 1 is always
     // present; Player 2 and the AI depend on the mode.
-    private void SpawnTanks(MazeDefinition maze)
+    private void SpawnTanks(LevelMap level)
     {
         var twoPlayer = _mode != GameMode.OnePlayer;
 
         // In two-player the left mouse button is Player 2's fire, so Player 1 fires with space.
         var p1Input = new KeyboardMouseInputSource(GetViewport(), fireOnClick: !twoPlayer);
-        _player = new Tank(p1Input, _world, _arena, CellCentre(maze.SpawnX, maze.SpawnY),
+        _player = new Tank(p1Input, _world, _arena, CellCentre(level.SpawnX, level.SpawnY),
             TankSpeed, FireInterval, ProjectileSpeed, maxHp: 3, team: PlayerTeam);
         _world.Spawn(_player);
 
@@ -107,10 +107,10 @@ public partial class ArenaScene : Node2D
             }
         }
 
-        // One-player follows the tank; two-player frames the whole maze so both stay on screen.
+        // One-player follows the tank; two-player frames the whole field so both stay on screen.
         if (twoPlayer)
         {
-            _camera.Position = MazeCentre;
+            _camera.Position = ArenaCentre;
             _camera.Zoom = TwoPlayerZoom;
         }
         else

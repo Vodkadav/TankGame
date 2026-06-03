@@ -4,13 +4,13 @@ using TankGame.Domain;
 
 namespace TankGame.GameLogic;
 
-/// <summary>A hand-authored maze parsed from a text map: <c>#</c> steel, <c>x</c> brick,
-/// <c>.</c> floor, <c>@</c> the tank spawn (a floor cell). Pure C# — produces a
+/// <summary>A hand-authored level parsed from a text map: <c>#</c> steel, <c>x</c> brick,
+/// <c>.</c> floor, <c>@</c> the player spawn (a floor cell). Pure C# — produces a
 /// <see cref="WallGrid"/> model the arena and view consume. The map is the single source of
 /// the level layout; no procedural generation.</summary>
-public sealed class MazeDefinition
+public sealed class LevelMap
 {
-    private MazeDefinition(CellMaterial[,] materials, int spawnX, int spawnY)
+    private LevelMap(CellMaterial[,] materials, int spawnX, int spawnY)
     {
         Materials = materials;
         Width = materials.GetLength(0);
@@ -25,20 +25,20 @@ public sealed class MazeDefinition
     public int Width { get; }
     public int Height { get; }
 
-    /// <summary>Column of the tank spawn.</summary>
+    /// <summary>Column of the player spawn.</summary>
     public int SpawnX { get; }
 
-    /// <summary>Row of the tank spawn.</summary>
+    /// <summary>Row of the player spawn.</summary>
     public int SpawnY { get; }
 
     /// <summary>Parses a text map. Throws <see cref="FormatException"/> on ragged rows, an
     /// unknown character, or anything other than exactly one spawn.</summary>
-    public static MazeDefinition Parse(string text)
+    public static LevelMap Parse(string text)
     {
         var rows = SplitRows(text);
         if (rows.Count == 0)
         {
-            throw new FormatException("maze is empty");
+            throw new FormatException("level map is empty");
         }
 
         var width = rows[0].Length;
@@ -62,7 +62,7 @@ public sealed class MazeDefinition
                 {
                     if (spawnX.HasValue)
                     {
-                        throw new FormatException("maze has more than one spawn");
+                        throw new FormatException("level map has more than one spawn");
                     }
 
                     spawnX = x;
@@ -76,20 +76,20 @@ public sealed class MazeDefinition
                     '#' => CellMaterial.Steel,
                     'x' => CellMaterial.Brick,
                     '.' => CellMaterial.Floor,
-                    _ => throw new FormatException($"unknown maze character '{c}' at ({x},{y})"),
+                    _ => throw new FormatException($"unknown level character '{c}' at ({x},{y})"),
                 };
             }
         }
 
         if (!spawnX.HasValue)
         {
-            throw new FormatException("maze has no spawn ('@')");
+            throw new FormatException("level map has no spawn ('@')");
         }
 
-        return new MazeDefinition(materials, spawnX.Value, spawnY);
+        return new LevelMap(materials, spawnX.Value, spawnY);
     }
 
-    /// <summary>Builds the <see cref="WallGrid"/> for this maze (brick starts at full hp).</summary>
+    /// <summary>Builds the <see cref="WallGrid"/> for this level (brick starts at full hp).</summary>
     public WallGrid BuildGrid() => WallGrid.FromMaterials(Materials);
 
     private static List<string> SplitRows(string text)

@@ -3,7 +3,7 @@
 Living status tracker. The full spec is `docs/research/development-plan.md`; this
 file records what is actually done and what is next.
 
-## Current status: **M1 + S1 + M2 + local-first combat arc complete** (2026-06-03)
+## Current status: **M1 + S1 + M2 + local-first combat arc complete; local polish arc in progress** (2026-06-03)
 
 The CI/CD pipeline is live and every merge to `main` builds, tests, and deploys. M1's core
 loop ships; the S1 entity spine (ADR-0010) is done; M2 (ADR-0004) ships the destructible maze
@@ -181,6 +181,22 @@ networked MP harder.
   death; per-tank health bars. Proposal promoted to **ADR-0011**.
 
 Test counts on `main`: GameLogic 78, Domain 22, Infrastructure 8, Architecture 6, 26 GoDotTest
+scene tests.
+
+## In progress: Local polish arc (no new art, no networking)
+
+A curated cut of `feature-roadmap.md` that ships now with programmer-drawn placeholder visuals
+and runs on one device — the battlefield/cover, fog of war, hide spots, and match-flow items.
+Catalogue and ordering: `docs/research/local-backlog.md`.
+
+- **LP1 — open battlefield** ✅ replaced the dense `Maze01` labyrinth with `Battlefield01`,
+  an open arena of scattered brick (destructible) and steel (permanent) cover. The maze
+  parser/loader generalised to `LevelMap`; the "no orphan wall" test flipped to the new
+  intent — interior is ≥80% open floor and every floor cell is reachable from the spawn
+  (no walled-off pockets), while single-cell cover is now allowed. Camera/spawns unchanged
+  (still 28×16).
+
+Test counts on `main`: GameLogic 80, Domain 22, Infrastructure 8, Architecture 6, 26 GoDotTest
 scene tests.
 
 ### Deferred: M3 — 2-player real-time via a single Durable Object
