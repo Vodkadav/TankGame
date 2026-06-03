@@ -8,12 +8,13 @@ using NVector2 = System.Numerics.Vector2;
 
 namespace TankGame.Presentation;
 
-/// <summary>M1 play scene root and gameplay composition root: builds the input source, a
-/// <see cref="World"/>, and a bounding <see cref="RectArena"/>, then spawns the player
-/// <see cref="Tank"/> into the world. It subscribes once to the world's spawn/despawn
-/// events and maps each entity to its Godot view via a type-switch (the tank to a
-/// <see cref="TankView"/> with a following camera, a projectile to a
-/// <see cref="ProjectileView"/>), freeing the view when the world reaps the entity. The
+/// <summary>M2 play scene root and gameplay composition root: loads the hand-authored
+/// <see cref="Maze01"/> into a <see cref="WallGrid"/>, builds a <see cref="GridArena"/> over
+/// it, renders it with a <see cref="WallGridView"/>, then spawns the player
+/// <see cref="Tank"/> into the <see cref="World"/> at the maze's spawn cell. It subscribes
+/// once to the world's spawn/despawn events and maps each entity to its Godot view via a
+/// type-switch (the tank to a <see cref="TankView"/> with a following camera, a projectile
+/// to a <see cref="ProjectileView"/>), freeing the view when the world reaps the entity. The
 /// world is the single tick owner — <c>_Process</c> calls <see cref="World.Step"/> once and
 /// the views are pure mirrors. Drawing a new kind of entity needs only a new switch arm.</summary>
 public partial class ArenaScene : Node2D
@@ -21,29 +22,36 @@ public partial class ArenaScene : Node2D
     private const float TankSpeed = 200f;
     private const float ProjectileSpeed = 600f;
     private const float FireInterval = 0.3f;
+    private const float TileSize = 64f;
 
-    private static readonly NVector2 ArenaMin = new(-400f, -300f);
-    private static readonly NVector2 ArenaMax = new(400f, 300f);
+    private static readonly NVector2 GridOrigin = NVector2.Zero;
 
     private readonly Dictionary<Guid, Node2D> _views = new();
     private KeyboardMouseInputSource _input = null!;
     private World _world = null!;
-    private RectArena _arena = null!;
+    private GridArena _arena = null!;
 
     public override void _Ready()
     {
         _input = new KeyboardMouseInputSource(GetViewport());
-        _arena = new RectArena(ArenaMin, ArenaMax);
+
+        var maze = MazeDefinition.Parse(Maze01.Text);
+        var grid = maze.BuildGrid();
+        _arena = new GridArena(grid, TileSize, GridOrigin);
+
         _world = new World();
         _world.EntitySpawned += OnEntitySpawned;
         _world.EntityDespawned += OnEntityDespawned;
 
-        AddChild(BuildWalls());
+        var wallView = new WallGridView { Name = "WallGridView", RenderTileSize = (int)TileSize };
+        AddChild(wallView);     // runs _Ready (builds the atlas TileSet)
+        wallView.Bind(grid);    // then draw the maze and track damage
         AddChild(BuildInstructionsOverlay());
 
         // Spawn through the world so the tank reaches the screen by the same event path as
         // every other entity — no hand-wiring. EntitySpawned fires synchronously here.
-        _world.Spawn(new Tank(_input, _world, _arena, NVector2.Zero, TankSpeed, FireInterval, ProjectileSpeed));
+        var spawn = CellCentre(maze.SpawnX, maze.SpawnY);
+        _world.Spawn(new Tank(_input, _world, _arena, spawn, TankSpeed, FireInterval, ProjectileSpeed));
     }
 
     // The world is the single tick owner: it advances every entity (tank and projectiles)
@@ -101,14 +109,7 @@ public partial class ArenaScene : Node2D
         return layer;
     }
 
-    private static Line2D BuildWalls()
-    {
-        var line = new Line2D { Width = 4f, DefaultColor = new Color(0.5f, 0.5f, 0.55f) };
-        line.AddPoint(new Vector2(ArenaMin.X, ArenaMin.Y));
-        line.AddPoint(new Vector2(ArenaMax.X, ArenaMin.Y));
-        line.AddPoint(new Vector2(ArenaMax.X, ArenaMax.Y));
-        line.AddPoint(new Vector2(ArenaMin.X, ArenaMax.Y));
-        line.AddPoint(new Vector2(ArenaMin.X, ArenaMin.Y));
-        return line;
-    }
+    // World-space centre of cell (x, y) — where the tank starts and where shots land.
+    private static NVector2 CellCentre(int x, int y) =>
+        new(GridOrigin.X + ((x + 0.5f) * TileSize), GridOrigin.Y + ((y + 0.5f) * TileSize));
 }

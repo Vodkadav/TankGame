@@ -18,6 +18,10 @@ public partial class WallGridView : TileMapLayer
     private int _sourceId = -1;
     private IWallGrid? _grid;
 
+    /// <summary>World-space size of one rendered tile. Defaults to the atlas tile size; set
+    /// larger to scale the placeholder art up to the gameplay grid (the arena uses 64).</summary>
+    public int RenderTileSize { get; set; } = AtlasTile;
+
     public override void _Ready() => EnsureTileSet();
 
     /// <summary>Binds the grid, draws it once, and tracks future cell changes.</summary>
@@ -78,7 +82,7 @@ public partial class WallGridView : TileMapLayer
             source.CreateTile(new Vector2I(frame, 0));
         }
 
-        var tileSet = new TileSet { TileSize = new Vector2I(AtlasTile, AtlasTile) };
+        var tileSet = new TileSet { TileSize = new Vector2I(RenderTileSize, RenderTileSize) };
         _sourceId = tileSet.AddSource(source);
         TileSet = tileSet;
     }
