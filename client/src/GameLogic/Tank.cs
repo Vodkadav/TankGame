@@ -28,6 +28,7 @@ public sealed class Tank : ITank
     /// <param name="fireInterval">Minimum seconds between shots.</param>
     /// <param name="projectileSpeed">Speed of spawned projectiles, units per second.</param>
     /// <param name="maxHp">Hit points at full health.</param>
+    /// <param name="team">The side this tank fights for (its shots spare the same team).</param>
     public Tank(
         IInputSource input,
         IWorld world,
@@ -36,11 +37,13 @@ public sealed class Tank : ITank
         float speed,
         float fireInterval,
         float projectileSpeed,
-        int maxHp = 3)
+        int maxHp = 3,
+        int team = 0)
     {
         Id = Guid.NewGuid();
         MaxHp = maxHp;
         Hp = maxHp;
+        Team = team;
         _input = input;
         _world = world;
         _arena = arena;
@@ -66,6 +69,7 @@ public sealed class Tank : ITank
 
     public int Hp { get; private set; }
     public int MaxHp { get; }
+    public int Team { get; }
 
     // Reaped by the world once its hit points are gone.
     public bool IsAlive => Hp > 0;
@@ -138,7 +142,7 @@ public sealed class Tank : ITank
         {
             _fireCooldown = _fireInterval;
             var direction = new Vector2(MathF.Cos(TurretRotation), MathF.Sin(TurretRotation));
-            _world.Spawn(new Projectile(_arena, Position, direction, _projectileSpeed));
+            _world.Spawn(new Projectile(_arena, Position, direction, _projectileSpeed, team: Team));
         }
     }
 

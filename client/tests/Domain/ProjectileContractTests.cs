@@ -26,6 +26,7 @@ public class ProjectileContractTests
         }
 
         public Guid Id { get; }
+        public int Team => 0;
         public Vector2 Position { get; private set; }
         public bool IsAlive { get; private set; }
 

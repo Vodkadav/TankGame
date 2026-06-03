@@ -12,4 +12,8 @@ public interface ITank : IEntity, IDamageable
 
     /// <summary>Turret facing, in radians (follows the aim input).</summary>
     float TurretRotation { get; }
+
+    /// <summary>The side this tank fights for. Shots from the same team pass through it; a
+    /// different team's shots damage it. Player 1, Player 2, and the AI each get their own.</summary>
+    int Team { get; }
 }

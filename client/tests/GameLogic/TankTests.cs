@@ -161,6 +161,21 @@ public class TankTests
     }
 
     [Fact]
+    public void Step_StampsItsTeamOnFiredProjectiles()
+    {
+        var world = new World();
+        var tank = new Tank(
+            new ScriptedInput(new TankInput(Vector2.Zero, Aim: 0f, Fire: true)),
+            world, new OpenArena(), Vector2.Zero, Speed, FireInterval, ProjectileSpeed, maxHp: 3, team: 2);
+
+        tank.Step(0.1f);
+
+        var shot = Assert.IsType<Projectile>(world.Entities.First());
+        Assert.Equal(2, tank.Team);
+        Assert.Equal(2, shot.Team); // the shot belongs to the firing tank's team
+    }
+
+    [Fact]
     public void Step_DoesNotSpawn_WhenFireIsNotHeld()
     {
         var world = new World();

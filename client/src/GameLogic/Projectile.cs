@@ -18,10 +18,12 @@ public sealed class Projectile : IProjectile
     /// <param name="spawn">World-space spawn position (the turret muzzle).</param>
     /// <param name="direction">Travel direction; normalised internally.</param>
     /// <param name="speed">Travel speed in units per second.</param>
-    /// <param name="damage">Damage dealt to a destructible wall on impact.</param>
-    public Projectile(IArena arena, Vector2 spawn, Vector2 direction, float speed, int damage = 1)
+    /// <param name="damage">Damage dealt to a destructible wall or tank on impact.</param>
+    /// <param name="team">The firing tank's team; the combat pass spares the same team.</param>
+    public Projectile(IArena arena, Vector2 spawn, Vector2 direction, float speed, int damage = 1, int team = 0)
     {
         Id = Guid.NewGuid();
+        Team = team;
         _arena = arena;
         Position = spawn;
         _direction = Vector2.Normalize(direction);
@@ -30,6 +32,7 @@ public sealed class Projectile : IProjectile
         IsAlive = true;
     }
 
+    public int Team { get; }
     public Guid Id { get; }
     public Vector2 Position { get; private set; }
     public bool IsAlive { get; private set; }

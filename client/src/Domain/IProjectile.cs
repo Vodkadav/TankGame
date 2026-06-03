@@ -7,4 +7,7 @@ namespace TankGame.Domain;
 /// whole contract — a projectile adds no members of its own today.</summary>
 public interface IProjectile : IEntity
 {
+    /// <summary>The team of the tank that fired this shot. The combat pass spares tanks on
+    /// the same team, so a tank cannot shoot itself or its allies.</summary>
+    int Team { get; }
 }
