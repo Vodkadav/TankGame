@@ -34,9 +34,13 @@ public partial class ArenaScene : Node2D
     private static readonly (int X, int Y)[] EnemySpawns = { (25, 2), (25, 14), (13, 13) };
 
     private readonly Dictionary<Guid, Node2D> _views = new();
+    private readonly MatchTracker _matchTracker = new();
     private KeyboardMouseInputSource _input = null!;
     private World _world = null!;
     private GridArena _arena = null!;
+    private Camera2D _camera = null!;
+    private ITank _player = null!;
+    private bool _matchOver;
 
     public override void _Ready()
     {
@@ -59,12 +63,17 @@ public partial class ArenaScene : Node2D
         AddChild(brickCounter); // runs _Ready (builds the label)
         brickCounter.Bind(grid);
 
+        // The camera lives on the scene (not the player's view) and follows the player each
+        // frame, so it survives the player's death and the game-over screen stays put.
+        _camera = new Camera2D { Name = "GameCamera", ProcessCallback = Camera2D.Camera2DProcessCallback.Physics };
+        AddChild(_camera);
+
         // Spawn through the world so each tank reaches the screen by the same event path as
         // every other entity — no hand-wiring. EntitySpawned fires synchronously here.
-        var player = new Tank(_input, _world, _arena, CellCentre(maze.SpawnX, maze.SpawnY),
+        _player = new Tank(_input, _world, _arena, CellCentre(maze.SpawnX, maze.SpawnY),
             TankSpeed, FireInterval, ProjectileSpeed, maxHp: 3, team: PlayerTeam);
-        _world.Spawn(player);
-        AttachCamera(player); // the camera follows the player tank only
+        _world.Spawn(_player);
+        _camera.Position = new Vector2(_player.Position.X, _player.Position.Y);
 
         foreach (var (ex, ey) in EnemySpawns)
         {
@@ -76,9 +85,30 @@ public partial class ArenaScene : Node2D
         }
     }
 
-    // The world is the single tick owner: it advances every entity (tank and projectiles)
-    // and reaps the dead. The views hold no tick — they mirror their model each frame.
-    public override void _Process(double delta) => _world.Step((float)delta);
+    // The world is the single tick owner: it advances every entity (tank and projectiles) and
+    // reaps the dead. The views hold no tick — they mirror their model each frame. Once the
+    // match is decided the world freezes and the game-over screen shows.
+    public override void _Process(double delta)
+    {
+        if (_matchOver)
+        {
+            return;
+        }
+
+        _world.Step((float)delta);
+
+        if (_player.IsAlive)
+        {
+            _camera.Position = new Vector2(_player.Position.X, _player.Position.Y);
+        }
+
+        var result = _matchTracker.Evaluate(_world.Entities);
+        if (result.Decided)
+        {
+            _matchOver = true;
+            ShowGameOver(result);
+        }
+    }
 
     private void OnEntitySpawned(IEntity entity)
     {
@@ -114,13 +144,34 @@ public partial class ArenaScene : Node2D
         return view;
     }
 
-    // The camera lives on a tank's view (so it follows that tank) — only the player's.
-    private void AttachCamera(ITank tank)
+    // Resolve the decided match into the player's perspective: their team winning is a win,
+    // a draw or any other team surviving is a loss. Shows a screen-space overlay with a
+    // restart button that reloads the scene for a fresh round.
+    private void ShowGameOver(MatchResult result)
     {
-        if (_views.TryGetValue(tank.Id, out var view))
+        var key = result.WinningTeam == PlayerTeam ? "hud.you_win"
+            : result.WinningTeam is null ? "hud.draw"
+            : "hud.you_lose";
+
+        var layer = new CanvasLayer { Name = "GameOverLayer" };
+        var box = new VBoxContainer { Name = "GameOver" };
+        box.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.Center);
+        box.GrowHorizontal = Control.GrowDirection.Both;
+        box.GrowVertical = Control.GrowDirection.Both;
+
+        box.AddChild(new Label
         {
-            view.AddChild(new Camera2D { ProcessCallback = Camera2D.Camera2DProcessCallback.Physics });
-        }
+            Name = "Outcome",
+            Text = key,
+            HorizontalAlignment = HorizontalAlignment.Center,
+        });
+
+        var restart = new Button { Name = "Restart", Text = "hud.restart" };
+        restart.Pressed += () => GetTree().ReloadCurrentScene();
+        box.AddChild(restart);
+
+        layer.AddChild(box);
+        AddChild(layer);
     }
 
     private static ProjectileView BuildProjectileView(IProjectile projectile)
