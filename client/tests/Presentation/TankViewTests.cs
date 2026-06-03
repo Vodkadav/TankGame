@@ -43,18 +43,19 @@ public class TankViewTests : TestClass
     }
 
     [Test]
-    public void UpdateFromModel_MovesNodeAndRotatesSpritesToMatchTank()
+    public void UpdateFromModel_MirrorsTheTankPositionAndRotations()
     {
         var input = new FixedInput(new TankInput(new NVector2(1f, 0f), Aim: 0.75f, Fire: false));
         var arena = new RectArena(new NVector2(-500f, -500f), new NVector2(500f, 500f));
         var tank = new Tank(input, new World(), arena, NVector2.Zero, speed: 100f, fireInterval: 0.3f, projectileSpeed: 600f);
         _view.Bind(tank);
 
-        _view.UpdateFromModel(0.1f); // 100 u/s * 0.1s = 10 units along +X
+        tank.Step(0.1f); // the model advances 10 units along +X; the view only mirrors
+        _view.UpdateFromModel();
 
         if (Mathf.Abs(_view.Position.X - 10f) > 0.01f)
         {
-            throw new System.Exception($"View should follow the tank to x=10; was {_view.Position.X}.");
+            throw new System.Exception($"View should mirror the tank to x=10; was {_view.Position.X}.");
         }
 
         var turret = _view.GetNode<Sprite2D>("Turret");
