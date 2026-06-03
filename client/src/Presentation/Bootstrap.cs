@@ -35,7 +35,7 @@ public partial class Bootstrap : Node
         // Deferred: the scene tree is mid-add during _Ready and rejects an
         // immediate scene swap ("parent node is busy adding/removing children").
         GetTree().CallDeferred(
-            SceneTree.MethodName.ChangeSceneToFile, "res://src/Presentation/Arena/Arena.tscn");
+            SceneTree.MethodName.ChangeSceneToFile, "res://src/Presentation/Title.tscn");
     }
 
 #if DEBUG
