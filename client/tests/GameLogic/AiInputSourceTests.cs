@@ -126,4 +126,69 @@ public class AiInputSourceTests
 
         Assert.False(intent.Fire); // cannot see the target through steel
     }
+
+    [Fact]
+    public void DoesNotChaseAnEnemyItCannotSee_BehindAWall()
+    {
+        var materials = new CellMaterial[5, 1];
+        for (var x = 0; x < 5; x++)
+        {
+            materials[x, 0] = x == 2 ? CellMaterial.Steel : CellMaterial.Floor;
+        }
+
+        var arena = new GridArena(WallGrid.FromMaterials(materials), tileSize: 64f, origin: Vector2.Zero);
+        var world = new World();
+        var self = new StubTank(new Vector2(32f, 32f), team: 1);
+        world.Spawn(self);
+        world.Spawn(new StubTank(new Vector2(288f, 32f), team: 0)); // behind the wall
+        var ai = AiDriving(self, world, arena);
+
+        var intent = ai.Read();
+
+        Assert.Equal(Vector2.Zero, intent.Move); // an unseen enemy is not hunted
+        Assert.False(intent.Fire);
+    }
+
+    [Fact]
+    public void IgnoresAnEnemyBeyondVisionRange()
+    {
+        var world = new World();
+        var self = new StubTank(Vector2.Zero, team: 1);
+        world.Spawn(self);
+        world.Spawn(new StubTank(new Vector2(5000f, 0f), team: 0)); // far past sight, open ground
+        var ai = AiDriving(self, world);
+
+        var intent = ai.Read();
+
+        Assert.Equal(Vector2.Zero, intent.Move); // too far to see — no target acquired
+        Assert.False(intent.Fire);
+    }
+
+    [Fact]
+    public void ChasesTheNearestEnemyItCanSee_NotACloserHiddenOne()
+    {
+        // A steel wall in cell 2 hides a close enemy in cell 0's row; a visible enemy sits
+        // in the open below. The AI must pick the one it can see, not the nearer hidden one.
+        var materials = new CellMaterial[5, 5];
+        for (var x = 0; x < 5; x++)
+        {
+            for (var y = 0; y < 5; y++)
+            {
+                materials[x, y] = (x == 2 && y == 0) ? CellMaterial.Steel : CellMaterial.Floor;
+            }
+        }
+
+        var arena = new GridArena(WallGrid.FromMaterials(materials), tileSize: 64f, origin: Vector2.Zero);
+        var world = new World();
+        var self = new StubTank(new Vector2(32f, 32f), team: 1);
+        world.Spawn(self);
+        world.Spawn(new StubTank(new Vector2(288f, 32f), team: 0));  // nearer but behind steel
+        world.Spawn(new StubTank(new Vector2(32f, 288f), team: 0));  // farther but in the open (+Y)
+        var ai = AiDriving(self, world, arena);
+
+        var intent = ai.Read();
+
+        Assert.True(intent.Move.Y > 0f, "AI should chase the visible enemy below, not the hidden one");
+        Assert.True(MathF.Abs(intent.Move.X) < 0.01f);
+    }
 }
