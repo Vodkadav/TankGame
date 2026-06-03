@@ -48,6 +48,10 @@ public partial class ArenaScene : Node2D
         wallView.Bind(grid);    // then draw the maze and track damage
         AddChild(BuildInstructionsOverlay());
 
+        var brickCounter = new BrickCounterOverlay { Name = "BrickCounterOverlay" };
+        AddChild(brickCounter); // runs _Ready (builds the label)
+        brickCounter.Bind(grid);
+
         // Spawn through the world so the tank reaches the screen by the same event path as
         // every other entity — no hand-wiring. EntitySpawned fires synchronously here.
         var spawn = CellCentre(maze.SpawnX, maze.SpawnY);
