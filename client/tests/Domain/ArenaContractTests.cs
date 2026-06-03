@@ -19,6 +19,10 @@ public class ArenaContractTests
             var dir = Vector2.Normalize(direction);
             return new RaycastHit(origin + (dir * wallDistance), wallDistance);
         }
+
+        public void DamageAt(Vector2 point, Vector2 direction, int amount)
+        {
+        }
     }
 
     [Fact]

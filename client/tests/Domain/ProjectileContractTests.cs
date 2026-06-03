@@ -58,6 +58,10 @@ public class ProjectileContractTests
                 ? new RaycastHit(new Vector2(distance, origin.Y), remaining)
                 : null;
         }
+
+        public void DamageAt(Vector2 point, Vector2 direction, int amount)
+        {
+        }
     }
 
     [Fact]

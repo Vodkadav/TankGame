@@ -19,6 +19,7 @@ public class TankTests
     private sealed class OpenArena : IArena
     {
         public RaycastHit? RaycastFirstHit(Vector2 origin, Vector2 direction, float maxDistance) => null;
+        public void DamageAt(Vector2 point, Vector2 direction, int amount) { }
     }
 
     private const float Speed = 100f;

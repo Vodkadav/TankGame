@@ -39,4 +39,9 @@ public sealed class RectArena(Vector2 min, Vector2 max) : IArena
 
         return new RaycastHit(origin + (dir * exit), exit);
     }
+
+    // The bounding walls are indestructible, so there is nothing to damage.
+    public void DamageAt(Vector2 point, Vector2 direction, int amount)
+    {
+    }
 }
