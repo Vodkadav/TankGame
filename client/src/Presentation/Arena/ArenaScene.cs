@@ -20,12 +20,18 @@ namespace TankGame.Presentation;
 public partial class ArenaScene : Node2D
 {
     private const float TankSpeed = 200f;
+    private const float EnemySpeed = 140f;
     private const float ProjectileSpeed = 600f;
     private const float FireInterval = 0.3f;
     private const float TileSize = 64f;
     private const float CombatHitRadius = 28f;
+    private const int PlayerTeam = 0;
+    private const int EnemyTeam = 1;
 
     private static readonly NVector2 GridOrigin = NVector2.Zero;
+
+    // Floor cells in Maze01, spread away from the player spawn at (2,1).
+    private static readonly (int X, int Y)[] EnemySpawns = { (25, 2), (25, 14), (13, 13) };
 
     private readonly Dictionary<Guid, Node2D> _views = new();
     private KeyboardMouseInputSource _input = null!;
@@ -53,10 +59,21 @@ public partial class ArenaScene : Node2D
         AddChild(brickCounter); // runs _Ready (builds the label)
         brickCounter.Bind(grid);
 
-        // Spawn through the world so the tank reaches the screen by the same event path as
+        // Spawn through the world so each tank reaches the screen by the same event path as
         // every other entity — no hand-wiring. EntitySpawned fires synchronously here.
-        var spawn = CellCentre(maze.SpawnX, maze.SpawnY);
-        _world.Spawn(new Tank(_input, _world, _arena, spawn, TankSpeed, FireInterval, ProjectileSpeed));
+        var player = new Tank(_input, _world, _arena, CellCentre(maze.SpawnX, maze.SpawnY),
+            TankSpeed, FireInterval, ProjectileSpeed, maxHp: 3, team: PlayerTeam);
+        _world.Spawn(player);
+        AttachCamera(player); // the camera follows the player tank only
+
+        foreach (var (ex, ey) in EnemySpawns)
+        {
+            var ai = new AiInputSource(_world, _arena);
+            var enemy = new Tank(ai, _world, _arena, CellCentre(ex, ey),
+                EnemySpeed, FireInterval, ProjectileSpeed, maxHp: 3, team: EnemyTeam);
+            ai.Bind(enemy); // resolve the input-source ↔ tank construction cycle
+            _world.Spawn(enemy);
+        }
     }
 
     // The world is the single tick owner: it advances every entity (tank and projectiles)
@@ -89,8 +106,21 @@ public partial class ArenaScene : Node2D
         var view = GD.Load<PackedScene>("res://src/Presentation/Tank/TankView.tscn")
             .Instantiate<TankView>();
         view.Bind(tank);
-        view.AddChild(new Camera2D { ProcessCallback = Camera2D.Camera2DProcessCallback.Physics });
+        if (tank.Team != PlayerTeam)
+        {
+            view.Modulate = new Color(1f, 0.5f, 0.5f); // tint adversaries red
+        }
+
         return view;
+    }
+
+    // The camera lives on a tank's view (so it follows that tank) — only the player's.
+    private void AttachCamera(ITank tank)
+    {
+        if (_views.TryGetValue(tank.Id, out var view))
+        {
+            view.AddChild(new Camera2D { ProcessCallback = Camera2D.Camera2DProcessCallback.Physics });
+        }
     }
 
     private static ProjectileView BuildProjectileView(IProjectile projectile)

@@ -21,34 +21,35 @@ public class ArenaSceneTests : TestClass
     public void Cleanup() => _arena.QueueFree();
 
     [Test]
-    public void Arena_WiresUpATankViewWithAFollowingCamera()
+    public void Arena_WiresUpThePlayerAndAdversaries_WithACameraOnThePlayerOnly()
     {
-        TankView? view = null;
+        var tankViews = 0;
+        var cameras = 0;
         foreach (var child in _arena.GetChildren())
         {
-            if (child is TankView tankView)
+            if (child is not TankView tankView)
             {
-                view = tankView;
+                continue;
+            }
+
+            tankViews++;
+            foreach (var grandchild in tankView.GetChildren())
+            {
+                if (grandchild is Camera2D)
+                {
+                    cameras++;
+                }
             }
         }
 
-        if (view is null)
+        if (tankViews < 2)
         {
-            throw new System.Exception("Arena must instance a TankView at runtime.");
+            throw new System.Exception($"Arena must instance the player plus AI adversaries; saw {tankViews} tanks.");
         }
 
-        var hasCamera = false;
-        foreach (var child in view.GetChildren())
+        if (cameras != 1)
         {
-            if (child is Camera2D)
-            {
-                hasCamera = true;
-            }
-        }
-
-        if (!hasCamera)
-        {
-            throw new System.Exception("The TankView must have a Camera2D so the tank stays centred.");
+            throw new System.Exception($"Exactly one tank (the player) must carry the Camera2D; saw {cameras}.");
         }
     }
 
