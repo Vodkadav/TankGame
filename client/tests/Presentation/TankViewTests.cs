@@ -64,4 +64,26 @@ public class TankViewTests : TestClass
             throw new System.Exception($"Turret should aim at 0.75 rad; was {turret.Rotation}.");
         }
     }
+
+    [Test]
+    public void UpdateFromModel_ShrinksTheHealthBar_AsTheTankTakesDamage()
+    {
+        var input = new FixedInput(new TankInput(NVector2.Zero, Aim: 0f, Fire: false));
+        var arena = new RectArena(new NVector2(-500f, -500f), new NVector2(500f, 500f));
+        var tank = new Tank(input, new World(), arena, NVector2.Zero, speed: 100f, fireInterval: 0.3f,
+            projectileSpeed: 600f, maxHp: 4);
+        _view.Bind(tank);
+
+        _view.UpdateFromModel();
+        var bar = _view.GetNode<ColorRect>("HealthBar");
+        var fullWidth = bar.Size.X;
+
+        tank.TakeDamage(2); // half health
+        _view.UpdateFromModel();
+
+        if (Mathf.Abs(bar.Size.X - (fullWidth / 2f)) > 0.5f)
+        {
+            throw new System.Exception($"Health bar should halve to {fullWidth / 2f}; was {bar.Size.X}.");
+        }
+    }
 }
