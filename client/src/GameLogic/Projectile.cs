@@ -37,6 +37,13 @@ public sealed class Projectile : IProjectile
     public Vector2 Position { get; private set; }
     public bool IsAlive { get; private set; }
 
+    /// <summary>Damage this shot deals to a tank on impact.</summary>
+    public int Damage => _damage;
+
+    /// <summary>Marks the shot spent so the world reaps it — used when the combat pass lands
+    /// it on a tank.</summary>
+    public void Expire() => IsAlive = false;
+
     public void Step(float deltaSeconds)
     {
         if (!IsAlive)
