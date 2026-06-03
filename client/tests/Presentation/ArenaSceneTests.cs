@@ -53,20 +53,26 @@ public class ArenaSceneTests : TestClass
     }
 
     [Test]
-    public void Arena_DrawsItsWalls()
+    public void Arena_RendersTheMazeWallGrid()
     {
-        var hasWalls = false;
+        WallGridView? walls = null;
         foreach (var child in _arena.GetChildren())
         {
-            if (child is Line2D line && line.GetPointCount() >= 4)
+            if (child is WallGridView view)
             {
-                hasWalls = true;
+                walls = view;
             }
         }
 
-        if (!hasWalls)
+        if (walls is null)
         {
-            throw new System.Exception("Arena must draw a wall boundary (a closed Line2D).");
+            throw new System.Exception("Arena must render the maze via a WallGridView.");
+        }
+
+        // The hand-authored maze has a steel border, so the corner cell must carry a tile.
+        if (walls.GetCellSourceId(new Vector2I(0, 0)) == -1)
+        {
+            throw new System.Exception("The maze's steel border should be drawn at cell (0,0).");
         }
     }
 }
