@@ -3,13 +3,14 @@
 Living status tracker. The full spec is `docs/research/development-plan.md`; this
 file records what is actually done and what is next.
 
-## Current status: **M1 + S1 + M2 complete** (2026-06-03) — M3 needs the developer
+## Current status: **M1 + S1 + M2 complete** (2026-06-03) — building the local-first combat arc
 
 The CI/CD pipeline is live and every merge to `main` builds, tests, and deploys. M1's core
 loop ships (drive + shoot + instructions overlay); the S1 entity spine (ADR-0010) is done
-(the world owns and steps every entity, nothing hand-spawns); and M2 (ADR-0004) ships the
-destructible maze. The next milestone **M3** (real-time 2-player) needs developer
-involvement (Cloudflare Durable Object, secrets, two-device testing) — see "Next" below.
+(the world owns and steps every entity, nothing hand-spawns); M2 (ADR-0004) ships the
+destructible maze; and a post-M2 pass added tank↔wall collision + push-to-demolish. After
+playtesting, the developer pivoted to a **local-first combat arc** (single-player vs AI →
+local 2-player → networked later); the networked M3 is deferred. See "Next" below.
 
 ### Live surfaces
 
@@ -155,9 +156,29 @@ to floor) and steel (indestructible) walls. Design + as-built record:
 
 ---
 
-## Next: M3 — 2-player real-time via a single Durable Object
+## Next: Local-first combat arc (networked M3 deferred)
 
-Per `development-plan.md` M3. Two devices, same maze, both tanks moving in real time over
-WebSocket with a server-authoritative simulation, client prediction, and reconciliation.
-**Needs developer involvement** — a Cloudflare account + Durable Object deploy, secrets in
-GitHub Actions, and two-device playtesting — so it is not fully autonomous like M1/S1/M2.
+After playtesting M2, the developer chose to grow the game locally before networking:
+**single-player vs computer adversaries → local 2-player (P1 WASD+Space, P2 arrows+left
+click) → networked later.** Design + MP-safety rationale + ticket table:
+`docs/adr/PROPOSAL-local-first-combat.md`. The guarantee: `IInputSource` is the universal
+"intent" seam (human / AI / future network player all drive a tank the same way) and combat
+is a deterministic GameLogic pass — so this arc does not make networked MP harder.
+
+Sequence (each a shippable TDD slice):
+
+- **C1 — tank health + death**: `Tank` gains `MaxHp`/`Hp`; `IsAlive` becomes HP-driven
+  (resolves the S1 stub); dead tanks reaped by the world.
+- **C2 — teams + projectile ownership**: a shot never hurts its own team.
+- **C3 — projectile↔tank combat pass**: a deterministic resolver in the world's step cycle
+  applies damage and kills shots/tanks.
+- **C4 — computer adversaries**: an `AiInputSource` drives enemy tanks (seek/aim/fire) —
+  single-player vs AI playable.
+- **C5 — local 2-player**: a second keyboard+mouse input source — couch versus playable.
+- **C6 — HUD + round flow + ADR**: health bars, win/lose (EN/ES/DK), promote the proposal.
+
+### Deferred: M3 — 2-player real-time via a single Durable Object
+
+Still planned (`development-plan.md` M3), but **after** the local-first arc. Needs developer
+involvement (Cloudflare Durable Object + secrets + two-device testing), so it is not
+autonomous; the intent seam and deterministic combat above are what keep it tractable.
