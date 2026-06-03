@@ -107,7 +107,7 @@ of the views** (they call `model.Step` today).
   calling `model.Step`; `world.Step` advances the tank too), and generalize the spawn→view
   factory to a type-switch over `ITank`/`IProjectile`. `ArenaSceneTests` (TankView +
   Camera2D + walls) must stay green. Then **S1-T6** (promote the proposal to a numbered ADR
-  + update this file).
+  and update this file).
 
 S1 is the systems-foundation slice and is **not** yet a numbered milestone in
 `development-plan.md`; **M2 — static labyrinth + destructible walls** remains the next
