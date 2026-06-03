@@ -30,21 +30,26 @@ public partial class ArenaScene : Node2D
 
     private static readonly NVector2 GridOrigin = NVector2.Zero;
 
-    // Floor cells in Maze01, spread away from the player spawn at (2,1).
+    // Floor cells in Maze01, spread away from the player spawns.
     private static readonly (int X, int Y)[] EnemySpawns = { (25, 2), (25, 14), (13, 13) };
+    private static readonly (int X, int Y) Player2Spawn = (25, 7);
+
+    // Two-player uses a static camera framing the whole maze so both tanks stay on screen.
+    private static readonly Vector2 MazeCentre = new(GridOrigin.X + (28 * TileSize / 2f), GridOrigin.Y + (16 * TileSize / 2f));
+    private static readonly Vector2 TwoPlayerZoom = new(0.55f, 0.55f);
 
     private readonly Dictionary<Guid, Node2D> _views = new();
     private readonly MatchTracker _matchTracker = new();
-    private KeyboardMouseInputSource _input = null!;
     private World _world = null!;
     private GridArena _arena = null!;
     private Camera2D _camera = null!;
     private ITank _player = null!;
+    private GameMode _mode;
     private bool _matchOver;
 
     public override void _Ready()
     {
-        _input = new KeyboardMouseInputSource(GetViewport());
+        _mode = GameSetup.Mode;
 
         var maze = MazeDefinition.Parse(Maze01.Text);
         var grid = maze.BuildGrid();
@@ -63,25 +68,54 @@ public partial class ArenaScene : Node2D
         AddChild(brickCounter); // runs _Ready (builds the label)
         brickCounter.Bind(grid);
 
-        // The camera lives on the scene (not the player's view) and follows the player each
-        // frame, so it survives the player's death and the game-over screen stays put.
         _camera = new Camera2D { Name = "GameCamera", ProcessCallback = Camera2D.Camera2DProcessCallback.Physics };
         AddChild(_camera);
 
-        // Spawn through the world so each tank reaches the screen by the same event path as
-        // every other entity — no hand-wiring. EntitySpawned fires synchronously here.
-        _player = new Tank(_input, _world, _arena, CellCentre(maze.SpawnX, maze.SpawnY),
+        SpawnTanks(maze);
+    }
+
+    // Spawn through the world so each tank reaches the screen by the same event path as every
+    // other entity — no hand-wiring. EntitySpawned fires synchronously. Player 1 is always
+    // present; Player 2 and the AI depend on the mode.
+    private void SpawnTanks(MazeDefinition maze)
+    {
+        var twoPlayer = _mode != GameMode.OnePlayer;
+
+        // In two-player the left mouse button is Player 2's fire, so Player 1 fires with space.
+        var p1Input = new KeyboardMouseInputSource(GetViewport(), fireOnClick: !twoPlayer);
+        _player = new Tank(p1Input, _world, _arena, CellCentre(maze.SpawnX, maze.SpawnY),
             TankSpeed, FireInterval, ProjectileSpeed, maxHp: 3, team: PlayerTeam);
         _world.Spawn(_player);
-        _camera.Position = new Vector2(_player.Position.X, _player.Position.Y);
 
-        foreach (var (ex, ey) in EnemySpawns)
+        if (twoPlayer)
         {
-            var ai = new AiInputSource(_world, _arena);
-            var enemy = new Tank(ai, _world, _arena, CellCentre(ex, ey),
-                EnemySpeed, FireInterval, ProjectileSpeed, maxHp: 3, team: EnemyTeam);
-            ai.Bind(enemy); // resolve the input-source ↔ tank construction cycle
-            _world.Spawn(enemy);
+            var p2Team = _mode == GameMode.TwoPlayerVersus ? EnemyTeam : PlayerTeam;
+            var p2 = new Tank(new Player2InputSource(), _world, _arena, CellCentre(Player2Spawn.X, Player2Spawn.Y),
+                TankSpeed, FireInterval, ProjectileSpeed, maxHp: 3, team: p2Team);
+            _world.Spawn(p2);
+        }
+
+        if (_mode != GameMode.TwoPlayerVersus)
+        {
+            foreach (var (ex, ey) in EnemySpawns)
+            {
+                var ai = new AiInputSource(_world, _arena);
+                var enemy = new Tank(ai, _world, _arena, CellCentre(ex, ey),
+                    EnemySpeed, FireInterval, ProjectileSpeed, maxHp: 3, team: EnemyTeam);
+                ai.Bind(enemy); // resolve the input-source ↔ tank construction cycle
+                _world.Spawn(enemy);
+            }
+        }
+
+        // One-player follows the tank; two-player frames the whole maze so both stay on screen.
+        if (twoPlayer)
+        {
+            _camera.Position = MazeCentre;
+            _camera.Zoom = TwoPlayerZoom;
+        }
+        else
+        {
+            _camera.Position = new Vector2(_player.Position.X, _player.Position.Y);
         }
     }
 
@@ -97,7 +131,8 @@ public partial class ArenaScene : Node2D
 
         _world.Step((float)delta);
 
-        if (_player.IsAlive)
+        // One-player keeps the camera on the player; two-player uses a fixed maze-framing camera.
+        if (_mode == GameMode.OnePlayer && _player.IsAlive)
         {
             _camera.Position = new Vector2(_player.Position.X, _player.Position.Y);
         }
@@ -149,9 +184,9 @@ public partial class ArenaScene : Node2D
     // restart button that reloads the scene for a fresh round.
     private void ShowGameOver(MatchResult result)
     {
-        var key = result.WinningTeam == PlayerTeam ? "hud.you_win"
-            : result.WinningTeam is null ? "hud.draw"
-            : "hud.you_lose";
+        var key = _mode == GameMode.TwoPlayerVersus
+            ? (result.WinningTeam is null ? "hud.draw" : result.WinningTeam == PlayerTeam ? "hud.p1_wins" : "hud.p2_wins")
+            : (result.WinningTeam == PlayerTeam ? "hud.you_win" : result.WinningTeam is null ? "hud.draw" : "hud.you_lose");
 
         var layer = new CanvasLayer { Name = "GameOverLayer" };
         var box = new VBoxContainer { Name = "GameOver" };

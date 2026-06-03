@@ -24,23 +24,25 @@ public class GameOverLocaleTests : TestClass
 
     [Test]
     public void English_RendersTheRoundEndStrings()
-        => AssertAll("en", "You win!", "You lose!", "Draw!", "Play again");
+        => AssertAll("en", "You win!", "You lose!", "Draw!", "Play again", "Player 1 wins!", "Player 2 wins!");
 
     [Test]
     public void Spanish_RendersTheRoundEndStrings()
-        => AssertAll("es", "¡Ganaste!", "¡Perdiste!", "¡Empate!", "Jugar de nuevo");
+        => AssertAll("es", "¡Ganaste!", "¡Perdiste!", "¡Empate!", "Jugar de nuevo", "¡Jugador 1 gana!", "¡Jugador 2 gana!");
 
     [Test]
     public void Danish_RendersTheRoundEndStrings()
-        => AssertAll("dk", "Du vandt!", "Du tabte!", "Uafgjort!", "Spil igen");
+        => AssertAll("dk", "Du vandt!", "Du tabte!", "Uafgjort!", "Spil igen", "Spiller 1 vinder!", "Spiller 2 vinder!");
 
-    private static void AssertAll(string locale, string win, string lose, string draw, string restart)
+    private static void AssertAll(string locale, string win, string lose, string draw, string restart, string p1, string p2)
     {
         TranslationServer.SetLocale(locale);
         AssertKey(locale, "hud.you_win", win);
         AssertKey(locale, "hud.you_lose", lose);
         AssertKey(locale, "hud.draw", draw);
         AssertKey(locale, "hud.restart", restart);
+        AssertKey(locale, "hud.p1_wins", p1);
+        AssertKey(locale, "hud.p2_wins", p2);
     }
 
     private static void AssertKey(string locale, string key, string expected)
