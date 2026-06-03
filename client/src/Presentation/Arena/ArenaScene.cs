@@ -9,12 +9,13 @@ using NVector2 = System.Numerics.Vector2;
 namespace TankGame.Presentation;
 
 /// <summary>M1 play scene root and gameplay composition root: builds the input source, a
-/// <see cref="World"/>, a <see cref="Tank"/>, and a bounding <see cref="RectArena"/>;
-/// renders the tank with a following camera; draws the arena walls. The tank owns the
-/// fire/cooldown rule and spawns <see cref="Projectile"/>s into the world; the scene
-/// subscribes to the world's spawn/despawn events and maps each spawned projectile to a
-/// <see cref="ProjectileView"/>, freeing it when the world reaps the projectile. (Tick
-/// ownership for the tank still lives in <see cref="TankView"/> until S1-T5.)</summary>
+/// <see cref="World"/>, and a bounding <see cref="RectArena"/>, then spawns the player
+/// <see cref="Tank"/> into the world. It subscribes once to the world's spawn/despawn
+/// events and maps each entity to its Godot view via a type-switch (the tank to a
+/// <see cref="TankView"/> with a following camera, a projectile to a
+/// <see cref="ProjectileView"/>), freeing the view when the world reaps the entity. The
+/// world is the single tick owner — <c>_Process</c> calls <see cref="World.Step"/> once and
+/// the views are pure mirrors. Drawing a new kind of entity needs only a new switch arm.</summary>
 public partial class ArenaScene : Node2D
 {
     private const float TankSpeed = 200f;
@@ -27,7 +28,6 @@ public partial class ArenaScene : Node2D
     private readonly Dictionary<Guid, Node2D> _views = new();
     private KeyboardMouseInputSource _input = null!;
     private World _world = null!;
-    private Tank _tank = null!;
     private RectArena _arena = null!;
 
     public override void _Ready()
@@ -38,34 +38,28 @@ public partial class ArenaScene : Node2D
         _world.EntitySpawned += OnEntitySpawned;
         _world.EntityDespawned += OnEntityDespawned;
 
-        _tank = new Tank(_input, _world, _arena, NVector2.Zero, TankSpeed, FireInterval, ProjectileSpeed);
-
         AddChild(BuildWalls());
         AddChild(BuildInstructionsOverlay());
 
-        var view = GD.Load<PackedScene>("res://src/Presentation/Tank/TankView.tscn")
-            .Instantiate<TankView>();
-        AddChild(view);
-        view.Bind(_tank);
-        view.AddChild(new Camera2D { ProcessCallback = Camera2D.Camera2DProcessCallback.Physics });
+        // Spawn through the world so the tank reaches the screen by the same event path as
+        // every other entity — no hand-wiring. EntitySpawned fires synchronously here.
+        _world.Spawn(new Tank(_input, _world, _arena, NVector2.Zero, TankSpeed, FireInterval, ProjectileSpeed));
     }
 
-    // The world advances and reaps the entities it owns (the spawned projectiles). The tank
-    // is still hand-wired and stepped by its view; it is not in the world yet, so this does
-    // not double-step it. S1-T5 moves the tank into the world and inverts the view ticks.
+    // The world is the single tick owner: it advances every entity (tank and projectiles)
+    // and reaps the dead. The views hold no tick — they mirror their model each frame.
     public override void _Process(double delta) => _world.Step((float)delta);
 
     private void OnEntitySpawned(IEntity entity)
     {
-        if (entity is not IProjectile projectile)
+        Node2D view = entity switch
         {
-            return;
-        }
+            ITank tank => BuildTankView(tank),
+            IProjectile projectile => BuildProjectileView(projectile),
+            _ => throw new NotSupportedException($"No view registered for {entity.GetType().Name}.")
+        };
 
-        var view = GD.Load<PackedScene>("res://src/Presentation/Projectile/ProjectileView.tscn")
-            .Instantiate<ProjectileView>();
         AddChild(view);
-        view.Bind(projectile);
         _views[entity.Id] = view;
     }
 
@@ -75,6 +69,23 @@ public partial class ArenaScene : Node2D
         {
             view.QueueFree();
         }
+    }
+
+    private static TankView BuildTankView(ITank tank)
+    {
+        var view = GD.Load<PackedScene>("res://src/Presentation/Tank/TankView.tscn")
+            .Instantiate<TankView>();
+        view.Bind(tank);
+        view.AddChild(new Camera2D { ProcessCallback = Camera2D.Camera2DProcessCallback.Physics });
+        return view;
+    }
+
+    private static ProjectileView BuildProjectileView(IProjectile projectile)
+    {
+        var view = GD.Load<PackedScene>("res://src/Presentation/Projectile/ProjectileView.tscn")
+            .Instantiate<ProjectileView>();
+        view.Bind(projectile);
+        return view;
     }
 
     // Screen-space overlay so the "how to play" line stays put while the camera tracks

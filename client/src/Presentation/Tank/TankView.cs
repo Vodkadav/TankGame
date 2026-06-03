@@ -3,9 +3,9 @@ using TankGame.Domain;
 
 namespace TankGame.Presentation;
 
-/// <summary>Renders an <see cref="ITank"/>: the node's position follows the model, the
-/// Body sprite rotates with the chassis, the Turret sprite with the aim. The model is
-/// injected via <see cref="Bind"/> (composition root) so this view holds no game rules.</summary>
+/// <summary>Renders an <see cref="ITank"/>: a pure mirror that copies the model's position
+/// onto the node, the chassis facing onto the Body sprite, and the aim onto the Turret
+/// sprite. The world owns the tick (advancing the tank); this view holds no game rules.</summary>
 public partial class TankView : Node2D
 {
     private ITank? _tank;
@@ -20,19 +20,17 @@ public partial class TankView : Node2D
 
     public void Bind(ITank tank) => _tank = tank;
 
-    public override void _Process(double delta)
-    {
-        if (_tank is not null)
-        {
-            UpdateFromModel((float)delta);
-        }
-    }
+    public override void _Process(double delta) => UpdateFromModel();
 
-    /// <summary>Advances the bound tank and mirrors its state onto the sprites. Public so
-    /// tests can drive a deterministic step without relying on frame timing.</summary>
-    public void UpdateFromModel(float deltaSeconds)
+    /// <summary>Mirrors the bound tank's state onto the node and sprites. Public so tests
+    /// can assert the mirror without relying on frame timing.</summary>
+    public void UpdateFromModel()
     {
-        _tank!.Step(deltaSeconds);
+        if (_tank is null)
+        {
+            return;
+        }
+
         Position = new Vector2(_tank.Position.X, _tank.Position.Y);
         _body.Rotation = _tank.Rotation;
         _turret.Rotation = _tank.TurretRotation;
