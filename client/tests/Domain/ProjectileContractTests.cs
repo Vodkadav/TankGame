@@ -62,6 +62,8 @@ public class ProjectileContractTests
         public void DamageAt(Vector2 point, Vector2 direction, int amount)
         {
         }
+
+        public bool IsBlocked(Vector2 point) => false;
     }
 
     [Fact]

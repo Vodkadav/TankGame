@@ -44,4 +44,8 @@ public sealed class RectArena(Vector2 min, Vector2 max) : IArena
     public void DamageAt(Vector2 point, Vector2 direction, int amount)
     {
     }
+
+    // Anything on or outside the rectangle's edges is wall.
+    public bool IsBlocked(Vector2 point) =>
+        point.X <= min.X || point.X >= max.X || point.Y <= min.Y || point.Y >= max.Y;
 }

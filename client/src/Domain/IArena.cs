@@ -21,4 +21,8 @@ public interface IArena
     /// direction resolves which cell took the hit). A no-op where nothing is destructible —
     /// an open box or an indestructible boundary.</summary>
     void DamageAt(Vector2 point, Vector2 direction, int amount);
+
+    /// <summary>Whether <paramref name="point"/> lies inside a solid wall (or outside the
+    /// playable space). Used to stop a tank from driving through walls.</summary>
+    bool IsBlocked(Vector2 point);
 }

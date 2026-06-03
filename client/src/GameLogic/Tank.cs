@@ -45,6 +45,10 @@ public sealed class Tank : ITank
         _projectileSpeed = projectileSpeed;
     }
 
+    /// <summary>Half-extent of the tank used for wall collision: its leading edge, not its
+    /// centre, is what must clear a wall.</summary>
+    public const float CollisionRadius = 24f;
+
     public Guid Id { get; }
     public Vector2 Position { get; private set; }
     public float Rotation { get; private set; }
@@ -63,7 +67,25 @@ public sealed class Tank : ITank
             move = Vector2.Normalize(move); // a (1,1) keyboard diagonal must not be faster
         }
 
-        Position += move * _speed * deltaSeconds;
+        var desired = Position + (move * _speed * deltaSeconds);
+
+        // Resolve each axis independently so the tank slides along a wall instead of
+        // sticking. A move is allowed only if the leading edge (centre + radius) stays clear.
+        var nextX = Position.X;
+        if (move.X != 0f &&
+            !_arena.IsBlocked(new Vector2(desired.X + (MathF.Sign(move.X) * CollisionRadius), Position.Y)))
+        {
+            nextX = desired.X;
+        }
+
+        var nextY = Position.Y;
+        if (move.Y != 0f &&
+            !_arena.IsBlocked(new Vector2(nextX, desired.Y + (MathF.Sign(move.Y) * CollisionRadius))))
+        {
+            nextY = desired.Y;
+        }
+
+        Position = new Vector2(nextX, nextY);
 
         if (move != Vector2.Zero)
         {

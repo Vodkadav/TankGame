@@ -88,6 +88,12 @@ public sealed class GridArena : IArena
         _grid.DamageCell(FloorDiv(local.X), FloorDiv(local.Y), amount);
     }
 
+    public bool IsBlocked(Vector2 point)
+    {
+        var local = point - _origin;
+        return _grid.IsBlocked(FloorDiv(local.X), FloorDiv(local.Y));
+    }
+
     private int FloorDiv(float worldComponent) => (int)MathF.Floor(worldComponent / _tileSize);
 
     // Per-axis DDA setup: which way the ray steps in this axis, the ray parameter at the
