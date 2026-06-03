@@ -38,7 +38,15 @@ public partial class ArenaScene : Node2D
     private static readonly Vector2 ArenaCentre = new(GridOrigin.X + (28 * TileSize / 2f), GridOrigin.Y + (16 * TileSize / 2f));
     private static readonly Vector2 TwoPlayerZoom = new(0.55f, 0.55f);
 
+    // Fog of war: a dark ambient the player's light cuts a hole in. Radius ≈ the AI fire range
+    // so you can see roughly as far as a hidden enemy can hit you. No wall shadows yet — a soft
+    // circular reveal. Off in versus (one shared screen can't fairly fog two rival views).
+    private static readonly Color FogAmbient = new(0.16f, 0.16f, 0.22f);
+    private const float FogLightRadius = 420f;
+    private const int LightTextureSize = 256;
+
     private readonly Dictionary<Guid, Node2D> _views = new();
+    private readonly List<(ITank Tank, PointLight2D Light)> _fogLights = new();
     private readonly MatchTracker _matchTracker = new();
     private World _world = null!;
     private GridArena _arena = null!;
@@ -94,12 +102,17 @@ public partial class ArenaScene : Node2D
             TankSpeed, FireInterval, ProjectileSpeed, maxHp: 3, team: PlayerTeam);
         _world.Spawn(_player);
 
+        var viewers = new List<ITank> { _player };
         if (twoPlayer)
         {
             var p2Team = _mode == GameMode.TwoPlayerVersus ? EnemyTeam : PlayerTeam;
             var p2 = new Tank(new Player2InputSource(), _world, _arena, CellCentre(Player2Spawn.X, Player2Spawn.Y),
                 TankSpeed, FireInterval, ProjectileSpeed, maxHp: 3, team: p2Team);
             _world.Spawn(p2);
+            if (p2Team == PlayerTeam)
+            {
+                viewers.Add(p2); // co-op allies share the fog reveal (versus rivals do not)
+            }
         }
 
         if (_mode != GameMode.TwoPlayerVersus)
@@ -124,6 +137,51 @@ public partial class ArenaScene : Node2D
         {
             _camera.Position = new Vector2(_player.Position.X, _player.Position.Y);
         }
+
+        // Versus shares one screen between rivals, so fogging it would blind one of them; every
+        // other mode limits the player team's sight to a lit circle around each ally.
+        if (_mode != GameMode.TwoPlayerVersus)
+        {
+            SetUpFog(viewers);
+        }
+    }
+
+    // A dark CanvasModulate over the field plus one PointLight2D per ally that follows them,
+    // so the team sees only a lit circle. The light texture is a radial gradient built in code
+    // (no art asset). Lights are tracked so _Process can keep them on their tanks.
+    private void SetUpFog(List<ITank> viewers)
+    {
+        AddChild(new CanvasModulate { Name = "FogModulate", Color = FogAmbient });
+
+        var texture = BuildLightTexture();
+        foreach (var viewer in viewers)
+        {
+            var light = new PointLight2D
+            {
+                Name = "FogLight",
+                Texture = texture,
+                TextureScale = FogLightRadius / (LightTextureSize / 2f),
+                Position = new Vector2(viewer.Position.X, viewer.Position.Y),
+            };
+            AddChild(light);
+            _fogLights.Add((viewer, light));
+        }
+    }
+
+    private static GradientTexture2D BuildLightTexture()
+    {
+        var gradient = new Gradient();
+        gradient.SetColor(0, new Color(1f, 1f, 1f, 1f)); // bright at the centre…
+        gradient.SetColor(1, new Color(1f, 1f, 1f, 0f)); // …fading to dark at the rim
+        return new GradientTexture2D
+        {
+            Gradient = gradient,
+            Fill = GradientTexture2D.FillEnum.Radial,
+            FillFrom = new Vector2(0.5f, 0.5f),
+            FillTo = new Vector2(1f, 0.5f),
+            Width = LightTextureSize,
+            Height = LightTextureSize,
+        };
     }
 
     // The world is the single tick owner: it advances every entity (tank and projectiles) and
@@ -138,10 +196,20 @@ public partial class ArenaScene : Node2D
 
         _world.Step((float)delta);
 
-        // One-player keeps the camera on the player; two-player uses a fixed maze-framing camera.
+        // One-player keeps the camera on the player; two-player uses a fixed field-framing camera.
         if (_mode == GameMode.OnePlayer && _player.IsAlive)
         {
             _camera.Position = new Vector2(_player.Position.X, _player.Position.Y);
+        }
+
+        // Each ally's vision light rides their tank; a fallen ally's light goes dark.
+        foreach (var (tank, light) in _fogLights)
+        {
+            light.Visible = tank.IsAlive;
+            if (tank.IsAlive)
+            {
+                light.Position = new Vector2(tank.Position.X, tank.Position.Y);
+            }
         }
 
         var result = _matchTracker.Evaluate(_world.Entities);

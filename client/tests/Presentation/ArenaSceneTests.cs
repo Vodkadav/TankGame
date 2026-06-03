@@ -81,6 +81,67 @@ public class ArenaSceneTests : TestClass
     }
 
     [Test]
+    public void OnePlayer_FogsTheField_WithALightAroundThePlayer()
+    {
+        // Setup() loads the scene in the default OnePlayer mode.
+        var hasModulate = false;
+        var lights = 0;
+        foreach (var child in _arena.GetChildren())
+        {
+            if (child is CanvasModulate)
+            {
+                hasModulate = true;
+            }
+            else if (child is PointLight2D)
+            {
+                lights++;
+            }
+        }
+
+        if (!hasModulate)
+        {
+            throw new System.Exception("Fog of war must darken the field with a CanvasModulate.");
+        }
+
+        if (lights != 1)
+        {
+            throw new System.Exception($"One-player fog needs exactly one player light; saw {lights}.");
+        }
+    }
+
+    [Test]
+    public void VersusMode_HasNoFog()
+    {
+        var original = GameSetup.Mode;
+        try
+        {
+            GameSetup.Mode = GameMode.TwoPlayerVersus;
+            var arena = GD.Load<PackedScene>("res://src/Presentation/Arena/Arena.tscn").Instantiate();
+            TestScene.AddChild(arena);
+
+            var hasFog = false;
+            foreach (var child in arena.GetChildren())
+            {
+                if (child is CanvasModulate or PointLight2D)
+                {
+                    hasFog = true;
+                }
+            }
+
+            arena.QueueFree();
+
+            if (hasFog)
+            {
+                throw new System.Exception("Versus shares one screen, so it must not fog the field.");
+            }
+        }
+        finally
+        {
+            GameSetup.Mode = original;
+        }
+    }
+
+    [Test]
     public void Arena_RendersTheMazeWallGrid()
     {
         WallGridView? walls = null;
