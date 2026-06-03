@@ -39,4 +39,16 @@ public class InputHelperTests
         var aim = KeyboardMouseInputSource.ComputeAim(new NVector2(100f, 90f), new NVector2(200f, 100f));
         Assert.Equal(MathF.PI / 2f, aim, precision: 4);
     }
+
+    [Fact]
+    public void AimFromMovement_FacesTheDriveDirection()
+    {
+        // Driving +X aims at 0; driving down (+Y) aims at +π/2.
+        Assert.Equal(0f, Player2InputSource.AimFromMovement(new NVector2(1f, 0f), lastAim: 3f), precision: 4);
+        Assert.Equal(MathF.PI / 2f, Player2InputSource.AimFromMovement(new NVector2(0f, 1f), lastAim: 0f), precision: 4);
+    }
+
+    [Fact]
+    public void AimFromMovement_KeepsLastAim_WhenIdle()
+        => Assert.Equal(1.23f, Player2InputSource.AimFromMovement(NVector2.Zero, lastAim: 1.23f), precision: 4);
 }
