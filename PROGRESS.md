@@ -87,12 +87,27 @@ of the views** (they call `model.Step` today).
   raises `EntityDespawned`. `Step` snapshots the live set first, so a mid-step spawn (the
   future-spawner seam) cannot corrupt iteration and the child is deferred to the next tick.
   `WorldTests` (7) verify it against the S1-T1 contract semantics.
-- **Next → S1-T3** — migrate `Tank` to `IEntity` (assign `Guid Id`, `IsAlive` always true)
-  and move the fire/cooldown rule out of `ArenaScene` into `Tank` with an injected
-  `IWorld` (+ `IArena`); firing spawns a `Projectile` into the world when `Fire` and the
-  cooldown has elapsed. Then **S1-T4** (migrate `Projectile`), **S1-T5** (refactor
-  `ArenaScene` to spawn-event wiring + make the views pure mirrors), **S1-T6** (promote
-  the proposal to a numbered ADR + update this file).
+- **S1-T4 — `Projectile` → `IEntity`** ✅ (done before T3: T3's `Tank` spawns a
+  `Projectile` into `IWorld`, which needs `Projectile` to be an `IEntity` — the proposal
+  listed T3→T4 but the spawn dependency runs the other way). `IProjectile` extends
+  `IEntity` (empty body); `Projectile` assigns a stable `Guid Id`. `ProjectileTests` add
+  Id-assigned/stable/unique.
+- **S1-T3 — `Tank` → `IEntity` + owns the fire rule** ✅ `ITank` extends `IEntity` (adds
+  only `Rotation`/`TurretRotation`); `Tank` assigns a `Guid Id`, is always alive (no health
+  until S3), and takes an injected `IWorld` + `IArena`. `Step` spawns a `Projectile` into
+  the world when `Fire` is held and the cooldown has elapsed — the rule moved out of
+  `ArenaScene._Process`. `ArenaScene` now builds the `World`, subscribes once to
+  `EntitySpawned`/`EntityDespawned` to map spawned projectiles to `ProjectileView`s, and
+  calls `world.Step` per frame. **`ProjectileView` became a pure mirror here** (pulled
+  forward from T5) because the world owning the projectile tick is what reaps the dead and
+  avoids a `world.Entities` leak. `TankTests` cover the migrated fire rule (spawn, rate
+  limit, aim) + `Id`/`IsAlive`; `ProjectileViewTests` rewritten mirror-only.
+- **Next → S1-T5** — the remaining, riskier half of the tick inversion: spawn the **initial
+  tank** through `world.Spawn` (not hand-wired), make **`TankView` a pure mirror** (stop
+  calling `model.Step`; `world.Step` advances the tank too), and generalize the spawn→view
+  factory to a type-switch over `ITank`/`IProjectile`. `ArenaSceneTests` (TankView +
+  Camera2D + walls) must stay green. Then **S1-T6** (promote the proposal to a numbered ADR
+  + update this file).
 
 S1 is the systems-foundation slice and is **not** yet a numbered milestone in
 `development-plan.md`; **M2 — static labyrinth + destructible walls** remains the next
