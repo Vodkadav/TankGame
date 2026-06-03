@@ -5,11 +5,14 @@ using NVector2 = System.Numerics.Vector2;
 
 namespace TankGame.Infrastructure;
 
-/// <summary>Keyboard + mouse implementation of <see cref="IInputSource"/>: WASD to move,
-/// the mouse to aim, left-click or space to fire. Aim is taken relative to the viewport
-/// centre (the camera keeps the tank centred in M1). The pure helpers below carry the
-/// logic so it is unit-testable without a Godot runtime.</summary>
-public sealed class KeyboardMouseInputSource(Viewport viewport) : IInputSource
+/// <summary>Keyboard + mouse implementation of <see cref="IInputSource"/> for Player 1: WASD
+/// to move, the mouse to aim, space (and optionally left-click) to fire. Aim is taken
+/// relative to the viewport centre (the camera keeps the tank centred). The pure helpers
+/// below carry the logic so it is unit-testable without a Godot runtime.</summary>
+/// <param name="viewport">The viewport whose centre and mouse position drive aim.</param>
+/// <param name="fireOnClick">Whether left-click also fires. Off in two-player, where the
+/// left mouse button belongs to Player 2 — then Player 1 fires with space only.</param>
+public sealed class KeyboardMouseInputSource(Viewport viewport, bool fireOnClick = true) : IInputSource
 {
     public TankInput Read()
     {
@@ -23,8 +26,8 @@ public sealed class KeyboardMouseInputSource(Viewport viewport) : IInputSource
         var mouse = viewport.GetMousePosition();
         var aim = ComputeAim(new NVector2(mouse.X, mouse.Y), new NVector2(size.X, size.Y));
 
-        var fire = Input.IsMouseButtonPressed(MouseButton.Left)
-            || Input.IsPhysicalKeyPressed(Key.Space);
+        var fire = Input.IsPhysicalKeyPressed(Key.Space)
+            || (fireOnClick && Input.IsMouseButtonPressed(MouseButton.Left));
 
         return new TankInput(move, aim, fire);
     }
