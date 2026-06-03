@@ -167,15 +167,22 @@ is a deterministic GameLogic pass — so this arc does not make networked MP har
 
 Sequence (each a shippable TDD slice):
 
-- **C1 — tank health + death**: `Tank` gains `MaxHp`/`Hp`; `IsAlive` becomes HP-driven
-  (resolves the S1 stub); dead tanks reaped by the world.
-- **C2 — teams + projectile ownership**: a shot never hurts its own team.
-- **C3 — projectile↔tank combat pass**: a deterministic resolver in the world's step cycle
-  applies damage and kills shots/tanks.
-- **C4 — computer adversaries**: an `AiInputSource` drives enemy tanks (seek/aim/fire) —
-  single-player vs AI playable.
+- **C1 — tank health + death** ✅ `IDamageable` (Hp/MaxHp/TakeDamage); `Tank` has `MaxHp`
+  (default 3) and HP-driven `IsAlive` (resolves the S1 stub); dead tanks reaped.
+- **C2 — teams + projectile ownership** ✅ `Team` on `ITank`/`IProjectile`; a tank stamps its
+  team on shots, so a shot never hurts its own team.
+- **C3 — projectile↔tank combat pass** ✅ `ICombatResolver`/`CombatResolver`: enemy shots
+  damage tanks and expire; the `World` runs it each step between advancing and reaping.
+- **C4 — computer adversaries** ✅ `AiInputSource` (seek/aim/fire-with-LOS) drives three
+  enemy tanks; `ArenaScene` spawns player (team 0) + AI (team 1), camera on the player only,
+  adversaries tinted red. **Single-player vs AI playable.**
 - **C5 — local 2-player**: a second keyboard+mouse input source — couch versus playable.
 - **C6 — HUD + round flow + ADR**: health bars, win/lose (EN/ES/DK), promote the proposal.
+
+**Known rough edge after C4 (addressed in C6 / round-flow):** when the player tank dies it is
+reaped and its view (which carries the camera) is freed — so there is no health display, no
+"you win / you lose", and no restart yet. The single-player loop is playable but its win/lose
+ending is unbuilt.
 
 ### Deferred: M3 — 2-player real-time via a single Durable Object
 
