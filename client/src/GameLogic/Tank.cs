@@ -18,6 +18,7 @@ public sealed class Tank : ITank
     private readonly float _fireInterval;
     private readonly float _projectileSpeed;
     private float _fireCooldown;
+    private float _pushTimer;
 
     /// <param name="input">Per-frame intent source.</param>
     /// <param name="world">The world the tank spawns its shots into.</param>
@@ -49,6 +50,11 @@ public sealed class Tank : ITank
     /// centre, is what must clear a wall.</summary>
     public const float CollisionRadius = 24f;
 
+    /// <summary>Seconds of sustained pushing between each point of demolition damage. Three
+    /// hits (a full-hp brick) break in <c>3 ×</c> this — about 1.2 s of shoving.</summary>
+    public const float PushInterval = 0.4f;
+    private const int PushDamage = 1;
+
     public Guid Id { get; }
     public Vector2 Position { get; private set; }
     public float Rotation { get; private set; }
@@ -71,21 +77,37 @@ public sealed class Tank : ITank
 
         // Resolve each axis independently so the tank slides along a wall instead of
         // sticking. A move is allowed only if the leading edge (centre + radius) stays clear.
+        var blockedX = false;
         var nextX = Position.X;
-        if (move.X != 0f &&
-            !_arena.IsBlocked(new Vector2(desired.X + (MathF.Sign(move.X) * CollisionRadius), Position.Y)))
+        if (move.X != 0f)
         {
-            nextX = desired.X;
+            if (!_arena.IsBlocked(new Vector2(desired.X + (MathF.Sign(move.X) * CollisionRadius), Position.Y)))
+            {
+                nextX = desired.X;
+            }
+            else
+            {
+                blockedX = true;
+            }
         }
 
+        var blockedY = false;
         var nextY = Position.Y;
-        if (move.Y != 0f &&
-            !_arena.IsBlocked(new Vector2(nextX, desired.Y + (MathF.Sign(move.Y) * CollisionRadius))))
+        if (move.Y != 0f)
         {
-            nextY = desired.Y;
+            if (!_arena.IsBlocked(new Vector2(nextX, desired.Y + (MathF.Sign(move.Y) * CollisionRadius))))
+            {
+                nextY = desired.Y;
+            }
+            else
+            {
+                blockedY = true;
+            }
         }
 
         Position = new Vector2(nextX, nextY);
+
+        PushAgainstWall(blockedX, blockedY, move, deltaSeconds);
 
         if (move != Vector2.Zero)
         {
@@ -101,5 +123,34 @@ public sealed class Tank : ITank
             var direction = new Vector2(MathF.Cos(TurretRotation), MathF.Sin(TurretRotation));
             _world.Spawn(new Projectile(_arena, Position, direction, _projectileSpeed));
         }
+    }
+
+    // Driving into a destructible wall demolishes it: while the tank is jammed against a wall
+    // it is pushing into, accumulate time and chip that wall once per PushInterval. DamageAt
+    // only affects brick, so steel and the border shrug it off. Releasing the stick or
+    // breaking through resets the timer, so demolition needs sustained pressure, not a tap.
+    private void PushAgainstWall(bool blockedX, bool blockedY, Vector2 move, float deltaSeconds)
+    {
+        if (!blockedX && !blockedY)
+        {
+            _pushTimer = 0f;
+            return;
+        }
+
+        _pushTimer += deltaSeconds;
+        if (_pushTimer < PushInterval)
+        {
+            return;
+        }
+
+        _pushTimer -= PushInterval;
+
+        var (point, direction) = blockedX
+            ? (new Vector2(Position.X + (MathF.Sign(move.X) * CollisionRadius), Position.Y),
+                new Vector2(MathF.Sign(move.X), 0f))
+            : (new Vector2(Position.X, Position.Y + (MathF.Sign(move.Y) * CollisionRadius)),
+                new Vector2(0f, MathF.Sign(move.Y)));
+
+        _arena.DamageAt(point, direction, PushDamage);
     }
 }
