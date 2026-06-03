@@ -82,12 +82,17 @@ of the views** (they call `model.Step` today).
   `IsAlive`/`Step`; `Entities`/`Spawn`/`EntitySpawned`/`EntityDespawned`/`Step`) with
   `EntityContractTests` + `WorldContractTests` (pure C#, no Godot). Scoped to contracts
   only — `ITank`/`IProjectile` adopt `: IEntity` in S1-T3/T4 alongside the impl changes.
-- **Next → S1-T2** — `World` impl in `GameLogic` (owns entities; `Spawn`/`Step`/reap;
-  raises the events), verified against the S1-T1 contract semantics. Then **S1-T3**
-  (migrate `Tank`, move the fire/cooldown rule out of `ArenaScene` into `Tank` with an
-  injected `IWorld`), **S1-T4** (migrate `Projectile`), **S1-T5** (refactor `ArenaScene`
-  to spawn-event wiring + make the views pure mirrors), **S1-T6** (promote the proposal to
-  a numbered ADR + update this file).
+- **S1-T2 — `World` impl (`GameLogic`)** ✅ owns entities in insertion order; `Spawn`
+  adds + raises `EntitySpawned`; `Step` advances every entity, then reaps the dead and
+  raises `EntityDespawned`. `Step` snapshots the live set first, so a mid-step spawn (the
+  future-spawner seam) cannot corrupt iteration and the child is deferred to the next tick.
+  `WorldTests` (7) verify it against the S1-T1 contract semantics.
+- **Next → S1-T3** — migrate `Tank` to `IEntity` (assign `Guid Id`, `IsAlive` always true)
+  and move the fire/cooldown rule out of `ArenaScene` into `Tank` with an injected
+  `IWorld` (+ `IArena`); firing spawns a `Projectile` into the world when `Fire` and the
+  cooldown has elapsed. Then **S1-T4** (migrate `Projectile`), **S1-T5** (refactor
+  `ArenaScene` to spawn-event wiring + make the views pure mirrors), **S1-T6** (promote
+  the proposal to a numbered ADR + update this file).
 
 S1 is the systems-foundation slice and is **not** yet a numbered milestone in
 `development-plan.md`; **M2 — static labyrinth + destructible walls** remains the next
