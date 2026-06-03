@@ -15,7 +15,10 @@ public class TankContractTests
         public Vector2 Position { get; private set; }
         public float Rotation { get; private set; }
         public float TurretRotation { get; private set; }
-        public bool IsAlive => true;
+        public int Hp { get; private set; } = 1;
+        public int MaxHp => 1;
+        public bool IsAlive => Hp > 0;
+        public void TakeDamage(int amount) => Hp = System.Math.Max(0, Hp - amount);
 
         public void Step(float deltaSeconds)
         {
