@@ -200,8 +200,13 @@ Catalogue and ordering: `docs/research/local-backlog.md`.
   tank-diameter of another live tank (`Tank.OverlapsAnotherTank` over `World.Entities`). The
   mover stops; no momentum is transferred. Wall and tank blocks are tracked separately so
   bumping a tank never chips a wall behind it (push-to-demolish still needs a wall).
+- **LP5 — AI vision-gated targeting** ✅ the enemy AI no longer seeks omnisciently through
+  walls: `NearestVisibleEnemy` only acquires an enemy within `VisionRange` (≈18 tiles) with a
+  clear line of sight, so an enemy that breaks line of sight (behind steel, and later a bush)
+  is no longer hunted — the AI holds until it sees something. Foundation for the fog/stealth
+  cluster (LP2–LP4). `VisionRange` is a tunable balance knob.
 
-Test counts on `main`: GameLogic 82, Domain 22, Infrastructure 8, Architecture 6, 26 GoDotTest
+Test counts on `main`: GameLogic 85, Domain 22, Infrastructure 8, Architecture 6, 26 GoDotTest
 scene tests.
 
 ### Deferred: M3 — 2-player real-time via a single Durable Object

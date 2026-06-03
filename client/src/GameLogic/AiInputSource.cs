@@ -6,14 +6,22 @@ namespace TankGame.GameLogic;
 
 /// <summary>Drives an enemy tank by emitting the same <see cref="TankInput"/> intent a human
 /// would — the multiplayer-safe seam (see <c>docs/adr/PROPOSAL-local-first-combat.md</c>).
-/// Each tick it finds the nearest tank on another team, aims the turret at it, drives toward
-/// it until within stand-off range, and fires when the target is in range with a clear line
-/// of sight. Pure C#: no Godot, no pathfinding yet (it bulldozes brick walls in the way and
-/// is stopped by steel). Bind it to the tank it drives after construction.</summary>
+/// Each tick it finds the nearest tank on another team that it can actually <em>see</em> —
+/// within <see cref="VisionRange"/> and with a clear line of sight — aims the turret at it,
+/// drives toward it until within stand-off range, and fires when in firing range. An enemy
+/// hidden behind a wall (or too far off) is not hunted: the AI holds until something comes
+/// into view, so cover and concealment matter. Pure C#: no Godot, no pathfinding yet (it
+/// bulldozes brick walls in the way and is stopped by steel). Bind it to the tank it drives
+/// after construction.</summary>
 public sealed class AiInputSource : IInputSource
 {
     private const float FireRange = 420f;
     private const float StandoffDistance = 160f;
+
+    // Generous sight (≈18 tiles) so enemies engage across the open battlefield's clear
+    // sightlines and the game stays lively — while line-of-sight gating means walls (and,
+    // later, bushes) still break the AI's view and enable ambush. A tunable balance knob.
+    private const float VisionRange = 1200f;
 
     private readonly IWorld _world;
     private readonly IArena _arena;
@@ -36,7 +44,7 @@ public sealed class AiInputSource : IInputSource
             return Hold();
         }
 
-        var target = NearestEnemy();
+        var target = NearestVisibleEnemy();
         if (target is null)
         {
             return Hold();
@@ -46,14 +54,16 @@ public sealed class AiInputSource : IInputSource
         var distance = delta.Length();
         var aim = MathF.Atan2(delta.Y, delta.X);
         var move = distance > StandoffDistance ? Vector2.Normalize(delta) : Vector2.Zero;
-        var fire = distance <= FireRange && HasLineOfSight(_self.Position, target.Position, distance);
+        var fire = distance <= FireRange; // the target is already known to be in sight
 
         return new TankInput(move, aim, fire);
     }
 
     private TankInput Hold() => new(Vector2.Zero, _self?.TurretRotation ?? 0f, Fire: false);
 
-    private ITank? NearestEnemy()
+    // The nearest enemy the AI can see: on another team, within VisionRange, and with no wall
+    // between. Enemies it cannot see are invisible to its decision-making entirely.
+    private ITank? NearestVisibleEnemy()
     {
         ITank? nearest = null;
         var nearestDistance = float.PositiveInfinity;
@@ -66,11 +76,18 @@ public sealed class AiInputSource : IInputSource
             }
 
             var distance = Vector2.Distance(tank.Position, _self.Position);
-            if (distance < nearestDistance)
+            if (distance > VisionRange || distance >= nearestDistance)
             {
-                nearestDistance = distance;
-                nearest = tank;
+                continue;
             }
+
+            if (!HasLineOfSight(_self.Position, tank.Position, distance))
+            {
+                continue;
+            }
+
+            nearestDistance = distance;
+            nearest = tank;
         }
 
         return nearest;
