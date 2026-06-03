@@ -21,24 +21,19 @@ public class ArenaSceneTests : TestClass
     public void Cleanup() => _arena.QueueFree();
 
     [Test]
-    public void Arena_WiresUpThePlayerAndAdversaries_WithACameraOnThePlayerOnly()
+    public void Arena_WiresUpThePlayerAndAdversaries_WithAFollowingCamera()
     {
         var tankViews = 0;
-        var cameras = 0;
+        Camera2D? camera = null;
         foreach (var child in _arena.GetChildren())
         {
-            if (child is not TankView tankView)
+            if (child is TankView)
             {
-                continue;
+                tankViews++;
             }
-
-            tankViews++;
-            foreach (var grandchild in tankView.GetChildren())
+            else if (child is Camera2D cam)
             {
-                if (grandchild is Camera2D)
-                {
-                    cameras++;
-                }
+                camera = cam; // the game camera lives on the scene, so it survives a death
             }
         }
 
@@ -47,9 +42,9 @@ public class ArenaSceneTests : TestClass
             throw new System.Exception($"Arena must instance the player plus AI adversaries; saw {tankViews} tanks.");
         }
 
-        if (cameras != 1)
+        if (camera is null)
         {
-            throw new System.Exception($"Exactly one tank (the player) must carry the Camera2D; saw {cameras}.");
+            throw new System.Exception("Arena must have a Camera2D that follows the player.");
         }
     }
 
