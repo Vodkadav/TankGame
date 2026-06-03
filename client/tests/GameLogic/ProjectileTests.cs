@@ -80,6 +80,14 @@ public class ProjectileTests
     }
 
     [Fact]
+    public void Carries_TheFiringTeam()
+    {
+        var shot = new Projectile(new OpenArena(), Vector2.Zero, new Vector2(1f, 0f), Speed, damage: 1, team: 7);
+
+        Assert.Equal(7, shot.Team);
+    }
+
+    [Fact]
     public void Id_IsUniquePerProjectile()
     {
         var a = new Projectile(new OpenArena(), Vector2.Zero, new Vector2(1f, 0f), Speed);
