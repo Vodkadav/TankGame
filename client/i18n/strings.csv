@@ -1,3 +1,4 @@
 keys,en,es,dk
 m0.boot_label,"TankGame M0","TankGame M0","TankGame M0"
 m1.instructions,"WASD to move, mouse to aim, click to fire","WASD para mover, ratón para apuntar, clic para disparar","WASD for at bevæge dig, mus for at sigte, klik for at skyde"
+m2.bricks_destroyed,"Bricks destroyed: {0}","Ladrillos destruidos: {0}","Mursten ødelagt: {0}"
