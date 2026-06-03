@@ -97,11 +97,45 @@ public class TankTests
     }
 
     [Fact]
-    public void IsAlive_IsTrue_UntilHealthExists()
+    public void NewTank_StartsAtFullHealthAndAlive()
     {
         var tank = NewTank(new ScriptedInput(new TankInput(Vector2.Zero, Aim: 0f, Fire: false)));
 
+        Assert.Equal(tank.MaxHp, tank.Hp);
         Assert.True(tank.IsAlive);
+    }
+
+    [Fact]
+    public void TakeDamage_ReducesHp_AndKillsTheTankAtZero()
+    {
+        var tank = NewTank(new ScriptedInput(new TankInput(Vector2.Zero, Aim: 0f, Fire: false)));
+        var max = tank.MaxHp;
+
+        tank.TakeDamage(1);
+        Assert.Equal(max - 1, tank.Hp);
+        Assert.True(tank.IsAlive);
+
+        tank.TakeDamage(max); // overkill clamps at 0
+        Assert.Equal(0, tank.Hp);
+        Assert.False(tank.IsAlive);
+
+        tank.TakeDamage(1); // damage to a dead tank is a no-op
+        Assert.Equal(0, tank.Hp);
+    }
+
+    [Fact]
+    public void DeadTank_IsReapedByTheWorld()
+    {
+        var world = new World();
+        var tank = new Tank(
+            new ScriptedInput(new TankInput(Vector2.Zero, Aim: 0f, Fire: false)),
+            world, new OpenArena(), Vector2.Zero, Speed, FireInterval, ProjectileSpeed, maxHp: 1);
+        world.Spawn(tank);
+
+        tank.TakeDamage(1);
+        world.Step(0.1f);
+
+        Assert.DoesNotContain(tank, world.Entities);
     }
 
     [Fact]

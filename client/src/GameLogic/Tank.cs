@@ -27,6 +27,7 @@ public sealed class Tank : ITank
     /// <param name="speed">Movement speed in units per second.</param>
     /// <param name="fireInterval">Minimum seconds between shots.</param>
     /// <param name="projectileSpeed">Speed of spawned projectiles, units per second.</param>
+    /// <param name="maxHp">Hit points at full health.</param>
     public Tank(
         IInputSource input,
         IWorld world,
@@ -34,9 +35,12 @@ public sealed class Tank : ITank
         Vector2 startPosition,
         float speed,
         float fireInterval,
-        float projectileSpeed)
+        float projectileSpeed,
+        int maxHp = 3)
     {
         Id = Guid.NewGuid();
+        MaxHp = maxHp;
+        Hp = maxHp;
         _input = input;
         _world = world;
         _arena = arena;
@@ -60,8 +64,21 @@ public sealed class Tank : ITank
     public float Rotation { get; private set; }
     public float TurretRotation { get; private set; }
 
-    // No health yet — a tank is always alive until S3 introduces damage.
-    public bool IsAlive => true;
+    public int Hp { get; private set; }
+    public int MaxHp { get; }
+
+    // Reaped by the world once its hit points are gone.
+    public bool IsAlive => Hp > 0;
+
+    public void TakeDamage(int amount)
+    {
+        if (amount <= 0)
+        {
+            return;
+        }
+
+        Hp = Math.Max(0, Hp - amount);
+    }
 
     public void Step(float deltaSeconds)
     {
