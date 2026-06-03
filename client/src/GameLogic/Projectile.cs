@@ -12,18 +12,21 @@ public sealed class Projectile : IProjectile
     private readonly IArena _arena;
     private readonly Vector2 _direction;
     private readonly float _speed;
+    private readonly int _damage;
 
     /// <param name="arena">Collision query source.</param>
     /// <param name="spawn">World-space spawn position (the turret muzzle).</param>
     /// <param name="direction">Travel direction; normalised internally.</param>
     /// <param name="speed">Travel speed in units per second.</param>
-    public Projectile(IArena arena, Vector2 spawn, Vector2 direction, float speed)
+    /// <param name="damage">Damage dealt to a destructible wall on impact.</param>
+    public Projectile(IArena arena, Vector2 spawn, Vector2 direction, float speed, int damage = 1)
     {
         Id = Guid.NewGuid();
         _arena = arena;
         Position = spawn;
         _direction = Vector2.Normalize(direction);
         _speed = speed;
+        _damage = damage;
         IsAlive = true;
     }
 
@@ -43,6 +46,7 @@ public sealed class Projectile : IProjectile
         if (_arena.RaycastFirstHit(Position, _direction, distance) is { } hit)
         {
             Position = hit.Point;
+            _arena.DamageAt(hit.Point, _direction, _damage);
             IsAlive = false;
             return;
         }
