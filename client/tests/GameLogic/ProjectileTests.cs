@@ -13,6 +13,7 @@ public class ProjectileTests
     {
         public RaycastHit? RaycastFirstHit(Vector2 origin, Vector2 direction, float maxDistance) => null;
         public void DamageAt(Vector2 point, Vector2 direction, int amount) { }
+        public bool IsBlocked(Vector2 point) => false;
     }
 
     // A wall on the +X axis at x = WallX. Records the last damage it was asked to apply.
@@ -29,6 +30,7 @@ public class ProjectileTests
         }
 
         public void DamageAt(Vector2 point, Vector2 direction, int amount) => DamageApplied += amount;
+        public bool IsBlocked(Vector2 point) => point.X >= wallX;
     }
 
     private const float Speed = 200f;

@@ -15,11 +15,12 @@ public class TankTests
         public TankInput Read() => Value;
     }
 
-    // Never reports a hit, so spawned projectiles travel freely in the fire tests.
+    // Never reports a hit and never blocks, so the movement/fire tests run unobstructed.
     private sealed class OpenArena : IArena
     {
         public RaycastHit? RaycastFirstHit(Vector2 origin, Vector2 direction, float maxDistance) => null;
         public void DamageAt(Vector2 point, Vector2 direction, int amount) { }
+        public bool IsBlocked(Vector2 point) => false;
     }
 
     private const float Speed = 100f;
@@ -149,6 +150,61 @@ public class TankTests
 
         tank.Step(0.40f); // well past the 0.3s cooldown → fires (2)
         Assert.Equal(2, world.Entities.Count);
+    }
+
+    // A grid (64-unit tiles, origin 0) whose column x=2 is a steel wall (world x in
+    // [128,192)); every other cell is floor. Tall enough to slide along.
+    private static GridArena WallColumnArena(int height = 16)
+    {
+        var materials = new CellMaterial[4, height];
+        for (var x = 0; x < 4; x++)
+        {
+            for (var y = 0; y < height; y++)
+            {
+                materials[x, y] = x == 2 ? CellMaterial.Steel : CellMaterial.Floor;
+            }
+        }
+
+        return new GridArena(WallGrid.FromMaterials(materials), tileSize: 64f, origin: Vector2.Zero);
+    }
+
+    [Fact]
+    public void Step_StopsAtAWall_WhenDrivingStraightIntoIt()
+    {
+        var arena = WallColumnArena();
+        var tank = new Tank(
+            new ScriptedInput(new TankInput(new Vector2(1f, 0f), Aim: 0f, Fire: false)),
+            new World(), arena, new Vector2(32f, 32f), Speed, FireInterval, ProjectileSpeed);
+
+        for (var i = 0; i < 40; i++)
+        {
+            tank.Step(0.1f); // keep driving +X into the wall at x=128
+        }
+
+        Assert.True(tank.Position.X > 32f, "tank should advance toward the wall");
+        Assert.True(tank.Position.X + Tank.CollisionRadius <= 128f, "tank must not enter the wall");
+        Assert.Equal(32f, tank.Position.Y, precision: 3); // no drift on the free axis
+
+        var stuckX = tank.Position.X;
+        tank.Step(0.1f);
+        Assert.Equal(stuckX, tank.Position.X, precision: 3); // fully stopped
+    }
+
+    [Fact]
+    public void Step_SlidesAlongAWall_WhenDrivingDiagonallyIntoIt()
+    {
+        var arena = WallColumnArena();
+        var tank = new Tank(
+            new ScriptedInput(new TankInput(new Vector2(1f, 1f), Aim: 0f, Fire: false)),
+            new World(), arena, new Vector2(32f, 32f), Speed, FireInterval, ProjectileSpeed);
+
+        for (var i = 0; i < 12; i++)
+        {
+            tank.Step(0.1f); // push diagonally; +X jams on the wall, +Y stays free
+        }
+
+        Assert.True(tank.Position.X + Tank.CollisionRadius <= 128f, "tank must not pass the wall");
+        Assert.True(tank.Position.Y > 90f, "tank should keep sliding along +Y");
     }
 
     [Fact]
