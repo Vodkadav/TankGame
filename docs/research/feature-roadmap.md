@@ -315,8 +315,8 @@ S1–S7 exist — that's the whole point of front-loading the systems.
 ## 7. ADRs to write (when each system is scheduled)
 
 - **ADR — entity/world model & spawn-event spine** (S1). *Largest leverage; write first.*
-  Drafted: [`PROPOSAL-entity-spine.md`](../adr/PROPOSAL-entity-spine.md) (interface
-  contracts, the ArenaScene migration, and an S1-T1..T6 TDD ticket breakdown).
+  ✅ Accepted: [`0010-entity-spine.md`](../adr/0010-entity-spine.md) (interface contracts,
+  the ArenaScene migration, and the as-built S1-T1..T6 record). Slice complete.
 - **ADR — weapon definition & projectile-behaviour strategy** (S2), incl. adding
   surface normals to `RaycastHit`.
 - **ADR — health/damage resolution & the combat step** (S3).

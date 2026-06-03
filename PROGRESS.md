@@ -3,11 +3,12 @@
 Living status tracker. The full spec is `docs/research/development-plan.md`; this
 file records what is actually done and what is next.
 
-## Current status: **M1 complete** (2026-06-02) — entity-spine foundation (S1) in progress
+## Current status: **M1 + S1 complete** (2026-06-03) — starting M2
 
 The CI/CD pipeline is live and every merge to `main` builds, tests, and deploys. M1's core
-loop ships (drive + shoot + instructions overlay); next work is the S1 entity-spine
-refactor — see "In progress" below.
+loop ships (drive + shoot + instructions overlay) and the S1 entity spine (ADR-0010) is
+done — the world owns and steps every entity, nothing hand-spawns. Next work is **M2**
+(static labyrinth + destructible walls) — see "Next" below.
 
 ### Live surfaces
 
@@ -65,18 +66,18 @@ dev build; 60 fps on the Galaxy A56).
 
 ---
 
-## In progress: extensibility foundation (roadmap S1)
+## Done: extensibility foundation (roadmap S1) — ADR-0010
 
 The expansion wishlist (new ammo types, tank upgrades, smart walls/doors, wormholes,
 droppables, drones, points of interest, hide spots) is catalogued in
 `docs/research/feature-roadmap.md`, which maps every idea to seven foundational system
 abstractions (**S1–S7**). Building the systems first makes the content cheap to add.
 
-**S1 — entity spine** (design: `docs/adr/PROPOSAL-entity-spine.md`): a `World` that owns
-and `Step`s many entities with spawn/despawn events, ending the `ArenaScene`
-hand-spawning. Decisions settled in the proposal: `ITank`/`IProjectile` **extend**
-`IEntity`; spawners get `IWorld` **injected at construction**; **tick ownership moves out
-of the views** (they call `model.Step` today).
+**S1 — entity spine** ✅ **complete** (design + as-built record:
+`docs/adr/0010-entity-spine.md`): a `World` that owns and `Step`s many entities with
+spawn/despawn events, ending the `ArenaScene` hand-spawning. Settled decisions:
+`ITank`/`IProjectile` **extend** `IEntity`; spawners get `IWorld` **injected at
+construction**; **the world is the single tick owner** and the views are pure mirrors.
 
 - **S1-T1 — `IEntity` + `IWorld` contracts** ✅ Domain interfaces (`Id`/`Position`/
   `IsAlive`/`Step`; `Entities`/`Spawn`/`EntitySpawned`/`EntityDespawned`/`Step`) with
@@ -102,13 +103,26 @@ of the views** (they call `model.Step` today).
   forward from T5) because the world owning the projectile tick is what reaps the dead and
   avoids a `world.Entities` leak. `TankTests` cover the migrated fire rule (spawn, rate
   limit, aim) + `Id`/`IsAlive`; `ProjectileViewTests` rewritten mirror-only.
-- **Next → S1-T5** — the remaining, riskier half of the tick inversion: spawn the **initial
-  tank** through `world.Spawn` (not hand-wired), make **`TankView` a pure mirror** (stop
-  calling `model.Step`; `world.Step` advances the tank too), and generalize the spawn→view
-  factory to a type-switch over `ITank`/`IProjectile`. `ArenaSceneTests` (TankView +
-  Camera2D + walls) must stay green. Then **S1-T6** (promote the proposal to a numbered ADR
-  and update this file).
+- **S1-T5 — world owns the tick; views are pure mirrors** ✅ the initial tank is spawned via
+  `world.Spawn` (no hand-wiring); `ArenaScene` maps entity→view with a type-switch
+  (`ITank` → `TankView` + `Camera2D`; `IProjectile` → `ProjectileView`) over a
+  `Dictionary<Guid,Node2D>` registry, and frees a view when the world reaps its entity.
+  `_Process` calls `world.Step` once. `TankView` became a pure mirror. `TankViewTests`
+  rewritten mirror-only; `ArenaSceneTests` stays green and now exercises the whole
+  spawn-event→factory pipeline.
+- **S1-T6 — promote to a numbered ADR** ✅ the proposal is promoted to
+  `docs/adr/0010-entity-spine.md` (Accepted; numbered 0010 because ADR-0004…0009 are
+  reserved by name for M2…M7). Full NetArchTest suite green; roadmap §7 S1 row links the ADR.
 
-S1 is the systems-foundation slice and is **not** yet a numbered milestone in
-`development-plan.md`; **M2 — static labyrinth + destructible walls** remains the next
-numbered milestone. Sequencing S1 vs M2 is an open call (see `feature-roadmap.md` §6).
+S1 was the systems-foundation slice (not a numbered milestone in `development-plan.md`).
+**M2 — static labyrinth + destructible walls** is the next numbered milestone and the next
+work.
+
+---
+
+## Next: M2 — static labyrinth + destructible walls
+
+Per `docs/research/development-plan.md` M2. Replaces the open `RectArena` with a tile wall
+grid the tank collides against and projectiles can damage. The S1 entity spine makes the
+destructible-wall content cheap. See the M2 ticket table in the development plan (M2-T1…T8,
+including ADR-0004 on the `IWallGrid` interface + tile-state model).
