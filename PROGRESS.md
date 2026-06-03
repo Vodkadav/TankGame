@@ -146,9 +146,12 @@ to floor) and steel (indestructible) walls. Design + as-built record:
 - **M2-T8 — ADR-0004** ✅ records the wall-grid model, the pure-query/explicit-damage split,
   and the text-map maze decision.
 
-**Known gap (not an M2 ticket):** tank↔wall collision is not implemented — the tank drives
-freely over walls. The maze is navigable and shootable, but blocking the tank is a likely
-small follow-up over `IWallGrid.IsBlocked` (see ADR-0004 → Forecloses/defers).
+- **Post-M2 — tank↔wall collision + push-to-demolish** ✅ `IArena.IsBlocked(point)` +
+  axis-separated movement in `Tank.Step` (the tank stops at walls and slides along them);
+  steel blocks permanently, brick blocks until cleared. **Driving into a brick wall and
+  holding** chips it once per `Tank.PushInterval` (≈1.2 s to break) through the same HP/crack
+  frames as gunfire, then the tank rolls through. Requested by the developer after M2. (Dust
+  particle on the break deferred to the art pass.)
 
 ---
 
