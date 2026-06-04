@@ -3,6 +3,18 @@
 Living status tracker. The full spec is `docs/research/development-plan.md`; this
 file records what is actually done and what is next.
 
+This `## Status` block is the live checklist the Command Center `/projects`
+dashboard reads — keep it in sync with the detailed sections below.
+
+## Status
+- [x] M0 — scaffold, CI/CD, i18n, Sentry, secret-scan hook (T1–T12)
+- [x] M1 — one tank, empty arena, moves and shoots (local)
+- [x] S1 — extensibility foundation / entity spine (ADR-0010)
+- [x] M2 — static labyrinth + destructible walls (ADR-0004)
+- [x] Local-first combat arc — single-player vs AI, local 2-player co-op & versus (ADR-0011)
+- [~] Local polish arc — no new art, no networking
+- [ ] M3 — networked multiplayer (deferred: needs Cloudflare Durable Object + secrets + two-device testing)
+
 ## Current status: **M1 + S1 + M2 + local-first combat arc complete; local polish arc in progress** (2026-06-03)
 
 The CI/CD pipeline is live and every merge to `main` builds, tests, and deploys. M1's core
