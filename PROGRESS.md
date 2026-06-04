@@ -308,10 +308,16 @@ being built autonomously ahead of that:
   `SendInput(InputFrame)` up, `SnapshotReceived` down; `INetClock` (monotonic `Now` + server
   `TickRateHz`). Contract tests on hand-written loopback/clock fakes. "Client sends intent, server
   resolves outcome" — the network analogue of the `IInputSource` seam (ADR-0011).
-- **M3-T2 (C# half) — wire protocol** ✅ `TankGame.Domain.Net`: `InputFrame` / `SnapshotFrame` /
-  `TankState` / `WallDelta` + `ProtocolCodec` (hand-rolled little-endian binary). Roundtrip tests
-  plus **canonical byte-vector** tests that the TypeScript codec must match byte-for-byte (the
-  cross-language parity anchor). TS mirror + Durable Object skeleton land next.
+- **M3-T2 — wire protocol (both languages)** ✅ `TankGame.Domain.Net`: `InputFrame` /
+  `SnapshotFrame` / `TankState` / `WallDelta` + `ProtocolCodec` (hand-rolled little-endian binary),
+  and its TypeScript mirror `server/worker/src/protocol/codec.ts`. Roundtrip tests in **both**
+  languages plus **identical canonical byte-vector** tests (the cross-language parity anchor — if
+  either side changes the layout, both fail).
+- **M3-T3 — `MatchRoom` Durable Object skeleton** ✅ `server/worker/src/MatchRoom.ts`: accepts the
+  WebSocket upgrade via the hibernation API (`state.acceptWebSocket`) and relays each peer's frame
+  to the others; the Worker routes `/room/:code` to one DO per code (`idFromName`). Vitest +
+  Miniflare test connects two sockets and asserts the host's input echoes to the guest. `wrangler.toml`
+  gains the `MATCH_ROOM` DO binding + a `new_sqlite_classes` migration. Worker suite 10 tests green.
 
 The intent seam and deterministic GameLogic combat from the local arc are what keep this
 tractable. Still **not fully autonomous** — the deploy/secrets/devices remain the developer's.

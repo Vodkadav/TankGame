@@ -9,3 +9,13 @@ compatibility_flags = ["nodejs_compat"]
 # It is intentionally NOT declared as a [vars] binding — a var and a secret of the
 # same name collide ("Binding name already in use"). Tests inject a stub value via
 # miniflare bindings (see vitest.config.ts).
+
+# One MatchRoom Durable Object per lobby code (M3). SQLite-backed storage is the current
+# default for new DO classes and supports the hibernatable-WebSocket API the room relies on.
+[[durable_objects.bindings]]
+name = "MATCH_ROOM"
+class_name = "MatchRoom"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["MatchRoom"]
