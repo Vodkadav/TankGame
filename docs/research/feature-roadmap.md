@@ -181,9 +181,10 @@ plates are buttons (S5) wired to features.
 ### S8 — Arena generation & theming (a level *source* + a theme)
 *(Owner ask, 2026-06-04: "different types of maps", random walls **including steel**,
 adjustable size, swappable background / ground texture.)* Today `LevelMap.Parse`
-turns one hardcoded text literal (`Battlefield01`) into `Materials[x,y]` + `Bushes[x,y]`
-+ a spawn. That array form is already the seam: **a generator is just another producer
-of the same data.** Make the producer pluggable and add a presentation-side theme.
+turns one hardcoded text literal (`Battlefield01`) into a `Materials[x,y]` grid plus a
+`Bushes[x,y]` mask plus a spawn. That array form is already the seam: **a generator is
+just another producer of the same data.** Make the producer pluggable and add a
+presentation-side theme.
 
 ```csharp
 public interface ILevelSource { LevelMap Build(LevelParams p); }   // hand-authored OR procedural
