@@ -52,4 +52,16 @@ public class PowerupViewTests : TestClass
             throw new Exception($"Shape colour should match the kind; was {shape.Color}.");
         }
     }
+
+    [Test]
+    public void HealthPickups_HaveDistinctColours()
+    {
+        var repair = PowerupView.ColourFor(PowerupKind.Repair);
+        var shield = PowerupView.ColourFor(PowerupKind.Shield);
+
+        if (repair == Colors.White || shield == Colors.White || repair == shield)
+        {
+            throw new Exception($"Repair ({repair}) and Shield ({shield}) need distinct, mapped colours.");
+        }
+    }
 }

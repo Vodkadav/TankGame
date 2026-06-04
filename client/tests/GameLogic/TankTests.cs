@@ -124,6 +124,71 @@ public class TankTests
     }
 
     [Fact]
+    public void Heal_RestoresHp_ClampedAtMaxHp()
+    {
+        var tank = NewTank(new ScriptedInput(new TankInput(Vector2.Zero, Aim: 0f, Fire: false)));
+        tank.TakeDamage(2); // 3 -> 1
+
+        tank.Heal(1);
+        Assert.Equal(2, tank.Hp);
+
+        tank.Heal(10); // clamps at MaxHp, no overheal
+        Assert.Equal(tank.MaxHp, tank.Hp);
+    }
+
+    [Fact]
+    public void Heal_IsANoOp_OnADownedTank()
+    {
+        var tank = new Tank(
+            new ScriptedInput(new TankInput(Vector2.Zero, Aim: 0f, Fire: false)),
+            new World(), new OpenArena(), Vector2.Zero, Speed, FireInterval, ProjectileSpeed, maxHp: 1, lives: 2);
+        tank.TakeDamage(1); // downed (Hp 0), awaiting respawn
+
+        tank.Heal(1); // repair cannot revive — only the respawn timer does
+
+        Assert.Equal(0, tank.Hp);
+    }
+
+    [Fact]
+    public void Shield_AbsorbsDamage_BeforeHitPoints()
+    {
+        var tank = NewTank(new ScriptedInput(new TankInput(Vector2.Zero, Aim: 0f, Fire: false)));
+        tank.AddShield(2);
+
+        tank.TakeDamage(1); // soaked by the shield
+        Assert.Equal(1, tank.Shield);
+        Assert.Equal(tank.MaxHp, tank.Hp);
+
+        tank.TakeDamage(1); // depletes the shield, still no Hp lost
+        Assert.Equal(0, tank.Shield);
+        Assert.Equal(tank.MaxHp, tank.Hp);
+    }
+
+    [Fact]
+    public void Shield_OverflowDamage_SpillsOntoHitPoints()
+    {
+        var tank = NewTank(new ScriptedInput(new TankInput(Vector2.Zero, Aim: 0f, Fire: false)));
+        tank.AddShield(1);
+
+        tank.TakeDamage(3); // 1 absorbed, 2 hits Hp
+
+        Assert.Equal(0, tank.Shield);
+        Assert.Equal(tank.MaxHp - 2, tank.Hp);
+    }
+
+    [Fact]
+    public void AddShield_Stacks_AndIgnoresNonPositiveAmounts()
+    {
+        var tank = NewTank(new ScriptedInput(new TankInput(Vector2.Zero, Aim: 0f, Fire: false)));
+
+        tank.AddShield(2);
+        tank.AddShield(3);
+        tank.AddShield(-5); // ignored
+
+        Assert.Equal(5, tank.Shield);
+    }
+
+    [Fact]
     public void DeadTank_IsReapedByTheWorld()
     {
         var world = new World();

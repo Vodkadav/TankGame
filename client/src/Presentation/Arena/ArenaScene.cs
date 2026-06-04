@@ -45,12 +45,16 @@ public partial class ArenaScene : Node2D
     // counts, and the pickup radius are tunable balance knobs.
     private const float PickupRadius = 28f;
     private const int AmmoShots = 5;
+    private const int RepairAmount = 2;
+    private const int ShieldAmount = 3;
     private static readonly (int X, int Y, PowerupKind Kind, IPickupEffect Effect)[] PowerupSpawns =
     {
         (10, 8, PowerupKind.SpeedBoost, new StatusEffectPickup(new StatusEffect(StatKind.Speed, Mult: 1.6f, AddFlat: 0f, Seconds: 6f))),
         (18, 10, PowerupKind.RapidFire, new StatusEffectPickup(new StatusEffect(StatKind.FireInterval, Mult: 0.5f, AddFlat: 0f, Seconds: 6f))),
         (6, 10, PowerupKind.BouncingAmmo, new AmmoPickup(new BehaviourWeapon(() => new BouncingBehaviour(bounces: 3)), AmmoShots)),
         (21, 6, PowerupKind.SpreadAmmo, new AmmoPickup(new SpreadWeapon(count: 3, spreadRadians: 0.18f), AmmoShots)),
+        (13, 13, PowerupKind.Repair, new RepairPickup(RepairAmount)),
+        (14, 4, PowerupKind.Shield, new ShieldPickup(ShieldAmount)),
     };
 
     // Two-player uses a static camera framing the whole field so both tanks stay on screen.

@@ -12,11 +12,13 @@ public partial class TankView : Node2D
     private const float BarWidth = 44f;
     private const float BarHeight = 6f;
     private const float BarOffsetY = -46f;
+    private const float ShieldOffsetY = BarOffsetY - BarHeight - 2f;
 
     private ITank? _tank;
     private Sprite2D _body = null!;
     private Sprite2D _turret = null!;
     private ColorRect _healthBar = null!;
+    private ColorRect _shieldBar = null!;
 
     public override void _Ready()
     {
@@ -49,6 +51,7 @@ public partial class TankView : Node2D
         _body.Rotation = _tank.Rotation;
         _turret.Rotation = _tank.TurretRotation;
         UpdateHealthBar();
+        UpdateShieldBar();
     }
 
     private void UpdateHealthBar()
@@ -58,6 +61,20 @@ public partial class TankView : Node2D
         _healthBar.Color = ratio > 0.5f ? new Color(0.2f, 0.8f, 0.2f)
             : ratio > 0.25f ? new Color(0.9f, 0.8f, 0.1f)
             : new Color(0.9f, 0.2f, 0.2f);
+    }
+
+    // Over-shield draws as a thin cyan bar just above the health bar, scaled against MaxHp (so a
+    // full-Hp-worth of shield reads as a full-width bar) and hidden entirely when unshielded.
+    private void UpdateShieldBar()
+    {
+        _shieldBar.Visible = _tank!.Shield > 0;
+        if (!_shieldBar.Visible)
+        {
+            return;
+        }
+
+        var ratio = _tank.MaxHp > 0 ? Mathf.Clamp((float)_tank.Shield / _tank.MaxHp, 0f, 1f) : 1f;
+        _shieldBar.Size = new Vector2(BarWidth * ratio, BarHeight);
     }
 
     private void BuildHealthBar()
@@ -80,5 +97,15 @@ public partial class TankView : Node2D
             Position = new Vector2(-BarWidth / 2f, BarOffsetY),
         };
         AddChild(_healthBar);
+
+        _shieldBar = new ColorRect
+        {
+            Name = "ShieldBar",
+            Color = new Color(0.3f, 0.9f, 0.95f),
+            Size = new Vector2(BarWidth, BarHeight),
+            Position = new Vector2(-BarWidth / 2f, ShieldOffsetY),
+            Visible = false,
+        };
+        AddChild(_shieldBar);
     }
 }

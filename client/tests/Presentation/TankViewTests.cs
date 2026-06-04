@@ -88,6 +88,30 @@ public class TankViewTests : TestClass
     }
 
     [Test]
+    public void ShieldBar_IsHiddenWhenUnshielded_AndShowsWhenShielded()
+    {
+        var input = new FixedInput(new TankInput(NVector2.Zero, Aim: 0f, Fire: false));
+        var arena = new RectArena(new NVector2(-500f, -500f), new NVector2(500f, 500f));
+        var tank = new Tank(input, new World(), arena, NVector2.Zero, speed: 100f, fireInterval: 0.3f,
+            projectileSpeed: 600f, maxHp: 3);
+        _view.Bind(tank);
+
+        _view.UpdateFromModel();
+        var shieldBar = _view.GetNode<ColorRect>("ShieldBar");
+        if (shieldBar.Visible)
+        {
+            throw new System.Exception("Shield bar should be hidden when the tank has no shield.");
+        }
+
+        tank.AddShield(3);
+        _view.UpdateFromModel();
+        if (!shieldBar.Visible || shieldBar.Size.X <= 0f)
+        {
+            throw new System.Exception($"Shield bar should show with a positive width; visible={shieldBar.Visible}, w={shieldBar.Size.X}.");
+        }
+    }
+
+    [Test]
     public void DownedTank_IsHidden_AndReappearsOnRespawn()
     {
         var input = new FixedInput(new TankInput(NVector2.Zero, Aim: 0f, Fire: false));

@@ -16,4 +16,9 @@ public interface ITank : IEntity, IDamageable
     /// <summary>The side this tank fights for. Shots from the same team pass through it; a
     /// different team's shots damage it. Player 1, Player 2, and the AI each get their own.</summary>
     int Team { get; }
+
+    /// <summary>Over-shield points: a buffer absorbed by incoming damage before hit points are
+    /// touched (granted by a shield pickup). 0 when unshielded; not capped by <see cref="IDamageable.MaxHp"/>.
+    /// The view renders it above the health bar.</summary>
+    int Shield { get; }
 }

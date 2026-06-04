@@ -18,6 +18,7 @@ public class TankContractTests
         public int Hp { get; private set; } = 1;
         public int MaxHp => 1;
         public int Team => 0;
+        public int Shield => 0;
         public bool IsAlive => Hp > 0;
         public void TakeDamage(int amount) => Hp = System.Math.Max(0, Hp - amount);
 

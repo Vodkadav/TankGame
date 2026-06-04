@@ -16,6 +16,12 @@ public enum PowerupKind
 
     /// <summary>An ammo crate: the next shots fire as a fanned spread.</summary>
     SpreadAmmo,
+
+    /// <summary>Restores hit points on pickup.</summary>
+    Repair,
+
+    /// <summary>Grants over-shield points that absorb damage before hit points.</summary>
+    Shield,
 }
 
 /// <summary>A collectible sitting on the field — a world <see cref="IEntity"/>. The

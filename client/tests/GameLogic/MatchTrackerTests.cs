@@ -19,6 +19,7 @@ public class MatchTrackerTests
         public int Team { get; }
         public int Hp => IsAlive ? 1 : 0;
         public int MaxHp => 1;
+        public int Shield => 0;
         public bool IsAlive { get; }
         public void TakeDamage(int amount) { }
         public void Step(float deltaSeconds) { }

@@ -283,8 +283,16 @@ Catalogue and ordering: `docs/research/local-backlog.md`.
   ammo **crates reuse the S4 pickup entity/view**; `ArenaScene` lays a purple bouncing crate and a
   pink spread crate (5 shots each). **Piercing deferred** — it needs pierce-aware combat or
   wall-skip geometry (a separate decision).
+- **Health path — shield & repair pickups** ✅ resolves the `MaxHp`/health-modifier deferral from
+  ADR-0012. `Tank` gains `Heal(amount)` (restores Hp clamped at `MaxHp`, no-op on a downed tank) and
+  an over-shield pool: `Shield` (now on `ITank`), `AddShield(amount)` (stacks, uncapped), and
+  `TakeDamage` spends shield before hit points. Two new `IPickupEffect`s (`RepairPickup`,
+  `ShieldPickup`) reuse the S4 pickup entity/view; `PowerupKind` gains `Repair` (green) / `Shield`
+  (cyan); `TankView` draws a cyan over-shield bar above the health bar (hidden when unshielded).
+  `ArenaScene` lays a repair (+2 Hp) and shield (+3) pickup. Shield is local-combat only for now
+  (not in the net `TankState`); `NetTank.Shield` defaults to 0.
 
-Test counts on `main`: GameLogic 136, Domain 22, Infrastructure 8, Architecture 6, 36 GoDotTest
+Test counts on `main`: GameLogic 155, Domain 32, Infrastructure 12, Architecture 6, 49 GoDotTest
 scene tests.
 
 **Recorded but not started — owner ask (2026-06-04):** map variety + progression. Captured in
