@@ -139,6 +139,33 @@ public class TankTests
     }
 
     [Fact]
+    public void Step_MovesFasterUnderASpeedBoost_UntilItExpires()
+    {
+        var input = new ScriptedInput(new TankInput(new Vector2(1f, 0f), Aim: 0f, Fire: false));
+        var tank = NewTank(input); // base speed 100
+        tank.ApplyEffect(new StatusEffect(StatKind.Speed, Mult: 2f, AddFlat: 0f, Seconds: 1f));
+
+        tank.Step(0.5f); // boosted to 200 u/s → +100
+        Assert.Equal(100f, tank.Position.X, precision: 3);
+
+        tank.Step(0.6f); // boost expires this step → base 100 u/s → +60
+        Assert.Equal(160f, tank.Position.X, precision: 3);
+    }
+
+    [Fact]
+    public void Step_FiresFasterUnderARapidFireEffect()
+    {
+        var world = new World();
+        var tank = NewTank(new ScriptedInput(new TankInput(Vector2.Zero, Aim: 0f, Fire: true)), world);
+        tank.ApplyEffect(new StatusEffect(StatKind.FireInterval, Mult: 0.5f, AddFlat: 0f, Seconds: 5f));
+
+        tank.Step(0.05f); // fires (1); cooldown set to 0.3 * 0.5 = 0.15s
+        tank.Step(0.16f); // 0.16 > 0.15 → fires (2); base 0.3s would not have fired yet
+
+        Assert.Equal(2, world.Entities.Count);
+    }
+
+    [Fact]
     public void DownedTank_WithALifeLeft_StaysInTheMatch_ThenRespawnsAtSpawnAtFullHealth()
     {
         var spawn = new Vector2(50f, 60f);
