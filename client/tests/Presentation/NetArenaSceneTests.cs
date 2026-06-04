@@ -127,6 +127,32 @@ public class NetArenaSceneTests : TestClass
         }
     }
 
+    [Test]
+    public void Status_ProgressesFromConnectingToConnectedToOpponentJoined()
+    {
+        var label = _scene.FindChild("NetStatus", recursive: true, owned: false) as Label
+            ?? throw new Exception("Net scene should show a status label.");
+
+        if (label.Text != NetStatusOverlay.ConnectingKey)
+        {
+            throw new Exception($"Before the welcome the status should be connecting, was '{label.Text}'.");
+        }
+
+        _transport.DeliverWelcome(0);
+        if (label.Text != NetStatusOverlay.ConnectedKey)
+        {
+            throw new Exception($"After the welcome the status should be connected, was '{label.Text}'.");
+        }
+
+        _transport.DeliverSnapshot(Snapshot(ackSeq: 0,
+            new TankState(0, 10f, 10f, 0f, 0f, 3, 0),
+            new TankState(1, 200f, 96f, 0f, 0f, 3, 1)));
+        if (label.Text != NetStatusOverlay.Player2JoinedKey)
+        {
+            throw new Exception($"When the opponent appears the status should say joined, was '{label.Text}'.");
+        }
+    }
+
     private static SnapshotFrame Snapshot(uint ackSeq, params TankState[] tanks) =>
         new(1, ackSeq, new List<TankState>(tanks), new List<WallDelta>());
 
