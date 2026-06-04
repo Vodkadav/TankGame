@@ -142,6 +142,25 @@ public class ArenaSceneTests : TestClass
     }
 
     [Test]
+    public void Arena_SpawnsThePickupsOnTheField()
+    {
+        // Setup() loads the scene in the default mode; the catalogue places two pickups.
+        var powerups = 0;
+        foreach (var child in _arena.GetChildren())
+        {
+            if (child is PowerupView)
+            {
+                powerups++;
+            }
+        }
+
+        if (powerups != 2)
+        {
+            throw new System.Exception($"Arena must spawn the two field pickups; saw {powerups} PowerupViews.");
+        }
+    }
+
+    [Test]
     public void Arena_RendersTheMazeWallGrid()
     {
         WallGridView? walls = null;

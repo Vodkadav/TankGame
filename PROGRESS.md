@@ -256,8 +256,16 @@ Catalogue and ordering: `docs/research/local-backlog.md`.
   is the single entry point — powerups/traps (#12) become "apply an effect", not new mechanics.
   The `Tank` ctor is unchanged (seeds `Stats` from the same args). Foundation only; over-shield /
   damage-over-time (which touch `MaxHp`/`IDamageable`) are deferred per the ADR.
+- **S4 #12 — pickups (stat-based)** ✅ a new `IPowerup`/`PowerupKind` Domain seam + `Powerup`
+  GameLogic entity: each `Step` it scans the world and the first live tank within `PickupRadius`
+  collects it (`Tank.ApplyEffect` + the powerup expires). `PowerupView` draws a code-built
+  coloured diamond keyed by kind (blue speed / orange rapid-fire — no art). `ArenaScene` spawns a
+  **speed-boost** (×1.6, 6 s) and a **rapid-fire** (fire interval ×0.5, 6 s) pickup at mid-field
+  floor cells via the entity-spine type-switch. One pickup per round (a round reload re-lays
+  them); no respawn yet. **Shield / repair deferred** — they need the `MaxHp`/health-modifier
+  path ADR-0012 deferred.
 
-Test counts on `main`: GameLogic 120, Domain 22, Infrastructure 8, Architecture 6, 34 GoDotTest
+Test counts on `main`: GameLogic 124, Domain 22, Infrastructure 8, Architecture 6, 36 GoDotTest
 scene tests.
 
 ### Deferred: M3 — 2-player real-time via a single Durable Object
