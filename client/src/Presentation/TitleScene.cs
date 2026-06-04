@@ -37,7 +37,7 @@ public partial class TitleScene : Control
 
     private void Start(GameMode mode)
     {
-        GameSetup.Mode = mode;
+        GameSetup.StartNewMatch(mode); // fresh series at 0 - 0
         GetTree().ChangeSceneToFile("res://src/Presentation/Arena/Arena.tscn");
     }
 }
