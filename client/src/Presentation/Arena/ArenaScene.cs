@@ -35,7 +35,13 @@ public partial class ArenaScene : Node2D
 
     private static readonly NVector2 GridOrigin = NVector2.Zero;
 
-    // Floor cells in Battlefield01, spread away from the player spawns.
+    // The procedural battlefield is generated at this size (S8); the camera framing below assumes it.
+    private const int ArenaWidth = 28;
+    private const int ArenaHeight = 16;
+    private static readonly (int X, int Y) PlayerSpawn = (2, 1);
+
+    // Spawn/pickup anchor cells, spread across the field. The generator keeps every one open floor
+    // (and reachable) so a procedural arena never strands a tank or buries a pickup behind a wall.
     private static readonly (int X, int Y)[] EnemySpawns = { (25, 2), (25, 14), (13, 13) };
     private static readonly (int X, int Y) Player2Spawn = (25, 7);
 
@@ -62,7 +68,7 @@ public partial class ArenaScene : Node2D
     };
 
     // Two-player uses a static camera framing the whole field so both tanks stay on screen.
-    private static readonly Vector2 ArenaCentre = new(GridOrigin.X + (28 * TileSize / 2f), GridOrigin.Y + (16 * TileSize / 2f));
+    private static readonly Vector2 ArenaCentre = new(GridOrigin.X + (ArenaWidth * TileSize / 2f), GridOrigin.Y + (ArenaHeight * TileSize / 2f));
     private static readonly Vector2 TwoPlayerZoom = new(0.55f, 0.55f);
 
     // Fog of war: a dark ambient the player's light cuts a hole in. Radius ≈ the AI fire range
@@ -89,7 +95,7 @@ public partial class ArenaScene : Node2D
     {
         _mode = GameSetup.Mode;
 
-        var level = LevelMap.Parse(Battlefield01.Text);
+        var level = new ArenaGenerator().Generate(BuildArenaParams(GameSetup.ArenaSeed));
         var grid = level.BuildGrid();
         _arena = new GridArena(grid, TileSize, GridOrigin);
         _bushes = new BushField(level.Bushes, TileSize, GridOrigin);
@@ -128,6 +134,24 @@ public partial class ArenaScene : Node2D
 
         SpawnPowerups(); // before the tanks so pickup diamonds render beneath them
         SpawnTanks(level);
+    }
+
+    // The procedural-arena recipe (S8): a 28x16 battlefield from the match seed, keeping the player
+    // spawn and every spawn/pickup anchor as reachable open floor.
+    private static ArenaGenParams BuildArenaParams(int seed)
+    {
+        var reserved = new List<(int X, int Y)> { Player2Spawn };
+        foreach (var (ex, ey) in EnemySpawns)
+        {
+            reserved.Add((ex, ey));
+        }
+
+        foreach (var (x, y, _, _) in PowerupSpawns)
+        {
+            reserved.Add((x, y));
+        }
+
+        return new ArenaGenParams(ArenaWidth, ArenaHeight, seed, PlayerSpawn.X, PlayerSpawn.Y, reserved);
     }
 
     // Spawn the field's pickups through the world so each reaches the screen by the same

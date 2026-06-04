@@ -4,10 +4,11 @@ using TankGame.Domain;
 
 namespace TankGame.GameLogic;
 
-/// <summary>A hand-authored level parsed from a text map: <c>#</c> steel, <c>x</c> brick,
-/// <c>.</c> floor, <c>b</c> bush (passable, concealing), <c>@</c> the player spawn (a floor
-/// cell). Pure C# — produces a <see cref="WallGrid"/> model the arena and view consume. The
-/// map is the single source of the level layout; no procedural generation.</summary>
+/// <summary>A level layout: cell materials, bush flags, and the player spawn. Built either from a
+/// hand-authored text map (<see cref="Parse"/>: <c>#</c> steel, <c>x</c> brick, <c>.</c> floor,
+/// <c>b</c> bush, <c>@</c> spawn) or, for S8, directly from generated cell data
+/// (<see cref="FromCells"/> — see <see cref="ArenaGenerator"/>). Pure C# — produces a
+/// <see cref="WallGrid"/> model the arena and view consume.</summary>
 public sealed class LevelMap
 {
     private LevelMap(CellMaterial[,] materials, bool[,] bushes, int spawnX, int spawnY)
@@ -18,6 +19,31 @@ public sealed class LevelMap
         Height = materials.GetLength(1);
         SpawnX = spawnX;
         SpawnY = spawnY;
+    }
+
+    /// <summary>Builds a level directly from cell data — the producer seam a procedural generator
+    /// (S8) uses instead of authoring a text map. <paramref name="bushes"/> must match the
+    /// materials' dimensions; the spawn must be an in-bounds floor cell.</summary>
+    public static LevelMap FromCells(CellMaterial[,] materials, bool[,] bushes, int spawnX, int spawnY)
+    {
+        var width = materials.GetLength(0);
+        var height = materials.GetLength(1);
+        if (bushes.GetLength(0) != width || bushes.GetLength(1) != height)
+        {
+            throw new ArgumentException("bushes must match the materials' dimensions");
+        }
+
+        if (spawnX < 0 || spawnY < 0 || spawnX >= width || spawnY >= height)
+        {
+            throw new ArgumentOutOfRangeException(nameof(spawnX), "spawn is out of bounds");
+        }
+
+        if (materials[spawnX, spawnY] != CellMaterial.Floor)
+        {
+            throw new ArgumentException("spawn must be a floor cell");
+        }
+
+        return new LevelMap(materials, bushes, spawnX, spawnY);
     }
 
     /// <summary>Cell materials indexed <c>[x, y]</c>.</summary>

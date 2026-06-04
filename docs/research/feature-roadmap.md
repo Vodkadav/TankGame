@@ -418,8 +418,9 @@ defer the full progression/cosmetics build until after the combat systems (S2/S3
   (§4). *Write before M5 content.*
 - **ADR — dynamic terrain features over `IWallGrid`** (S7).
 - **ADR — arena generation (`ILevelSource`, procedural + validator) & theming** (S8).
-  *Write before the first procedural/themed map ticket; settle the `LevelParams`/`ArenaTheme`
-  contracts and the `ArenaScene` size-generalisation.*
+  *Generation slice settled in `docs/adr/0014-procedural-arena-generation.md` (seeded
+  `ArenaGenerator` → validated `LevelMap.FromCells`, wired into local `ArenaScene`). A follow-up ADR
+  covers theming (`ArenaTheme`) + the size-as-option/procedural-spawn-placement work.*
 - **ADR — progression, XP/levels & cosmetic-only unlocks + match modifiers** (S9).
   *Cosmetics-only is a hard constraint; pin where XP is earned and that nothing unlocks power.*
 - Vision is already covered by the fog-of-war proposal (`docs/adr/PROPOSAL-fog-of-war.md`);
