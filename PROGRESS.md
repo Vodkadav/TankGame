@@ -378,8 +378,13 @@ being built autonomously ahead of that:
   "Join TEST01" button now enters the scene (guarded so the GoDotTest click-path doesn't swap the
   runner's scene). GoDotTest drives welcome/snapshot/Tick against a fake transport (slot adopt, remote
   mirror, local reconcile, per-frame input send, wall-delta apply); scene suite 43, GameLogic 148.
-  **Remaining M3 = T9 connection-status strings + T11 worker budget alarm**, then the developer-only
-  two-device playtest is the DoD.
+- **M3-T9 — connection-status UI (EN/ES/DK)** ✅ `NetStatusOverlay` (a screen-space banner) shows
+  `net.connecting` until the welcome, `net.connected` once welcomed, and `net.player2_joined` when the
+  opponent first appears in a snapshot; `NetArenaScene` drives it. Strings added in all three locales;
+  GoDotTest forces each locale and asserts the three render, plus a scene test that the status
+  progresses connecting → connected → joined. Scene suite 47.
+  **Remaining M3 = T11 worker request-budget alarm**, then the developer-only two-device playtest is
+  the DoD.
 
 The intent seam and deterministic GameLogic combat from the local arc are what keep this
 tractable. Still **not fully autonomous** — the deploy/secrets/devices remain the developer's.

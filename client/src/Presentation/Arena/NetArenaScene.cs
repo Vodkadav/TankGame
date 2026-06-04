@@ -39,6 +39,7 @@ public partial class NetArenaScene : Node2D
     private Camera2D _camera = null!;
     private LevelMap _level = null!;
 
+    private NetStatusOverlay _status = null!;
     private byte? _localSlot;
     private PredictedTank? _predicted;
     private uint _inputSeq;
@@ -69,6 +70,9 @@ public partial class NetArenaScene : Node2D
         AddChild(_camera);
 
         _input = new KeyboardMouseInputSource(GetViewport(), fireOnClick: true);
+
+        _status = new NetStatusOverlay { Name = "NetStatusOverlay" };
+        AddChild(_status); // _Ready shows "Connecting…" until the welcome arrives
 
         _transport.WelcomeReceived += OnWelcome;
         _transport.SnapshotReceived += OnSnapshot;
@@ -105,6 +109,7 @@ public partial class NetArenaScene : Node2D
         _predicted = new PredictedTank(slot, _arena, CellCentre(cx, cy));
         EnsureTank(slot);
         SyncLocalFromPrediction(slot);
+        _status.SetStatus(NetStatusOverlay.ConnectedKey);
     }
 
     // An authoritative snapshot: reconcile our prediction, mirror every other tank straight from the
@@ -121,12 +126,17 @@ public partial class NetArenaScene : Node2D
             }
             else
             {
+                var firstSighting = !_tanks.ContainsKey(state.Slot);
                 var tank = EnsureTank(state.Slot);
                 tank.Position = new NVector2(state.X, state.Y);
                 tank.Rotation = state.Rotation;
                 tank.TurretRotation = state.TurretRotation;
                 tank.Hp = state.Hp;
                 tank.Team = state.Team;
+                if (firstSighting)
+                {
+                    _status.SetStatus(NetStatusOverlay.Player2JoinedKey); // the opponent is here
+                }
             }
         }
 
