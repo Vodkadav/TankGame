@@ -24,8 +24,20 @@ public partial class TitleScene : Control
         menu.AddChild(ModeButton("OnePlayer", "title.one_player", GameMode.OnePlayer));
         menu.AddChild(ModeButton("Coop", "title.two_player_coop", GameMode.TwoPlayerCoop));
         menu.AddChild(ModeButton("Versus", "title.two_player_versus", GameMode.TwoPlayerVersus));
+        menu.AddChild(JoinTestButton());
 
         AddChild(menu);
+    }
+
+    private Button JoinTestButton()
+    {
+        var button = new Button { Name = "JoinTest", Text = "title.join_test" };
+        button.Pressed += () =>
+        {
+            NetworkSession.Join(NetworkSession.TestLobbyCode);
+            button.Disabled = true; // one shot — connecting; networked play scene wiring is M3-T7.
+        };
+        return button;
     }
 
     private Button ModeButton(string name, string textKey, GameMode mode)
