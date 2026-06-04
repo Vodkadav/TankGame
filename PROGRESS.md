@@ -352,6 +352,17 @@ being built autonomously ahead of that:
   path against a mock transport (button-present + press-joins-TEST01-and-stores-active). Scene suite
   38 tests. The networked play-scene swap (rendering remote tanks from snapshots) waits on the T7
   prediction wiring.
+- **M3-T7 — client prediction + reconciliation** ✅ `client/src/GameLogic/PredictedTank.cs`: the
+  local tank `Predict`s each input immediately (no input lag) and buffers it; on a snapshot,
+  `Reconcile` snaps this slot to the server's authoritative transform/health, drops every input the
+  server has acked (`Seq ≤ AckSeq`), and replays the rest — so a correct prediction is invisible and
+  a wrong one is pulled smoothly to truth. The movement model **mirrors the server sim** byte-for-step
+  (200 u/s, axis-separated 24 u leading-edge wall collision, unit-magnitude clamp) so replayed inputs
+  reproduce the server path; pure C#, no Godot/transport (the caller wires `SnapshotReceived` →
+  `Reconcile`). 10 deterministic xUnit cases (predict-advances/clamps/turret, reconcile snap/replay/
+  discard/correction/wall/wrong-slot, full transport loop). GameLogic suite 146 tests. **Remaining
+  client work = the networked play-scene wiring** (poll the transport each frame, send input + predict,
+  render remote tanks from snapshots) then T9 status strings + T11 worker alarm.
 
 The intent seam and deterministic GameLogic combat from the local arc are what keep this
 tractable. Still **not fully autonomous** — the deploy/secrets/devices remain the developer's.
