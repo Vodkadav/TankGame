@@ -13,6 +13,17 @@ public interface IMatchTransport
     /// transport's concern.</summary>
     void SendInput(InputFrame input);
 
+    /// <summary>Drives the transport once per frame: pumps the underlying socket and raises
+    /// <see cref="WelcomeReceived"/> / <see cref="SnapshotReceived"/> for any messages that have
+    /// arrived. A polled (rather than callback-threaded) model so delivery stays on the game loop —
+    /// the Godot <c>WebSocketPeer</c> must be pumped from <c>_Process</c>; test fakes raise the
+    /// events directly and leave this a no-op.</summary>
+    void Poll();
+
+    /// <summary>Raised once on connect with the slot the server assigned this client (0 host /
+    /// 1 guest) — the slot it predicts and renders as its own.</summary>
+    event Action<byte> WelcomeReceived;
+
     /// <summary>Raised when an authoritative snapshot arrives from the server.</summary>
     event Action<SnapshotFrame> SnapshotReceived;
 }

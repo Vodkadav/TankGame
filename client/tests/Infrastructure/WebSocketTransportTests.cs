@@ -39,8 +39,18 @@ public class WebSocketTransportTests
         Assert.Equal(ProtocolCodec.EncodeInput(frame), socket.Sent[0]);
     }
 
+    // Server→client messages carry a leading kind tag; the transport strips it and dispatches.
+    private static byte[] SnapshotMessage(SnapshotFrame frame)
+    {
+        var payload = ProtocolCodec.EncodeSnapshot(frame);
+        var message = new byte[payload.Length + 1];
+        message[0] = ProtocolCodec.MsgSnapshot;
+        Array.Copy(payload, 0, message, 1, payload.Length);
+        return message;
+    }
+
     [Fact]
-    public void Poll_DecodesEachInboundMessageAndRaisesSnapshotReceived()
+    public void Poll_DecodesEachInboundSnapshotMessageAndRaisesSnapshotReceived()
     {
         var socket = new FakeSocket();
         var transport = new WebSocketTransport(socket);
@@ -52,8 +62,8 @@ public class WebSocketTransportTests
         var second = new SnapshotFrame(
             2, 8, new[] { new TankState(1, 30f, 40f, 0.3f, 0.4f, 80, 1) },
             new[] { new WallDelta(3, 4, 1, 2) });
-        socket.Inbound.Enqueue(ProtocolCodec.EncodeSnapshot(first));
-        socket.Inbound.Enqueue(ProtocolCodec.EncodeSnapshot(second));
+        socket.Inbound.Enqueue(SnapshotMessage(first));
+        socket.Inbound.Enqueue(SnapshotMessage(second));
 
         transport.Poll();
 
@@ -62,6 +72,20 @@ public class WebSocketTransportTests
         Assert.Equal(7u, received[0].AckSeq);
         Assert.Equal(2u, received[1].Tick);
         Assert.Equal(3, received[1].WallDeltas[0].CellX);
+    }
+
+    [Fact]
+    public void Poll_RaisesWelcomeReceived_WithTheAssignedSlot()
+    {
+        var socket = new FakeSocket();
+        var transport = new WebSocketTransport(socket);
+        byte? welcomedSlot = null;
+        transport.WelcomeReceived += slot => welcomedSlot = slot;
+        socket.Inbound.Enqueue(ProtocolCodec.EncodeWelcome(1));
+
+        transport.Poll();
+
+        Assert.Equal((byte)1, welcomedSlot);
     }
 
     [Fact]

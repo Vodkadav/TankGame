@@ -39,6 +39,27 @@ export const TANK_STATE_SIZE = 19;
 export const WALL_DELTA_SIZE = 6;
 export const FIRE_BIT = 1 << 0;
 
+// Server→client messages share one socket, so each is tagged with a leading kind byte: a Welcome
+// (sent once on connect, carrying the player's assigned slot) or a Snapshot. Inputs (client→server)
+// are untagged — the server only ever receives that one kind. The C# client mirrors these tags
+// (TankGame.Domain.Net.ProtocolCodec) and the welcome byte vector is a cross-language parity anchor.
+export const MSG_WELCOME = 1;
+export const MSG_SNAPSHOT = 2;
+
+/** A welcome message: `[MSG_WELCOME, slot]`. Tells a freshly-joined client which slot it controls. */
+export function encodeWelcome(slot: number): Uint8Array {
+  return new Uint8Array([MSG_WELCOME, slot & 0xff]);
+}
+
+/** A snapshot message: `[MSG_SNAPSHOT, ...encodeSnapshot(frame)]`. */
+export function encodeSnapshotMessage(frame: SnapshotFrame): Uint8Array {
+  const payload = encodeSnapshot(frame);
+  const message = new Uint8Array(payload.length + 1);
+  message[0] = MSG_SNAPSHOT;
+  message.set(payload, 1);
+  return message;
+}
+
 export function encodeInput(frame: InputFrame): Uint8Array {
   const buffer = new Uint8Array(INPUT_FRAME_SIZE);
   const view = new DataView(buffer.buffer);

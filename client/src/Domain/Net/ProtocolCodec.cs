@@ -20,6 +20,28 @@ public static class ProtocolCodec
     /// <summary>Encoded size of one <see cref="WallDelta"/>: cell(2+2) + material(1) + hp(1).</summary>
     public const int WallDeltaSize = 6;
 
+    /// <summary>Leading kind byte of a server→client welcome message (slot assignment).</summary>
+    public const byte MsgWelcome = 1;
+
+    /// <summary>Leading kind byte of a server→client snapshot message.</summary>
+    public const byte MsgSnapshot = 2;
+
+    /// <summary>A welcome message: <c>[MsgWelcome, slot]</c>. The server sends it once on connect to
+    /// tell the client which slot it controls. Mirrors <c>encodeWelcome</c> in the TS codec — the
+    /// byte vector is a cross-language parity anchor.</summary>
+    public static byte[] EncodeWelcome(byte slot) => new[] { MsgWelcome, slot };
+
+    /// <summary>Reads the slot from a welcome message (the byte after the kind tag).</summary>
+    public static byte DecodeWelcome(ReadOnlySpan<byte> data)
+    {
+        if (data.Length < 2)
+        {
+            throw new ArgumentException($"welcome message needs 2 bytes, got {data.Length}");
+        }
+
+        return data[1];
+    }
+
     public static byte[] EncodeInput(InputFrame frame)
     {
         var buffer = new byte[InputFrameSize];
