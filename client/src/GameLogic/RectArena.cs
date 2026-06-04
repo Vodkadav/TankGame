@@ -13,22 +13,25 @@ public sealed class RectArena(Vector2 min, Vector2 max) : IArena
     {
         var dir = Vector2.Normalize(direction);
         var exit = float.PositiveInfinity;
+        var normal = Vector2.Zero;
 
         if (dir.X != 0f)
         {
             var t = ((dir.X > 0f ? max.X : min.X) - origin.X) / dir.X;
-            if (t >= 0f)
+            if (t >= 0f && t < exit)
             {
-                exit = MathF.Min(exit, t);
+                exit = t;
+                normal = new Vector2(dir.X > 0f ? -1f : 1f, 0f); // inward normal of the X wall
             }
         }
 
         if (dir.Y != 0f)
         {
             var t = ((dir.Y > 0f ? max.Y : min.Y) - origin.Y) / dir.Y;
-            if (t >= 0f)
+            if (t >= 0f && t < exit)
             {
-                exit = MathF.Min(exit, t);
+                exit = t;
+                normal = new Vector2(0f, dir.Y > 0f ? -1f : 1f); // inward normal of the Y wall
             }
         }
 
@@ -37,7 +40,7 @@ public sealed class RectArena(Vector2 min, Vector2 max) : IArena
             return null;
         }
 
-        return new RaycastHit(origin + (dir * exit), exit);
+        return new RaycastHit(origin + (dir * exit), exit, normal);
     }
 
     // The bounding walls are indestructible, so there is nothing to damage.
