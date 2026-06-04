@@ -25,7 +25,7 @@ public class ProjectileTests
         {
             var remaining = wallX - origin.X;
             return remaining >= 0f && maxDistance >= remaining
-                ? new RaycastHit(new Vector2(wallX, origin.Y), remaining)
+                ? new RaycastHit(new Vector2(wallX, origin.Y), remaining, new Vector2(-1f, 0f))
                 : null;
         }
 

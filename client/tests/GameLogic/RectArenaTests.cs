@@ -44,6 +44,21 @@ public class RectArenaTests
     }
 
     [Fact]
+    public void RaycastFirstHit_ReportsTheInwardWallNormal()
+    {
+        var arena = Arena();
+
+        Assert.Equal(new Vector2(-1f, 0f), // right wall
+            arena.RaycastFirstHit(new Vector2(50f, 50f), new Vector2(1f, 0f), 1000f)!.Value.Normal);
+        Assert.Equal(new Vector2(1f, 0f), // left wall
+            arena.RaycastFirstHit(new Vector2(50f, 50f), new Vector2(-1f, 0f), 1000f)!.Value.Normal);
+        Assert.Equal(new Vector2(0f, -1f), // bottom wall
+            arena.RaycastFirstHit(new Vector2(50f, 50f), new Vector2(0f, 1f), 1000f)!.Value.Normal);
+        Assert.Equal(new Vector2(0f, 1f), // top wall
+            arena.RaycastFirstHit(new Vector2(50f, 40f), new Vector2(0f, -1f), 1000f)!.Value.Normal);
+    }
+
+    [Fact]
     public void RaycastFirstHit_ReturnsNull_WhenTheWallIsBeyondMaxDistance()
     {
         var hit = Arena().RaycastFirstHit(new Vector2(50f, 50f), new Vector2(1f, 0f), maxDistance: 10f);

@@ -5,7 +5,10 @@ namespace TankGame.Domain;
 /// <summary>Where a ray first met an obstacle.</summary>
 /// <param name="Point">World-space contact point.</param>
 /// <param name="Distance">Distance from the ray origin to <paramref name="Point"/>.</param>
-public readonly record struct RaycastHit(Vector2 Point, float Distance);
+/// <param name="Normal">Unit surface normal of the struck face, pointing back toward the side
+/// the ray came from — so a reflection is <c>dir - 2·(dir·Normal)·Normal</c> (the seam a
+/// bouncing/ricochet shell needs, per <c>docs/research/feature-roadmap.md</c> S2).</param>
+public readonly record struct RaycastHit(Vector2 Point, float Distance, Vector2 Normal);
 
 /// <summary>The playable space. Resolves collisions for projectiles (and later tanks)
 /// without exposing how the space is represented (empty box now, wall grid in M2).</summary>

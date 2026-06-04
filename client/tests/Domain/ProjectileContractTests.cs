@@ -56,7 +56,7 @@ public class ProjectileContractTests
         {
             var remaining = distance - origin.X;
             return maxDistance >= remaining
-                ? new RaycastHit(new Vector2(distance, origin.Y), remaining)
+                ? new RaycastHit(new Vector2(distance, origin.Y), remaining, new Vector2(-1f, 0f))
                 : null;
         }
 

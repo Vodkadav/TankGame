@@ -40,7 +40,7 @@ public sealed class GridArena : IArena
 
         if (_grid.IsBlocked(cellX, cellY))
         {
-            return new RaycastHit(origin, 0f);
+            return new RaycastHit(origin, 0f, -dir); // already inside a wall — face back along the ray
         }
 
         var (stepX, tMaxX, tDeltaX) = SetupAxis(local.X, dir.X, cellX);
@@ -49,17 +49,20 @@ public sealed class GridArena : IArena
         while (true)
         {
             float t;
+            Vector2 normal;
             if (tMaxX < tMaxY)
             {
                 t = tMaxX;
                 cellX += stepX;
                 tMaxX += tDeltaX;
+                normal = new Vector2(-stepX, 0f); // crossed a vertical face
             }
             else
             {
                 t = tMaxY;
                 cellY += stepY;
                 tMaxY += tDeltaY;
+                normal = new Vector2(0f, -stepY); // crossed a horizontal face
             }
 
             if (t > maxDistance)
@@ -69,7 +72,7 @@ public sealed class GridArena : IArena
 
             if (_grid.IsBlocked(cellX, cellY))
             {
-                return new RaycastHit(origin + (dir * t), t);
+                return new RaycastHit(origin + (dir * t), t, normal);
             }
         }
     }
