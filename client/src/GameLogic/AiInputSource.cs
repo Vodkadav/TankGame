@@ -76,9 +76,9 @@ public sealed class AiInputSource : IInputSource
 
         foreach (var entity in _world.Entities)
         {
-            if (entity is not ITank tank || !tank.IsAlive || tank.Team == _self!.Team)
+            if (entity is not ITank tank || tank.Hp <= 0 || tank.Team == _self!.Team)
             {
-                continue;
+                continue; // skip allies and downed enemies (a respawning tank is no target)
             }
 
             var distance = Vector2.Distance(tank.Position, _self.Position);

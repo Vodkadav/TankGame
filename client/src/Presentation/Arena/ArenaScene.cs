@@ -29,6 +29,10 @@ public partial class ArenaScene : Node2D
     private const int PlayerTeam = 0;
     private const int EnemyTeam = 1;
 
+    // Total lives per tank: a fallen tank revives at its spawn after Tank.RespawnDelay until its
+    // lives run out, then it stays dead. Tunable balance knob; uniform across modes for now.
+    private const int StartingLives = 3;
+
     private static readonly NVector2 GridOrigin = NVector2.Zero;
 
     // Floor cells in Battlefield01, spread away from the player spawns.
@@ -107,7 +111,7 @@ public partial class ArenaScene : Node2D
         // In two-player the left mouse button is Player 2's fire, so Player 1 fires with space.
         var p1Input = new KeyboardMouseInputSource(GetViewport(), fireOnClick: !twoPlayer);
         _player = new Tank(p1Input, _world, _arena, CellCentre(level.SpawnX, level.SpawnY),
-            TankSpeed, FireInterval, ProjectileSpeed, maxHp: 3, team: PlayerTeam);
+            TankSpeed, FireInterval, ProjectileSpeed, maxHp: 3, team: PlayerTeam, lives: StartingLives);
         _world.Spawn(_player);
 
         var viewers = new List<ITank> { _player };
@@ -115,7 +119,7 @@ public partial class ArenaScene : Node2D
         {
             var p2Team = _mode == GameMode.TwoPlayerVersus ? EnemyTeam : PlayerTeam;
             var p2 = new Tank(new Player2InputSource(), _world, _arena, CellCentre(Player2Spawn.X, Player2Spawn.Y),
-                TankSpeed, FireInterval, ProjectileSpeed, maxHp: 3, team: p2Team);
+                TankSpeed, FireInterval, ProjectileSpeed, maxHp: 3, team: p2Team, lives: StartingLives);
             _world.Spawn(p2);
             if (p2Team == PlayerTeam)
             {
@@ -129,7 +133,7 @@ public partial class ArenaScene : Node2D
             {
                 var ai = new AiInputSource(_world, _arena, _bushes);
                 var enemy = new Tank(ai, _world, _arena, CellCentre(ex, ey),
-                    EnemySpeed, FireInterval, ProjectileSpeed, maxHp: 3, team: EnemyTeam);
+                    EnemySpeed, FireInterval, ProjectileSpeed, maxHp: 3, team: EnemyTeam, lives: StartingLives);
                 ai.Bind(enemy); // resolve the input-source ↔ tank construction cycle
                 _world.Spawn(enemy);
             }
@@ -205,16 +209,17 @@ public partial class ArenaScene : Node2D
         _world.Step((float)delta);
 
         // One-player keeps the camera on the player; two-player uses a fixed field-framing camera.
-        if (_mode == GameMode.OnePlayer && _player.IsAlive)
+        // While the player is down (awaiting respawn) the camera holds its last position.
+        if (_mode == GameMode.OnePlayer && _player.Hp > 0)
         {
             _camera.Position = new Vector2(_player.Position.X, _player.Position.Y);
         }
 
-        // Each ally's vision light rides their tank; a fallen ally's light goes dark.
+        // Each ally's vision light rides their tank; a downed (or fallen) ally's light goes dark.
         foreach (var (tank, light) in _fogLights)
         {
-            light.Visible = tank.IsAlive;
-            if (tank.IsAlive)
+            light.Visible = tank.Hp > 0;
+            if (tank.Hp > 0)
             {
                 light.Position = new Vector2(tank.Position.X, tank.Position.Y);
             }

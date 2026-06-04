@@ -139,6 +139,90 @@ public class TankTests
     }
 
     [Fact]
+    public void DownedTank_WithALifeLeft_StaysInTheMatch_ThenRespawnsAtSpawnAtFullHealth()
+    {
+        var spawn = new Vector2(50f, 60f);
+        var input = new ScriptedInput(new TankInput(new Vector2(1f, 0f), Aim: 0f, Fire: false));
+        var tank = new Tank(input, new World(), new OpenArena(), spawn,
+            Speed, FireInterval, ProjectileSpeed, maxHp: 1, team: 0, lives: 2);
+
+        tank.Step(0.1f); // drives +X away from the spawn cell
+        Assert.True(tank.Position.X > spawn.X);
+
+        tank.TakeDamage(1); // downed, but a life remains
+        Assert.Equal(0, tank.Hp);
+        Assert.True(tank.IsAlive); // still in the match — it will respawn
+
+        tank.Step(Tank.RespawnDelay / 2f); // mid-respawn: still down
+        Assert.Equal(0, tank.Hp);
+
+        tank.Step(Tank.RespawnDelay); // delay elapsed → revive at spawn, full health
+        Assert.Equal(tank.MaxHp, tank.Hp);
+        Assert.Equal(spawn, tank.Position);
+    }
+
+    [Fact]
+    public void DownedTank_DoesNotMove_WhileAwaitingRespawn()
+    {
+        var input = new ScriptedInput(new TankInput(new Vector2(1f, 0f), Aim: 0f, Fire: false));
+        var tank = new Tank(input, new World(), new OpenArena(), Vector2.Zero,
+            Speed, FireInterval, ProjectileSpeed, maxHp: 1, team: 0, lives: 2);
+
+        tank.TakeDamage(1); // downed
+        var resting = tank.Position;
+        tank.Step(Tank.RespawnDelay / 4f); // input says drive, but a downed tank is inert
+
+        Assert.Equal(resting, tank.Position);
+    }
+
+    [Fact]
+    public void DownedTank_DoesNotFire_WhileAwaitingRespawn()
+    {
+        var world = new World();
+        var tank = new Tank(new ScriptedInput(new TankInput(Vector2.Zero, Aim: 0f, Fire: true)),
+            world, new OpenArena(), Vector2.Zero, Speed, FireInterval, ProjectileSpeed, maxHp: 1, team: 0, lives: 2);
+
+        tank.TakeDamage(1); // downed
+        tank.Step(Tank.RespawnDelay / 4f);
+
+        Assert.Empty(world.Entities); // a downed tank holds fire
+    }
+
+    [Fact]
+    public void Tank_OutOfLives_IsReapedByTheWorld()
+    {
+        var world = new World();
+        var tank = new Tank(new ScriptedInput(new TankInput(Vector2.Zero, Aim: 0f, Fire: false)),
+            world, new OpenArena(), Vector2.Zero, Speed, FireInterval, ProjectileSpeed, maxHp: 1, team: 0, lives: 2);
+        world.Spawn(tank);
+
+        tank.TakeDamage(1); // first death — respawns
+        world.Step(Tank.RespawnDelay + 0.1f);
+        Assert.Contains(tank, world.Entities);
+        Assert.True(tank.Hp > 0); // back in the fight
+
+        tank.TakeDamage(tank.MaxHp); // second death — out of lives
+        Assert.False(tank.IsAlive);
+        world.Step(0.1f);
+        Assert.DoesNotContain(tank, world.Entities); // permanently reaped
+    }
+
+    [Fact]
+    public void MatchTracker_KeepsADownedTankWithLivesLeft_InTheMatch()
+    {
+        var stand = new ScriptedInput(new TankInput(Vector2.Zero, Aim: 0f, Fire: false));
+        var downed = new Tank(stand, new World(), new OpenArena(), Vector2.Zero,
+            Speed, FireInterval, ProjectileSpeed, maxHp: 1, team: 0, lives: 2);
+        var enemy = new Tank(stand, new World(), new OpenArena(), new Vector2(500f, 0f),
+            Speed, FireInterval, ProjectileSpeed, maxHp: 1, team: 1, lives: 1);
+        downed.TakeDamage(1); // Hp 0 but a life remains
+
+        var result = new MatchTracker().Evaluate(new IEntity[] { downed, enemy });
+
+        Assert.False(result.Decided); // team 0 is down but still in the match
+    }
+
+    [Fact]
     public void Id_IsAssignedAndUniquePerTank()
     {
         var a = NewTank(new ScriptedInput(new TankInput(Vector2.Zero, Aim: 0f, Fire: false)));

@@ -25,7 +25,9 @@ public sealed class CombatResolver : ICombatResolver
 
     public void Resolve(IReadOnlyCollection<IEntity> entities)
     {
-        var tanks = entities.OfType<Tank>().Where(t => t.IsAlive).ToList();
+        // Only tangible tanks (positive hit points) are targets; a downed tank awaiting respawn
+        // has Hp 0 but is still "alive" in the match sense, so it is skipped here.
+        var tanks = entities.OfType<Tank>().Where(t => t.Hp > 0).ToList();
         if (tanks.Count == 0)
         {
             return;
@@ -35,16 +37,16 @@ public sealed class CombatResolver : ICombatResolver
         {
             foreach (var tank in tanks)
             {
-                if (tank.Team == shot.Team || !tank.IsAlive)
+                if (tank.Team == shot.Team || tank.Hp <= 0)
                 {
-                    continue; // friendly fire passes through; skip the already-dead
+                    continue; // friendly fire passes through; skip the already-downed
                 }
 
                 if (Vector2.Distance(shot.Position, tank.Position) <= _hitRadius)
                 {
                     tank.TakeDamage(shot.Damage);
                     shot.Expire();
-                    if (!tank.IsAlive)
+                    if (tank.Hp <= 0)
                     {
                         TankKilled?.Invoke(shot.Team); // credit the kill to the shooter's team
                     }

@@ -223,8 +223,15 @@ Catalogue and ordering: `docs/research/local-backlog.md`.
   destroys a tank (once per death, since the dead are skipped thereafter). A `ScoreOverlay` HUD
   (top-right, EN/ES/DK `hud.score` "Score {0} - {1}") mirrors the board live, and the game-over
   screen shows the final tally. First match-flow item — no art, no networking.
+- **LP9 — lives / respawn** ✅ each tank gets `lives` (ctor, default 1 = no respawn; `ArenaScene`
+  uses `StartingLives` 3 uniformly). A downed tank (Hp 0) stays *in the match* and revives at its
+  spawn at full health after `Tank.RespawnDelay` (2 s), spending one life; once lives run out the
+  world reaps it. `IEntity.IsAlive` on a tank now means "in the match" (Hp > 0 **or** a life left);
+  combat targeting/kill-credit, tank–tank collision, AI target acquisition, the fog light, and the
+  `TankView` (hidden while down) all key off `Hp > 0` (tangible right now). `MatchTracker` keeps a
+  respawning team alive via `IsAlive`. Kills still credit on every destruction (LP8 intact).
 
-Test counts on `main`: GameLogic 99, Domain 22, Infrastructure 8, Architecture 6, 33 GoDotTest
+Test counts on `main`: GameLogic 106, Domain 22, Infrastructure 8, Architecture 6, 34 GoDotTest
 scene tests.
 
 ### Deferred: M3 — 2-player real-time via a single Durable Object

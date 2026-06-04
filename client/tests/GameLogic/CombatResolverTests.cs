@@ -22,9 +22,9 @@ public class CombatResolverTests
 
     private const float HitRadius = 24f;
 
-    private static Tank TankAt(Vector2 pos, int team) =>
+    private static Tank TankAt(Vector2 pos, int team, int lives = 1) =>
         new(new NoInput(), new World(), new OpenArena(), pos, speed: 100f, fireInterval: 0.3f,
-            projectileSpeed: 600f, maxHp: 3, team: team);
+            projectileSpeed: 600f, maxHp: 3, team: team, lives: lives);
 
     private static Projectile ShotAt(Vector2 pos, int team) =>
         new(new OpenArena(), pos, new Vector2(1f, 0f), speed: 600f, damage: 1, team: team);
@@ -149,5 +149,35 @@ public class CombatResolverTests
         var resolver = new CombatResolver(HitRadius);
         resolver.TankKilled += board.RecordKill;
         return resolver;
+    }
+
+    [Fact]
+    public void AFatalHit_CreditsTheKill_EvenWhenTheVictimWillRespawn()
+    {
+        var tank = TankAt(Vector2.Zero, team: 0, lives: 2);
+        tank.TakeDamage(tank.MaxHp - 1); // one hit from death
+        var shot = ShotAt(Vector2.Zero, team: 1);
+        var resolver = new CombatResolver(HitRadius);
+        int? killerTeam = null;
+        resolver.TankKilled += team => killerTeam = team;
+
+        resolver.Resolve(new List<IEntity> { tank, shot });
+
+        Assert.Equal(1, killerTeam);
+        Assert.Equal(0, tank.Hp);  // downed
+        Assert.True(tank.IsAlive);  // but still in the match, awaiting respawn
+    }
+
+    [Fact]
+    public void ADownedTank_AwaitingRespawn_IsIntangibleToShots()
+    {
+        var tank = TankAt(Vector2.Zero, team: 0, lives: 2);
+        tank.TakeDamage(tank.MaxHp); // downed, a life remains
+        var shot = ShotAt(Vector2.Zero, team: 1);
+
+        new CombatResolver(HitRadius).Resolve(new List<IEntity> { tank, shot });
+
+        Assert.True(shot.IsAlive); // passes through the downed tank
+        Assert.Equal(0, tank.Hp);
     }
 }

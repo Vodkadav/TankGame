@@ -38,6 +38,13 @@ public partial class TankView : Node2D
             return;
         }
 
+        // A downed tank (0 hp) is awaiting respawn — hide it until it revives at full health.
+        Visible = _tank.Hp > 0;
+        if (!Visible)
+        {
+            return;
+        }
+
         Position = new Vector2(_tank.Position.X, _tank.Position.Y);
         _body.Rotation = _tank.Rotation;
         _turret.Rotation = _tank.TurretRotation;
