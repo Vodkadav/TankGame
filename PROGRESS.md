@@ -277,8 +277,8 @@ Catalogue and ordering: `docs/research/local-backlog.md`.
 - **S2 #14 — bouncing & spread shells via ammo crates** ✅ `BouncingBehaviour` reflects off the
   hit `Normal` (`v − 2(v·n)n`), decrementing a per-shot bounce budget, then lands like a straight
   shot when spent. `IWeapon` firing strategy: `BehaviourWeapon` (one shot, a behaviour factory),
-  `SpreadWeapon` (N straight pellets fanned about the aim). `Tank` gains `LoadAmmo(weapon, shots)`
-  + a default straight weapon; it fires the special weapon while ammo lasts, then reverts. The
+  `SpreadWeapon` (N straight pellets fanned about the aim). `Tank` gains a default straight weapon
+  plus `LoadAmmo(weapon, shots)`; it fires the special weapon while ammo lasts, then reverts. The
   `Powerup` was generalised to carry an `IPickupEffect` (`StatusEffectPickup` | `AmmoPickup`), so
   ammo **crates reuse the S4 pickup entity/view**; `ArenaScene` lays a purple bouncing crate and a
   pink spread crate (5 shots each). **Piercing deferred** — it needs pierce-aware combat or
