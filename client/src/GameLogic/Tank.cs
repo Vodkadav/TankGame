@@ -14,11 +14,14 @@ public sealed class Tank : ITank
     private readonly IInputSource _input;
     private readonly IWorld _world;
     private readonly IArena _arena;
+    private readonly Vector2 _spawnPosition;
     private readonly float _speed;
     private readonly float _fireInterval;
     private readonly float _projectileSpeed;
     private float _fireCooldown;
     private float _pushTimer;
+    private int _livesRemaining;
+    private float _respawnTimer;
 
     /// <param name="input">Per-frame intent source.</param>
     /// <param name="world">The world the tank spawns its shots into.</param>
@@ -29,6 +32,8 @@ public sealed class Tank : ITank
     /// <param name="projectileSpeed">Speed of spawned projectiles, units per second.</param>
     /// <param name="maxHp">Hit points at full health.</param>
     /// <param name="team">The side this tank fights for (its shots spare the same team).</param>
+    /// <param name="lives">Total lives, including the current one: a tank revives at its spawn
+    /// after each death until its lives run out, then the world reaps it. Default 1 = no respawn.</param>
     public Tank(
         IInputSource input,
         IWorld world,
@@ -38,16 +43,19 @@ public sealed class Tank : ITank
         float fireInterval,
         float projectileSpeed,
         int maxHp = 3,
-        int team = 0)
+        int team = 0,
+        int lives = 1)
     {
         Id = Guid.NewGuid();
         MaxHp = maxHp;
         Hp = maxHp;
         Team = team;
+        _livesRemaining = lives;
         _input = input;
         _world = world;
         _arena = arena;
         Position = startPosition;
+        _spawnPosition = startPosition;
         _speed = speed;
         _fireInterval = fireInterval;
         _projectileSpeed = projectileSpeed;
@@ -62,6 +70,10 @@ public sealed class Tank : ITank
     public const float PushInterval = 0.4f;
     private const int PushDamage = 1;
 
+    /// <summary>Seconds a tank stays down after a death before it revives at its spawn point
+    /// (only while it still has lives left).</summary>
+    public const float RespawnDelay = 2f;
+
     public Guid Id { get; }
     public Vector2 Position { get; private set; }
     public float Rotation { get; private set; }
@@ -71,21 +83,52 @@ public sealed class Tank : ITank
     public int MaxHp { get; }
     public int Team { get; }
 
-    // Reaped by the world once its hit points are gone.
-    public bool IsAlive => Hp > 0;
+    // "In the match": a tank with positive hit points is fighting; one at zero hit points is
+    // down but still in the match while it has a life left to respawn. Only once both are gone
+    // does the world reap it. Combat, collision, and the view instead key off Hp > 0 (whether
+    // it is a tangible, fightable tank right now).
+    public bool IsAlive => Hp > 0 || _livesRemaining > 0;
 
     public void TakeDamage(int amount)
     {
-        if (amount <= 0)
+        if (amount <= 0 || Hp <= 0)
         {
-            return;
+            return; // no damage, or already down (the kill was already credited)
         }
 
         Hp = Math.Max(0, Hp - amount);
+        if (Hp == 0)
+        {
+            _livesRemaining--; // spend the life just lost; respawn if any remain
+            if (_livesRemaining > 0)
+            {
+                _respawnTimer = RespawnDelay;
+            }
+        }
     }
 
     public void Step(float deltaSeconds)
     {
+        if (Hp <= 0)
+        {
+            // Down: inert (no movement, aim, or fire) until the respawn timer elapses, then
+            // revive at the spawn point. A tank out of lives has no timer and simply waits to
+            // be reaped.
+            if (_respawnTimer > 0f)
+            {
+                _respawnTimer -= deltaSeconds;
+                if (_respawnTimer <= 0f)
+                {
+                    Hp = MaxHp;
+                    Position = _spawnPosition;
+                    _fireCooldown = 0f;
+                    _pushTimer = 0f;
+                }
+            }
+
+            return;
+        }
+
         var input = _input.Read();
 
         var move = input.Move;
@@ -188,7 +231,7 @@ public sealed class Tank : ITank
         var minDistance = CollisionRadius * 2f;
         foreach (var entity in _world.Entities)
         {
-            if (entity is ITank other && !ReferenceEquals(other, this) && other.IsAlive &&
+            if (entity is ITank other && !ReferenceEquals(other, this) && other.Hp > 0 &&
                 Vector2.DistanceSquared(candidateCentre, other.Position) < minDistance * minDistance)
             {
                 return true;

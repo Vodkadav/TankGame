@@ -86,4 +86,28 @@ public class TankViewTests : TestClass
             throw new System.Exception($"Health bar should halve to {fullWidth / 2f}; was {bar.Size.X}.");
         }
     }
+
+    [Test]
+    public void DownedTank_IsHidden_AndReappearsOnRespawn()
+    {
+        var input = new FixedInput(new TankInput(NVector2.Zero, Aim: 0f, Fire: false));
+        var arena = new RectArena(new NVector2(-500f, -500f), new NVector2(500f, 500f));
+        var tank = new Tank(input, new World(), arena, NVector2.Zero, speed: 100f, fireInterval: 0.3f,
+            projectileSpeed: 600f, maxHp: 1, team: 0, lives: 2);
+        _view.Bind(tank);
+
+        tank.TakeDamage(1); // downed, awaiting respawn
+        _view.UpdateFromModel();
+        if (_view.Visible)
+        {
+            throw new System.Exception("A downed tank's view should be hidden while it awaits respawn.");
+        }
+
+        tank.Step(Tank.RespawnDelay + 0.1f); // revive
+        _view.UpdateFromModel();
+        if (!_view.Visible)
+        {
+            throw new System.Exception("A respawned tank's view should be visible again.");
+        }
+    }
 }
