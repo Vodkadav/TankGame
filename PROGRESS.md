@@ -324,6 +324,14 @@ being built autonomously ahead of that:
   validates the code and returns the `/room/:code` WS URL (404 unknown). `LOBBY_KV` binding wired in
   `wrangler.toml` (namespace created by the developer). Vitest: pure-function collision-retry/store/
   join + Miniflare route round-trip. Worker suite 17 tests green.
+- **M3-T5 (core) — authoritative `MatchSim`** ✅ `server/worker/src/sim/`: a pure, deterministic
+  TypeScript MVP of the match — `map.ts` ports Battlefield01 (materials + brick HP, OOB steel);
+  `matchSim.ts` runs 2 tanks (per-slot input → axis-separated wall-collided movement, turret aim,
+  rate-limited firing), projectiles (travel → brick chip/break with `WallDelta`s, enemy-tank
+  damage), and `snapshotFor(slot)` (per-client `ackSeq`). **Anti-cheat clamps live here**: move
+  magnitude ≤ 1 and a server-enforced fire interval, so a tampered client cannot move/shoot faster.
+  Spawn cells are injectable for tests. 12 new Vitest cases (worker suite 29). The DO tick-loop
+  wiring (replace the relay → 20 Hz `step` + broadcast) is the next PR.
 
 The intent seam and deterministic GameLogic combat from the local arc are what keep this
 tractable. Still **not fully autonomous** — the deploy/secrets/devices remain the developer's.
