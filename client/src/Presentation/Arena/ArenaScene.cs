@@ -39,6 +39,18 @@ public partial class ArenaScene : Node2D
     private static readonly (int X, int Y)[] EnemySpawns = { (25, 2), (25, 14), (13, 13) };
     private static readonly (int X, int Y) Player2Spawn = (25, 7);
 
+    // Pickups: a tank driving over one collects its timed effect (S4, ADR-0012). Placed on open
+    // floor near the middle so reaching one is a contested choice. Magnitudes/durations and the
+    // pickup radius are tunable balance knobs.
+    private const float PickupRadius = 28f;
+    private static readonly StatusEffect SpeedBoostEffect = new(StatKind.Speed, Mult: 1.6f, AddFlat: 0f, Seconds: 6f);
+    private static readonly StatusEffect RapidFireEffect = new(StatKind.FireInterval, Mult: 0.5f, AddFlat: 0f, Seconds: 6f);
+    private static readonly (int X, int Y, PowerupKind Kind, StatusEffect Effect)[] PowerupSpawns =
+    {
+        (10, 8, PowerupKind.SpeedBoost, SpeedBoostEffect),
+        (18, 10, PowerupKind.RapidFire, RapidFireEffect),
+    };
+
     // Two-player uses a static camera framing the whole field so both tanks stay on screen.
     private static readonly Vector2 ArenaCentre = new(GridOrigin.X + (28 * TileSize / 2f), GridOrigin.Y + (16 * TileSize / 2f));
     private static readonly Vector2 TwoPlayerZoom = new(0.55f, 0.55f);
@@ -98,7 +110,18 @@ public partial class ArenaScene : Node2D
         _camera = new Camera2D { Name = "GameCamera", ProcessCallback = Camera2D.Camera2DProcessCallback.Physics };
         AddChild(_camera);
 
+        SpawnPowerups(); // before the tanks so pickup diamonds render beneath them
         SpawnTanks(level);
+    }
+
+    // Spawn the field's pickups through the world so each reaches the screen by the same
+    // spawn-event path as every other entity (a PowerupView via the type-switch).
+    private void SpawnPowerups()
+    {
+        foreach (var (x, y, kind, effect) in PowerupSpawns)
+        {
+            _world.Spawn(new Powerup(_world, CellCentre(x, y), kind, effect, PickupRadius));
+        }
     }
 
     // Spawn through the world so each tank reaches the screen by the same event path as every
@@ -240,6 +263,7 @@ public partial class ArenaScene : Node2D
         {
             ITank tank => BuildTankView(tank),
             IProjectile projectile => BuildProjectileView(projectile),
+            IPowerup powerup => BuildPowerupView(powerup),
             _ => throw new NotSupportedException($"No view registered for {entity.GetType().Name}.")
         };
 
@@ -328,6 +352,13 @@ public partial class ArenaScene : Node2D
         var view = GD.Load<PackedScene>("res://src/Presentation/Projectile/ProjectileView.tscn")
             .Instantiate<ProjectileView>();
         view.Bind(projectile);
+        return view;
+    }
+
+    private static PowerupView BuildPowerupView(IPowerup powerup)
+    {
+        var view = new PowerupView();
+        view.Bind(powerup);
         return view;
     }
 
