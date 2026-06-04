@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
@@ -16,6 +17,11 @@ public sealed class CombatResolver : ICombatResolver
 
     /// <param name="hitRadius">World distance within which a shot counts as hitting a tank.</param>
     public CombatResolver(float hitRadius) => _hitRadius = hitRadius;
+
+    /// <summary>Raised with the shooting tank's <see cref="Tank.Team"/> each time a shot's damage
+    /// destroys a tank — once per death, since the dead are skipped thereafter. A
+    /// <see cref="ScoreBoard"/> subscribes to tally per-team kills.</summary>
+    public event Action<int>? TankKilled;
 
     public void Resolve(IReadOnlyCollection<IEntity> entities)
     {
@@ -38,6 +44,11 @@ public sealed class CombatResolver : ICombatResolver
                 {
                     tank.TakeDamage(shot.Damage);
                     shot.Expire();
+                    if (!tank.IsAlive)
+                    {
+                        TankKilled?.Invoke(shot.Team); // credit the kill to the shooter's team
+                    }
+
                     break; // a shot lands on at most one tank
                 }
             }

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using Godot;
 using TankGame.Domain;
 using TankGame.GameLogic;
@@ -48,6 +49,7 @@ public partial class ArenaScene : Node2D
     private readonly Dictionary<Guid, Node2D> _views = new();
     private readonly List<(ITank Tank, PointLight2D Light)> _fogLights = new();
     private readonly MatchTracker _matchTracker = new();
+    private readonly ScoreBoard _scoreBoard = new();
     private World _world = null!;
     private GridArena _arena = null!;
     private BushField _bushes = null!;
@@ -65,7 +67,9 @@ public partial class ArenaScene : Node2D
         _arena = new GridArena(grid, TileSize, GridOrigin);
         _bushes = new BushField(level.Bushes, TileSize, GridOrigin);
 
-        _world = new World(new CombatResolver(CombatHitRadius));
+        var combat = new CombatResolver(CombatHitRadius);
+        combat.TankKilled += _scoreBoard.RecordKill; // credit each kill to the shooter's team
+        _world = new World(combat);
         _world.EntitySpawned += OnEntitySpawned;
         _world.EntityDespawned += OnEntityDespawned;
 
@@ -82,6 +86,10 @@ public partial class ArenaScene : Node2D
         var brickCounter = new BrickCounterOverlay { Name = "BrickCounterOverlay" };
         AddChild(brickCounter); // runs _Ready (builds the label)
         brickCounter.Bind(grid);
+
+        var scoreOverlay = new ScoreOverlay { Name = "ScoreOverlay" };
+        AddChild(scoreOverlay); // runs _Ready (builds the label)
+        scoreOverlay.Bind(_scoreBoard);
 
         _camera = new Camera2D { Name = "GameCamera", ProcessCallback = Camera2D.Camera2DProcessCallback.Physics };
         AddChild(_camera);
@@ -273,6 +281,17 @@ public partial class ArenaScene : Node2D
         {
             Name = "Outcome",
             Text = key,
+            HorizontalAlignment = HorizontalAlignment.Center,
+        });
+
+        box.AddChild(new Label
+        {
+            Name = "FinalScore",
+            Text = string.Format(
+                CultureInfo.InvariantCulture,
+                TranslationServer.Translate(ScoreOverlay.Key),
+                _scoreBoard.KillsFor(PlayerTeam),
+                _scoreBoard.KillsFor(EnemyTeam)),
             HorizontalAlignment = HorizontalAlignment.Center,
         });
 

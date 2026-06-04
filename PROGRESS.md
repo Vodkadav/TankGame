@@ -218,8 +218,13 @@ Catalogue and ordering: `docs/research/local-backlog.md`.
   off in versus (one shared screen can't fairly fog rivals). `FogAmbient`/`FogLightRadius` are
   tunable; no wall shadows yet (a soft circular reveal). Visual darkness/radius awaits a
   playtest pass. **Headline vision cluster (battlefield + fog + bushes) complete.**
+- **LP8 — score / kill tracking** ✅ a pure-C# `ScoreBoard` tallies kills per team, fed by a new
+  `CombatResolver.TankKilled` event that fires with the shooter's team the moment a shot's damage
+  destroys a tank (once per death, since the dead are skipped thereafter). A `ScoreOverlay` HUD
+  (top-right, EN/ES/DK `hud.score` "Score {0} - {1}") mirrors the board live, and the game-over
+  screen shows the final tally. First match-flow item — no art, no networking.
 
-Test counts on `main`: GameLogic 92, Domain 22, Infrastructure 8, Architecture 6, 30 GoDotTest
+Test counts on `main`: GameLogic 99, Domain 22, Infrastructure 8, Architecture 6, 33 GoDotTest
 scene tests.
 
 ### Deferred: M3 — 2-player real-time via a single Durable Object

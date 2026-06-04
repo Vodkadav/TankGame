@@ -96,4 +96,58 @@ public class CombatResolverTests
 
         Assert.DoesNotContain(tank, world.Entities); // destroyed and reaped
     }
+
+    [Fact]
+    public void AFatalHit_RaisesTankKilled_WithTheShootersTeam()
+    {
+        var tank = TankAt(Vector2.Zero, team: 0);
+        tank.TakeDamage(tank.MaxHp - 1); // one hit from death
+        var shot = ShotAt(Vector2.Zero, team: 1);
+        var resolver = new CombatResolver(HitRadius);
+        int? killerTeam = null;
+        resolver.TankKilled += team => killerTeam = team;
+
+        resolver.Resolve(new List<IEntity> { tank, shot });
+
+        Assert.Equal(1, killerTeam);
+    }
+
+    [Fact]
+    public void ANonFatalHit_DoesNotRaiseTankKilled()
+    {
+        var tank = TankAt(Vector2.Zero, team: 0); // full health, survives one hit
+        var shot = ShotAt(Vector2.Zero, team: 1);
+        var resolver = new CombatResolver(HitRadius);
+        var raised = false;
+        resolver.TankKilled += _ => raised = true;
+
+        resolver.Resolve(new List<IEntity> { tank, shot });
+
+        Assert.False(raised);
+    }
+
+    [Fact]
+    public void TankKilled_FeedsAScoreBoard_CreditingTheKill()
+    {
+        var board = new ScoreBoard();
+        var world = new World(BuildScoringResolver(board));
+        var tank = TankAt(Vector2.Zero, team: 0);
+        world.Spawn(tank);
+
+        for (var i = 0; i < tank.MaxHp; i++)
+        {
+            world.Spawn(ShotAt(Vector2.Zero, team: 1));
+            world.Step(0.016f);
+        }
+
+        Assert.Equal(1, board.KillsFor(1)); // team 1 destroyed exactly one tank
+        Assert.Equal(0, board.KillsFor(0));
+    }
+
+    private static CombatResolver BuildScoringResolver(ScoreBoard board)
+    {
+        var resolver = new CombatResolver(HitRadius);
+        resolver.TankKilled += board.RecordKill;
+        return resolver;
+    }
 }
