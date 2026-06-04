@@ -383,8 +383,15 @@ being built autonomously ahead of that:
   opponent first appears in a snapshot; `NetArenaScene` drives it. Strings added in all three locales;
   GoDotTest forces each locale and asserts the three render, plus a scene test that the status
   progresses connecting → connected → joined. Scene suite 47.
-  **Remaining M3 = T11 worker request-budget alarm**, then the developer-only two-device playtest is
-  the DoD.
+- **M3-T11 — request-budget alarm** ✅ `server/worker/src/budget.ts`: a daily cron (`crons = ["0 6 * * *"]`)
+  reads this month's Durable Object request usage and posts a Sentry warning at **80%** of the
+  free-tier budget (ADR-0005 §4) — the remedy is to refuse new lobbies, never to pay. The decision
+  logic (`overBudget`, `checkRequestBudget`, `monthStart`) is pure and unit-tested against stubbed
+  analytics/alerter (6 Vitest cases, worker suite 39); the live Cloudflare GraphQL Analytics client is
+  thin wiring that no-ops without a token (so the local/headless scheduled run is safe). `CF_API_TOKEN`
+  is a deploy-time read-only Analytics secret.
+  **The whole autonomous half of M3 is now done (T1–T9, T11).** The only thing left is the
+  developer-gated **two-device playtest** (`docs/setup/m3-go-live.md` Step 4) — the M3 definition of done.
 
 The intent seam and deterministic GameLogic combat from the local arc are what keep this
 tractable. Still **not fully autonomous** — the deploy/secrets/devices remain the developer's.

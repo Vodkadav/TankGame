@@ -10,6 +10,12 @@ compatibility_flags = ["nodejs_compat"]
 # same name collide ("Binding name already in use"). Tests inject a stub value via
 # miniflare bindings (see vitest.config.ts).
 
+# Request-budget alarm (M3-T11): a daily cron reads Durable Object usage and warns Sentry at 80%
+# of the free-tier budget (ADR-0005 §4). CF_API_TOKEN (read-only Analytics) is a deploy-time secret;
+# absent, the scheduled run is a safe no-op.
+[triggers]
+crons = ["0 6 * * *"]
+
 # One MatchRoom Durable Object per lobby code (M3). SQLite-backed storage is the current
 # default for new DO classes and supports the hibernatable-WebSocket API the room relies on.
 [[durable_objects.bindings]]
