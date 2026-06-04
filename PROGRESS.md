@@ -317,7 +317,13 @@ being built autonomously ahead of that:
   WebSocket upgrade via the hibernation API (`state.acceptWebSocket`) and relays each peer's frame
   to the others; the Worker routes `/room/:code` to one DO per code (`idFromName`). Vitest +
   Miniflare test connects two sockets and asserts the host's input echoes to the guest. `wrangler.toml`
-  gains the `MATCH_ROOM` DO binding + a `new_sqlite_classes` migration. Worker suite 10 tests green.
+  gains the `MATCH_ROOM` DO binding + a `new_sqlite_classes` migration. **Deployed live** — CI's
+  `deploy.yml` ran `wrangler deploy` on merge; `…workers.dev/room/TEST01` answers `426`.
+- **M3-T4 — lobby routes** ✅ `server/worker/src/lobby.ts`: `POST /lobby` allocates a 6-char code
+  (unambiguous alphabet, collision-retry) mapped to its DO id in `LOBBY_KV`; `POST /lobby/:code/join`
+  validates the code and returns the `/room/:code` WS URL (404 unknown). `LOBBY_KV` binding wired in
+  `wrangler.toml` (namespace created by the developer). Vitest: pure-function collision-retry/store/
+  join + Miniflare route round-trip. Worker suite 17 tests green.
 
 The intent seam and deterministic GameLogic combat from the local arc are what keep this
 tractable. Still **not fully autonomous** — the deploy/secrets/devices remain the developer's.
