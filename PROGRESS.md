@@ -367,8 +367,19 @@ being built autonomously ahead of that:
   (1), and tags each snapshot. `encodeWelcome`/`EncodeWelcome` exist in both codecs with a
   cross-language byte-vector parity anchor. `IMatchTransport` gains `Poll()` (pump the socket each
   frame) + `WelcomeReceived`; `WebSocketTransport.Poll` dispatches inbound messages on the kind byte.
-  Worker suite 33, Domain 32, Infrastructure 12. **Remaining = the net play scene itself** (poll +
-  send-input + predict + render remote tanks from snapshots) then T9 status strings + T11 worker alarm.
+  Worker suite 33, Domain 32, Infrastructure 12.
+- **M3 networked play scene** ✅ `client/src/Presentation/Arena/NetArenaScene.cs` (+ `NetArena.tscn`):
+  the client half of the authoritative match. Loads the shared `Battlefield01`; on the welcome it
+  adopts its slot and starts a `PredictedTank`; each `_Process`/`Tick` pumps the transport, sends the
+  local intent (`InputFrame`, seq++), predicts the local tank, and follows it with the camera; each
+  snapshot reconciles the local tank and mirrors every other slot straight from its `TankState`;
+  `WallDelta`s apply to the grid via the new absolute `WallGrid.SetCell`. `NetTank` (GameLogic) is a
+  mutable `ITank` view-model so the existing `TankView` renders network state unchanged. The title
+  "Join TEST01" button now enters the scene (guarded so the GoDotTest click-path doesn't swap the
+  runner's scene). GoDotTest drives welcome/snapshot/Tick against a fake transport (slot adopt, remote
+  mirror, local reconcile, per-frame input send, wall-delta apply); scene suite 43, GameLogic 148.
+  **Remaining M3 = T9 connection-status strings + T11 worker budget alarm**, then the developer-only
+  two-device playtest is the DoD.
 
 The intent seam and deterministic GameLogic combat from the local arc are what keep this
 tractable. Still **not fully autonomous** — the deploy/secrets/devices remain the developer's.

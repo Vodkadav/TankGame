@@ -35,7 +35,15 @@ public partial class TitleScene : Control
         button.Pressed += () =>
         {
             NetworkSession.Join(NetworkSession.TestLobbyCode);
-            button.Disabled = true; // one shot — connecting; networked play scene wiring is M3-T7.
+            button.Disabled = true;
+
+            // Enter the networked arena, which reads the session we just opened. Guarded so the
+            // GoDotTest click-path (which adds the title as a child, not the active scene) asserts
+            // the join without the runner swapping its whole scene out from under it.
+            if (GetTree().CurrentScene == this)
+            {
+                GetTree().ChangeSceneToFile("res://src/Presentation/Arena/NetArena.tscn");
+            }
         };
         return button;
     }
