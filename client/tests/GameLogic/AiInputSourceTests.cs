@@ -25,6 +25,7 @@ public class AiInputSourceTests
         public int Team { get; }
         public int Hp => 1;
         public int MaxHp => 1;
+        public int Shield => 0;
         public bool IsAlive { get; set; } = true;
         public void TakeDamage(int amount) { }
         public void Step(float deltaSeconds) { }

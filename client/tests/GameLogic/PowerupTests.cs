@@ -91,6 +91,37 @@ public class PowerupTests
     }
 
     [Fact]
+    public void ARepairPickup_RestoresHp_OnTheCollectingTank()
+    {
+        var world = new World();
+        var tank = TankAt(world, Vector2.Zero, new NoInput(), hp: 3);
+        tank.TakeDamage(2); // Hp 1
+        var repair = new Powerup(world, Vector2.Zero, PowerupKind.Repair, new RepairPickup(2), PickupRadius);
+        world.Spawn(tank);
+        world.Spawn(repair);
+
+        world.Step(0.016f);
+
+        Assert.Equal(3, tank.Hp); // repaired (clamped at MaxHp)
+        Assert.DoesNotContain(repair, world.Entities); // collected
+    }
+
+    [Fact]
+    public void AShieldPickup_GrantsOverShield_OnTheCollectingTank()
+    {
+        var world = new World();
+        var tank = TankAt(world, Vector2.Zero, new NoInput());
+        var shield = new Powerup(world, Vector2.Zero, PowerupKind.Shield, new ShieldPickup(3), PickupRadius);
+        world.Spawn(tank);
+        world.Spawn(shield);
+
+        world.Step(0.016f);
+
+        Assert.Equal(3, tank.Shield);
+        Assert.DoesNotContain(shield, world.Entities);
+    }
+
+    [Fact]
     public void AnAmmoCrate_LoadsItsSpecialWeapon_OnTheCollectingTank()
     {
         var world = new World();

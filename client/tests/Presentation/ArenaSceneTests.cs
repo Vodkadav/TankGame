@@ -144,8 +144,8 @@ public class ArenaSceneTests : TestClass
     [Test]
     public void Arena_SpawnsThePickupsOnTheField()
     {
-        // Setup() loads the scene in the default mode; the catalogue places four pickups
-        // (speed, rapid-fire, bouncing-ammo, spread-ammo).
+        // Setup() loads the scene in the default mode; the catalogue places six pickups
+        // (speed, rapid-fire, bouncing-ammo, spread-ammo, repair, shield).
         var powerups = 0;
         foreach (var child in _arena.GetChildren())
         {
@@ -155,9 +155,9 @@ public class ArenaSceneTests : TestClass
             }
         }
 
-        if (powerups != 4)
+        if (powerups != 6)
         {
-            throw new System.Exception($"Arena must spawn the four field pickups; saw {powerups} PowerupViews.");
+            throw new System.Exception($"Arena must spawn the six field pickups; saw {powerups} PowerupViews.");
         }
     }
 

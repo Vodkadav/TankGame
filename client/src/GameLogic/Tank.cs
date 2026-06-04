@@ -102,6 +102,7 @@ public sealed class Tank : ITank
     public int Hp { get; private set; }
     public int MaxHp { get; }
     public int Team { get; }
+    public int Shield { get; private set; }
 
     // "In the match": a tank with positive hit points is fighting; one at zero hit points is
     // down but still in the match while it has a life left to respawn. Only once both are gone
@@ -109,11 +110,44 @@ public sealed class Tank : ITank
     // it is a tangible, fightable tank right now).
     public bool IsAlive => Hp > 0 || _livesRemaining > 0;
 
+    /// <summary>Restores hit points up to <see cref="MaxHp"/> (a repair pickup). A no-op on a
+    /// downed tank — repair cannot revive; only the respawn timer does.</summary>
+    public void Heal(int amount)
+    {
+        if (amount <= 0 || Hp <= 0)
+        {
+            return;
+        }
+
+        Hp = Math.Min(MaxHp, Hp + amount);
+    }
+
+    /// <summary>Adds over-shield points (a shield pickup): a buffer that incoming damage spends
+    /// before hit points. Stacks; not capped by <see cref="MaxHp"/>.</summary>
+    public void AddShield(int amount)
+    {
+        if (amount > 0)
+        {
+            Shield += amount;
+        }
+    }
+
     public void TakeDamage(int amount)
     {
         if (amount <= 0 || Hp <= 0)
         {
             return; // no damage, or already down (the kill was already credited)
+        }
+
+        if (Shield > 0)
+        {
+            var absorbed = Math.Min(Shield, amount);
+            Shield -= absorbed;
+            amount -= absorbed;
+            if (amount == 0)
+            {
+                return; // the shield soaked the whole hit
+            }
         }
 
         Hp = Math.Max(0, Hp - amount);

@@ -21,6 +21,7 @@ public sealed class NetTank : ITank
     public int Hp { get; set; }
     public int MaxHp { get; }
     public int Team { get; set; }
+    public int Shield { get; set; }
 
     public bool IsAlive => true;
 
