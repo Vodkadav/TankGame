@@ -268,6 +268,17 @@ Catalogue and ordering: `docs/research/local-backlog.md`.
 Test counts on `main`: GameLogic 124, Domain 22, Infrastructure 8, Architecture 6, 36 GoDotTest
 scene tests.
 
+**Recorded but not started — owner ask (2026-06-04):** map variety + progression. Captured in
+`docs/research/feature-roadmap.md` as two new systems — **S8 arena generation & theming**
+(procedural/random walls incl. steel, adjustable size, swappable background/ground texture) and
+**S9 progression/meters/match-modifiers** (damage + kill/death meters, cosmetic-only unlocks,
+"everyone starts with effect X" / extra-traps / shootable NPC-animal-XP modifiers) — with
+near-term slices (#15–20) queued in `docs/research/local-backlog.md`. Near-term, no-networking:
+the map generator/size/theming and the damage + K/D meters; the deeper XP/cosmetics layer is
+post-systems content. Each gets its own ADR before build. Current `LevelMap` already exposes the
+producer seam (`Materials[x,y]`/`Bushes[x,y]`/spawn); the one hardcode to generalise first is
+`ArenaScene`'s 28×16 camera framing.
+
 ### Deferred: M3 — 2-player real-time via a single Durable Object
 
 Still planned (`development-plan.md` M3), but **after** the local-first arc. Needs developer

@@ -42,6 +42,30 @@ or per-player viewports; co-op (shared team vision) and single-player are clean.
 | 9 | Lives and respawn (co-op) | GameLogic | respawn after a delay or N lives |
 | 10 | Best-of-N rounds | GameLogic + HUD | multi-round matches |
 
+## Map variety & meters — owner ask (2026-06-04)
+
+Recorded in `feature-roadmap.md` as **S8** (arena generation & theming) and **S9**
+(progression/meters/modifiers). The near-term, no-networking slices land here; the
+deeper progression layer (XP, cosmetic unlocks, NPC-animal XP, trap/mine modifiers)
+is post-systems content and stays in the roadmap, not this near-term cut.
+
+| # | Feature | Needs | Notes |
+|---|---|---|---|
+| 15 | Procedural wall placement (brick **and** steel, not hardcoded) | S8 generator + existing `LevelMap` validator | seeded/deterministic; reuse the connectivity check |
+| 16 | Adjustable map size | S8 + generalise `ArenaScene`'s hardcoded 28×16 framing | camera/zoom/spawns must read `LevelMap.Width/Height` |
+| 17 | Swappable background + ground texture (themes) | S8 `ArenaTheme` (Presentation) | ground `TileMapLayer` / parallax under `WallGridView`; placeholder art first |
+| 18 | Damage-dealt meter | combat-pass damage signal + HUD | `CombatResolver` gains a damage signal beside `TankKilled` |
+| 19 | Kill / death meter | `TankKilled` + a death signal + HUD | per-player `MatchStats` block, sibling of `ScoreBoard` |
+| 20 | "Everyone starts with effect X" match modifier | `Tank.ApplyEffect` on spawn | trivial once a modifier hook exists; proves S9 modifiers |
+
+Deeper S9 (post-systems, in `feature-roadmap.md` only): extra-trap/mine modifiers
+(S1+S7), shootable NPC `Critter` animals → XP drops (S1+S3), XP/levels, and
+**cosmetic-only** unlocks (Data layer; **no power, no monetization** by mandate).
+
+Suggested entry point when picked up: an **ADR for S8** (`ILevelSource`/`LevelParams`/
+`ArenaTheme` + the `ArenaScene` size-generalisation) before #15–17, and the meters
+(#18–19) as a quick HUD win that reuses the combat pass.
+
 ## Powerups — one system (S4) then cheap pickups
 
 | # | Feature | Needs | Notes |
@@ -58,11 +82,15 @@ or per-player viewports; co-op (shared team vision) and single-player are clean.
 
 ## Suggested order
 
-1. **#1 battlefield + #6 tank collision** — quick, high-impact, make the open feel land.
-2. **#2 to #5 vision cluster** — the headline fog + bushes, self-contained.
-3. **#8 to #10 match flow** — turn skirmishes into matches.
-4. **S4 powerups (#11 to #12)**, then **S2 ammo (#13 to #14)** — bigger system builds
-   that each unlock a whole catalogue afterwards.
+1. **#1 battlefield + #6 tank collision** ✅ — quick, high-impact, make the open feel land.
+2. **#2 to #5 vision cluster** ✅ — the headline fog + bushes, self-contained.
+3. **#8 to #10 match flow** ✅ — turn skirmishes into matches.
+4. **S4 powerups (#11 ✅, #12 ✅ stat pickups; shield/repair deferred)**, then
+   **S2 ammo (#13 to #14)** — bigger system builds that each unlock a catalogue.
+5. **Map variety & meters (#15 to #20, owner ask)** — the **S8 map system** (random
+   walls incl. steel, adjustable size, themes) is its own slice with an ADR first; the
+   **damage + K/D meters** (#18–19) are a quick HUD win on the existing combat pass.
 
-Items are pulled forward into scheduled tickets only as they are built; until then
-this is aspirational, exactly like `feature-roadmap.md`.
+(Done ✅ as of 2026-06-04; `PROGRESS.md` is authoritative for status.) Items are pulled
+forward into scheduled tickets only as they are built; until then this is aspirational,
+exactly like `feature-roadmap.md`.

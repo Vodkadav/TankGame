@@ -14,9 +14,9 @@ architecture work that unlocks it.
 
 ## 1. The core insight
 
-The wishlist looks like ~40 features. It is really **~7 systems**. Once each system
-exists, the individual features become *data + a small behaviour class*, not new
-engine work. "Add a bouncing shell" should be a 20-line `BouncingBehaviour` + one
+The wishlist looks like ~40 features. It is really **~9 systems** (the original seven
+plus arena generation/theming and progression). Once each system exists, the individual
+features become *data + a small behaviour class*, not new engine work. "Add a bouncing shell" should be a 20-line `BouncingBehaviour` + one
 row in a weapon table — never a new code path threaded through the scene.
 
 So the roadmap is ordered by **system leverage**, not by feature flashiness. Build
@@ -52,13 +52,15 @@ What does **not** exist yet, and blocks the wishlist:
 | **Surface normals on raycast hits** | bouncing/ricochet (reflection needs the normal `IArena` doesn't return) |
 | A small **game-event bus** | sensors revealing, buttons triggering, wormhole teleport, drone-wave trigger |
 | **Vision sources with TTL** (generalising the planned `IVisibilityFilter`) | sensors, lookout towers, hide spots, smoke, drone fog-bypass |
+| **Arena generation + theming** (a level *source* + a theme, not a hardcoded text map) | varied/random maps, adjustable size, swappable background & ground, random wall (incl. steel) placement |
+| **Progression + match modifiers** (XP/levels, cosmetic unlocks, pre-match rule mods) | cosmetics rewards, "everyone starts with X" effects, extra-traps/mines modifiers, shootable NPC animals that grant level-ups |
 
 None of these are large. They are *foundational* — the difference between a
 content pipeline and a pile of special cases.
 
 ---
 
-## 3. The seven foundational systems
+## 3. The foundational systems (S1–S9)
 
 Each is an interface-first addition (per ADR-0003: interfaces land in `Domain`,
 impls in `GameLogic`, server mirror in TS `MatchSim`). Sketches are illustrative,
@@ -176,6 +178,67 @@ teleports an entity crossing cell A to cell B), conveyor/ice/mud (modify the mov
 effective velocity in `Tank.Step` via a terrain query). One-way gates and pressure
 plates are buttons (S5) wired to features.
 
+### S8 — Arena generation & theming (a level *source* + a theme)
+*(Owner ask, 2026-06-04: "different types of maps", random walls **including steel**,
+adjustable size, swappable background / ground texture.)* Today `LevelMap.Parse`
+turns one hardcoded text literal (`Battlefield01`) into `Materials[x,y]` + `Bushes[x,y]`
++ a spawn. That array form is already the seam: **a generator is just another producer
+of the same data.** Make the producer pluggable and add a presentation-side theme.
+
+```csharp
+public interface ILevelSource { LevelMap Build(LevelParams p); }   // hand-authored OR procedural
+public sealed record LevelParams(int Width, int Height, int Seed, float CoverDensity,
+    float SteelRatio, int SpawnsPerTeam, ThemeId Theme);
+public sealed record ArenaTheme(/* background colour/image, ground tile texture, wall atlas, fog tint */);
+```
+
+- **Random wall placement (incl. steel).** A `ProceduralLevelSource(seed)` scatters
+  brick/steel cover by density/ratio, carves connectivity, and reuses the existing
+  `LevelMap` validator ("≥X% open floor + every floor cell reachable from every spawn")
+  so a generated map is never walled-off. Deterministic from `Seed` — same seed, same
+  map — which is also what keeps it server-runnable for M3.
+- **Adjustable size.** `LevelParams.Width/Height` flow through. **Constraint to fix
+  first:** `ArenaScene` hardcodes `28×16` in the camera-framing math (`ArenaCentre`,
+  `TwoPlayerZoom`) and several spawn cells; generalise those to read `LevelMap.Width/
+  Height` before sizes can vary.
+- **Theming.** An `ArenaTheme` (background colour/image, ground tile texture, wall
+  atlas, fog tint) chosen per match/level, applied by the Presentation layer (a ground
+  `TileMapLayer` / parallax background under the existing `WallGridView`). Pure visual —
+  no gameplay coupling. Placeholder themes are code-built/PIL-generated per the art
+  convention until real CC0 art lands.
+
+The `WallGrid`/`IWallGrid` model and the entity spine are unaffected — this is a new
+*producer* + a *theme*, not a rules change. **Near-term buildable** (no networking): the
+generator, adjustable size, and theming are all local-arc work; only *fair* server-side
+generation needs M3.
+
+### S9 — Progression, cosmetics & match modifiers
+*(Owner ask, 2026-06-04: damage / kill-death meters, cosmetic rewards, and "cool
+effects from everyone" at match start — extra traps/mines, shootable NPC animals that
+grant level-ups.)* Three layers, smallest first:
+
+- **Meters (near-term HUD).** Per-tank damage-dealt and kill/death counters ride on the
+  existing combat pass: `CombatResolver` already raises `TankKilled`; add a
+  `DamageDealt(attackerTeam, amount)` signal and a death signal, tally per player in a
+  `MatchStats` block (sibling of `ScoreBoard`), render in the HUD + end-of-round panel.
+  No new systems needed — buildable now.
+- **Match modifiers (pre-match rules).** A `MatchModifier` set chosen before a match that
+  mutates setup: spawn extra mines/traps (S1 deployables + S7), seed NPC `Critter`
+  entities (S1 movers) that any tank can shoot for an XP drop, "everyone starts with
+  status effect X" (apply a `StatusEffect` to every tank on spawn — already possible via
+  `Tank.ApplyEffect`). Each modifier is a small function over `ArenaScene` setup + the
+  world; needs S1 (+ S3 for trap damage, S5 events for triggers).
+- **Progression & cosmetics (persistent).** An XP/level curve fed by kills, damage, NPC
+  drops, and objectives; levels unlock **cosmetics only** (no power — tank skins, turret
+  trails, colours) and/or the match modifiers above as togglable "loadout" flair. Needs
+  local persistence (the Data layer / SQLite already in the architecture) and, for shared
+  unlocks, the M3 server. **Cosmetics-only by mandate — no pay-to-win, no monetization
+  psychology.** This is the largest layer and lands post-systems.
+
+NPC animals are ordinary `IEntity`s on the spine (a wandering `Critter` with an
+`IInputSource`-style mover and HP via S3); shooting one routes through the same combat
+pass and emits an XP event on death — no special case.
+
 ---
 
 ## 4. The one cross-cutting decision to settle early
@@ -282,6 +345,27 @@ a rough milestone band. "Band" is indicative; the milestone plan in
 | Thermal scope / spotter (see through cover) | S6 counter-occluder | later |
 | Sound-based detection (firing pings you) | S5 + S6 | later |
 
+### Maps, generation & theming (S8)
+| Feature | Needs | Band |
+|---|---|---|
+| Random wall placement (brick **and** steel), validated connectivity | S8 generator + existing `LevelMap` validator | local-arc |
+| Adjustable map size | S8 + generalise `ArenaScene`'s 28×16 framing | local-arc |
+| Swappable background / ground texture (themes) | S8 theme (Presentation) | local-arc |
+| Multiple authored map layouts | S8 (more `ILevelSource`s) | local-arc |
+| Biome/theme variety (desert, snow, arena, ruins) | S8 theme + art | post-M5 |
+| Seeded/shareable maps (same seed → same map) | S8 deterministic gen | post-M5 |
+
+### Progression, meters & match modifiers (S9)
+| Feature | Needs | Band |
+|---|---|---|
+| Damage-dealt meter | combat-pass damage signal + HUD | local-arc |
+| Kill / death meter | `TankKilled` + death signal + HUD | local-arc |
+| "Everyone starts with effect X" modifier | `Tank.ApplyEffect` on spawn | local-arc |
+| Extra traps / mines match modifier | S1 deployables + S7 (+ S3 damage) | post-M5 |
+| Shootable NPC animals → XP drops | S1 mover entity + S3 + XP event | post-M5 |
+| XP / levels | S9 progression curve + Data persistence | post-M5 |
+| Cosmetic unlocks (skins, trails, colours — **no power**) | S9 + Data (+ M3 for shared) | post-M5 / later |
+
 ### Game modes (sit on the systems above)
 Deathmatch · co-op survival vs drone waves · CTF · control point · payload escort ·
 PvE "clear the maze." Each is a thin rules layer once S1/S3/S5/S6 exist.
@@ -308,7 +392,15 @@ cheap. Recommended shape:
    handful of rows — cheapest to fix while the content table is short.
 
 Everything tagged "later" is genuinely post-M8 content that becomes near-free once
-S1–S7 exist — that's the whole point of front-loading the systems.
+S1–S9 exist — that's the whole point of front-loading the systems.
+
+**S8 (arena gen/theming) and S9 (progression/meters/modifiers)** were added 2026-06-04
+from an owner ask. Their *near-term* slices fit the current local-arc (the procedural/
+sized/themed map and the damage + K/D meters need no networking); the deeper progression
+layer (XP, cosmetic unlocks, NPC-animal XP, trap/mine modifiers) is post-systems content
+that rides S1/S3/S5/S7 and the Data layer. Sequencing: tackle the **map system (S8)** as
+its own slice when the owner wants map variety, and the **meters** as a quick HUD win;
+defer the full progression/cosmetics build until after the combat systems (S2/S3) land.
 
 ---
 
@@ -324,6 +416,11 @@ S1–S7 exist — that's the whole point of front-loading the systems.
 - **ADR — client/server gameplay parity: data-driven defs + shared test vectors**
   (§4). *Write before M5 content.*
 - **ADR — dynamic terrain features over `IWallGrid`** (S7).
+- **ADR — arena generation (`ILevelSource`, procedural + validator) & theming** (S8).
+  *Write before the first procedural/themed map ticket; settle the `LevelParams`/`ArenaTheme`
+  contracts and the `ArenaScene` size-generalisation.*
+- **ADR — progression, XP/levels & cosmetic-only unlocks + match modifiers** (S9).
+  *Cosmetics-only is a hard constraint; pin where XP is earned and that nothing unlocks power.*
 - Vision is already covered by the fog-of-war proposal (`docs/adr/PROPOSAL-fog-of-war.md`);
   extend it (or a sibling ADR) to cover vision **sources** and **occluders** (S6).
 
