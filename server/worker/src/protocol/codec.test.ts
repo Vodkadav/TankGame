@@ -4,6 +4,10 @@ import {
   decodeInput,
   encodeSnapshot,
   decodeSnapshot,
+  encodeWelcome,
+  encodeSnapshotMessage,
+  MSG_WELCOME,
+  MSG_SNAPSHOT,
   FIRE_BIT,
   type SnapshotFrame,
 } from "./codec";
@@ -37,6 +41,19 @@ describe("protocol codec", () => {
 
   // Cross-language parity anchor — these exact bytes are asserted byte-for-byte by the C# codec
   // (client/tests/Domain/ProtocolCodecTests.cs). If either side changes the layout, both fail.
+  it("encodes a Welcome to the canonical byte vector", () => {
+    // Parity anchor — ProtocolCodecTests.cs asserts the identical [MSG_WELCOME, slot] bytes.
+    expect([...encodeWelcome(1)]).toEqual([MSG_WELCOME, 0x01]);
+    expect([...encodeWelcome(0)]).toEqual([MSG_WELCOME, 0x00]);
+  });
+
+  it("tags a snapshot message with the snapshot kind byte", () => {
+    const frame: SnapshotFrame = { tick: 7, ackSeq: 7, tanks: [], wallDeltas: [] };
+    const message = encodeSnapshotMessage(frame);
+    expect(message[0]).toBe(MSG_SNAPSHOT);
+    expect(decodeSnapshot(message.subarray(1))).toEqual(frame);
+  });
+
   it("encodes an InputFrame to the canonical byte vector", () => {
     const bytes = [...encodeInput({ seq: 1, moveX: 1, moveY: -1, aim: 0.5, buttons: 1 })];
     expect(bytes).toEqual([

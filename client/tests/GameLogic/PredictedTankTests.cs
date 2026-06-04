@@ -174,8 +174,11 @@ public class PredictedTankTests
     private sealed class LoopbackTransport : IMatchTransport
     {
         public List<InputFrame> Sent { get; } = new();
+        public event System.Action<byte>? WelcomeReceived;
         public event System.Action<SnapshotFrame>? SnapshotReceived;
         public void SendInput(InputFrame input) => Sent.Add(input);
+        public void Poll() { }
+        public void DeliverWelcome(byte slot) => WelcomeReceived?.Invoke(slot);
         public void DeliverSnapshot(SnapshotFrame snapshot) => SnapshotReceived?.Invoke(snapshot);
     }
 }

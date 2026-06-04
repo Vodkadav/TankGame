@@ -5,7 +5,7 @@
 // ADR-0005.
 
 import { MatchSim } from "./sim/matchSim";
-import { decodeInput, encodeSnapshot } from "./protocol/codec";
+import { decodeInput, encodeSnapshotMessage, encodeWelcome } from "./protocol/codec";
 
 const TICK_MS = 50; // 20 Hz
 const MAX_PLAYERS = 2;
@@ -38,6 +38,7 @@ export class MatchRoom implements DurableObject {
 
     this.state.acceptWebSocket(server); // hibernation API
     server.serializeAttachment({ slot } satisfies Attachment); // survives hibernation
+    server.send(encodeWelcome(slot)); // first message: tell the client which tank it drives
     this.ensureRunning();
 
     return new Response(null, { status: 101, webSocket: client });
@@ -83,7 +84,7 @@ export class MatchRoom implements DurableObject {
     this.sim.step();
     for (const ws of this.state.getWebSockets()) {
       try {
-        ws.send(encodeSnapshot(this.sim.snapshotFor(slotOf(ws))));
+        ws.send(encodeSnapshotMessage(this.sim.snapshotFor(slotOf(ws))));
       } catch {
         // socket closing mid-tick — the close handler will clean it up
       }

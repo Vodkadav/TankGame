@@ -12,11 +12,16 @@ public class MatchTransportContractTests
     private sealed class LoopbackTransport : IMatchTransport
     {
         public List<InputFrame> Sent { get; } = new();
+        public event System.Action<byte>? WelcomeReceived;
         public event System.Action<SnapshotFrame>? SnapshotReceived;
 
         public void SendInput(InputFrame input) => Sent.Add(input);
 
-        // Test hook standing in for "a snapshot arrived from the server".
+        // A fake raises its events directly from the test hooks below, so pumping is a no-op.
+        public void Poll() { }
+
+        // Test hooks standing in for "the server welcomed us" / "a snapshot arrived".
+        public void DeliverWelcome(byte slot) => WelcomeReceived?.Invoke(slot);
         public void DeliverSnapshot(SnapshotFrame snapshot) => SnapshotReceived?.Invoke(snapshot);
     }
 
@@ -50,6 +55,18 @@ public class MatchTransportContractTests
         Assert.NotNull(received);
         Assert.Equal(9u, received!.Tick);
         Assert.Equal(5u, received.AckSeq);
+    }
+
+    [Fact]
+    public void WelcomeReceived_DeliversTheAssignedSlot()
+    {
+        var transport = new LoopbackTransport();
+        byte? slot = null;
+        transport.WelcomeReceived += s => slot = s;
+
+        transport.DeliverWelcome(1);
+
+        Assert.Equal((byte)1, slot);
     }
 
     [Fact]

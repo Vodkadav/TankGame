@@ -97,6 +97,14 @@ public class TitleSceneTests : TestClass
     {
         public void SendInput(InputFrame input) { }
 
+        public void Poll() { }
+
+        public event Action<byte> WelcomeReceived
+        {
+            add { }
+            remove { }
+        }
+
         public event Action<SnapshotFrame> SnapshotReceived
         {
             add { }

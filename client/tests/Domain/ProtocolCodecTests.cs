@@ -75,6 +75,15 @@ public class ProtocolCodecTests
     }
 
     [Fact]
+    public void Welcome_EncodesToTheCanonicalByteVector()
+    {
+        // Parity anchor — codec.test.ts asserts the identical [MSG_WELCOME, slot] bytes.
+        Assert.Equal(new byte[] { 0x01, 0x01 }, ProtocolCodec.EncodeWelcome(1));
+        Assert.Equal(new byte[] { 0x01, 0x00 }, ProtocolCodec.EncodeWelcome(0));
+        Assert.Equal((byte)1, ProtocolCodec.DecodeWelcome(ProtocolCodec.EncodeWelcome(1)));
+    }
+
+    [Fact]
     public void Snapshot_EncodesToTheCanonicalByteVector()
     {
         var frame = new SnapshotFrame(

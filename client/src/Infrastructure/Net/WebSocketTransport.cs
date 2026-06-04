@@ -15,18 +15,33 @@ public sealed class WebSocketTransport : IMatchTransport
 
     public WebSocketTransport(IMatchSocket socket) => _socket = socket;
 
+    public event Action<byte>? WelcomeReceived;
     public event Action<SnapshotFrame>? SnapshotReceived;
 
     public void SendInput(InputFrame input) => _socket.Send(ProtocolCodec.EncodeInput(input));
 
-    /// <summary>Pumps the socket and raises <see cref="SnapshotReceived"/> for every snapshot that
-    /// arrived since the last call. Drive it from the game loop (<c>_Process</c>); it is decoupled
-    /// from <see cref="SendInput"/> so input can be sent at any time independent of snapshot cadence.</summary>
+    /// <summary>Pumps the socket and raises the matching event for every server message that arrived
+    /// since the last call, dispatching on its leading kind byte (welcome vs snapshot). Drive it from
+    /// the game loop (<c>_Process</c>); it is decoupled from <see cref="SendInput"/> so input can be
+    /// sent at any time independent of snapshot cadence.</summary>
     public void Poll()
     {
         foreach (var message in _socket.Poll())
         {
-            SnapshotReceived?.Invoke(ProtocolCodec.DecodeSnapshot(message));
+            if (message.Length == 0)
+            {
+                continue;
+            }
+
+            switch (message[0])
+            {
+                case ProtocolCodec.MsgWelcome:
+                    WelcomeReceived?.Invoke(ProtocolCodec.DecodeWelcome(message));
+                    break;
+                case ProtocolCodec.MsgSnapshot:
+                    SnapshotReceived?.Invoke(ProtocolCodec.DecodeSnapshot(message.AsSpan(1)));
+                    break;
+            }
         }
     }
 }

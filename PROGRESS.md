@@ -360,9 +360,15 @@ being built autonomously ahead of that:
   (200 u/s, axis-separated 24 u leading-edge wall collision, unit-magnitude clamp) so replayed inputs
   reproduce the server path; pure C#, no Godot/transport (the caller wires `SnapshotReceived` →
   `Reconcile`). 10 deterministic xUnit cases (predict-advances/clamps/turret, reconcile snap/replay/
-  discard/correction/wall/wrong-slot, full transport loop). GameLogic suite 146 tests. **Remaining
-  client work = the networked play-scene wiring** (poll the transport each frame, send input + predict,
-  render remote tanks from snapshots) then T9 status strings + T11 worker alarm.
+  discard/correction/wall/wrong-slot, full transport loop). GameLogic suite 146 tests.
+- **M3 play-scene groundwork — slot discovery + transport pump** ✅ (toward the net play scene): a
+  server→client message now carries a leading **kind byte** (`MSG_WELCOME` / `MSG_SNAPSHOT`); the DO
+  sends a `WelcomeFrame { slot }` once on connect so a client learns whether it is host (0) or guest
+  (1), and tags each snapshot. `encodeWelcome`/`EncodeWelcome` exist in both codecs with a
+  cross-language byte-vector parity anchor. `IMatchTransport` gains `Poll()` (pump the socket each
+  frame) + `WelcomeReceived`; `WebSocketTransport.Poll` dispatches inbound messages on the kind byte.
+  Worker suite 33, Domain 32, Infrastructure 12. **Remaining = the net play scene itself** (poll +
+  send-input + predict + render remote tanks from snapshots) then T9 status strings + T11 worker alarm.
 
 The intent seam and deterministic GameLogic combat from the local arc are what keep this
 tractable. Still **not fully autonomous** — the deploy/secrets/devices remain the developer's.
