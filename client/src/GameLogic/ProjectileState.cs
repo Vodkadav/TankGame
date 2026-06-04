@@ -1,3 +1,5 @@
+using System;
+using System.Collections.Generic;
 using System.Numerics;
 
 namespace TankGame.GameLogic;
@@ -25,4 +27,14 @@ public sealed class ProjectileState
 
     /// <summary>False once the shot is spent; the world reaps it.</summary>
     public bool IsAlive = true;
+
+    /// <summary>How many more targets this shot can pass through before it stops. 0 (default) is an
+    /// ordinary shot that spends itself on the first target. A piercing shot starts above 0; both
+    /// the wall pass (<see cref="PiercingBehaviour"/>) and the tank pass (the combat resolver)
+    /// decrement this shared budget, so "pierce one target, the next stops it" holds across both.</summary>
+    public int Pierce;
+
+    /// <summary>Tanks this shot has already damaged — so a piercing shot that overlaps the same
+    /// tank across several ticks hits it once, not once per tick.</summary>
+    public readonly HashSet<Guid> HitTanks = new();
 }

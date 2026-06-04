@@ -8,7 +8,10 @@ namespace TankGame.Domain;
 /// <param name="Normal">Unit surface normal of the struck face, pointing back toward the side
 /// the ray came from — so a reflection is <c>dir - 2·(dir·Normal)·Normal</c> (the seam a
 /// bouncing/ricochet shell needs, per <c>docs/research/feature-roadmap.md</c> S2).</param>
-public readonly record struct RaycastHit(Vector2 Point, float Distance, Vector2 Normal);
+/// <param name="Destructible">Whether the struck obstacle can be destroyed (a brick wall) versus
+/// permanent (steel or an arena boundary). A piercing shell passes through a destructible hit but
+/// is stopped by a permanent one. Defaults to false so existing call sites are unaffected.</param>
+public readonly record struct RaycastHit(Vector2 Point, float Distance, Vector2 Normal, bool Destructible = false);
 
 /// <summary>The playable space. Resolves collisions for projectiles (and later tanks)
 /// without exposing how the space is represented (empty box now, wall grid in M2).</summary>

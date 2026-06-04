@@ -23,8 +23,10 @@ public sealed class Projectile : IProjectile
     /// <param name="damage">Damage dealt to a destructible wall or tank on impact.</param>
     /// <param name="team">The firing tank's team; the combat pass spares the same team.</param>
     /// <param name="behaviour">How the shot moves and hits; defaults to a straight shot.</param>
+    /// <param name="pierce">How many targets the shot passes through before stopping; 0 (default)
+    /// is an ordinary shot spent on its first hit.</param>
     public Projectile(IArena arena, Vector2 spawn, Vector2 direction, float speed, int damage = 1,
-        int team = 0, IProjectileBehaviour? behaviour = null)
+        int team = 0, IProjectileBehaviour? behaviour = null, int pierce = 0)
     {
         Id = Guid.NewGuid();
         _arena = arena;
@@ -35,6 +37,7 @@ public sealed class Projectile : IProjectile
             Speed = speed,
             Damage = damage,
             Team = team,
+            Pierce = pierce,
         };
         _behaviour = behaviour ?? StraightBehaviour.Instance;
     }
@@ -50,6 +53,26 @@ public sealed class Projectile : IProjectile
     /// <summary>Marks the shot spent so the world reaps it — used when the combat pass lands
     /// it on a tank.</summary>
     public void Expire() => _state.IsAlive = false;
+
+    /// <summary>Whether this shot has already damaged the tank with <paramref name="tankId"/> — so
+    /// a piercing shot lingering over the same tank does not damage it every tick.</summary>
+    public bool HasHit(Guid tankId) => _state.HitTanks.Contains(tankId);
+
+    /// <summary>Records a tank hit and spends one unit of the shared pierce budget: a shot with
+    /// budget left passes through (stays alive); one with none stops here. The combat resolver
+    /// calls this after applying the damage.</summary>
+    public void RegisterTankHit(Guid tankId)
+    {
+        _state.HitTanks.Add(tankId);
+        if (_state.Pierce > 0)
+        {
+            _state.Pierce--;
+        }
+        else
+        {
+            _state.IsAlive = false;
+        }
+    }
 
     public void Step(float deltaSeconds)
     {

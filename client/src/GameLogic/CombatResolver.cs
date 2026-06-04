@@ -45,15 +45,14 @@ public sealed class CombatResolver : ICombatResolver
         {
             foreach (var tank in tanks)
             {
-                if (tank.Team == shot.Team || tank.Hp <= 0)
+                if (tank.Team == shot.Team || tank.Hp <= 0 || shot.HasHit(tank.Id))
                 {
-                    continue; // friendly fire passes through; skip the already-downed
+                    continue; // friendly fire passes through; skip the downed and the already-pierced
                 }
 
                 if (Vector2.Distance(shot.Position, tank.Position) <= _hitRadius)
                 {
                     tank.TakeDamage(shot.Damage);
-                    shot.Expire();
                     var killed = tank.Hp <= 0;
                     Hit?.Invoke(new CombatHit(shot.Team, tank.Team, shot.Damage, killed));
                     if (killed)
@@ -61,7 +60,14 @@ public sealed class CombatResolver : ICombatResolver
                         TankKilled?.Invoke(shot.Team); // credit the kill to the shooter's team
                     }
 
-                    break; // a shot lands on at most one tank
+                    // Spends a pierce, or stops the shot if none is left. An ordinary shot (no
+                    // budget) stops on its first tank — the prior behaviour; a piercing shot passes
+                    // through and may strike a second tank in range this same step.
+                    shot.RegisterTankHit(tank.Id);
+                    if (!shot.IsAlive)
+                    {
+                        break;
+                    }
                 }
             }
         }
