@@ -229,7 +229,8 @@ public partial class ArenaScene : Node2D
         if (result.Decided)
         {
             _matchOver = true;
-            ShowGameOver(result);
+            GameSetup.Series.RecordRound(result.WinningTeam); // tally this round toward best-of-N
+            ShowRoundOver(result);
         }
     }
 
@@ -267,12 +268,14 @@ public partial class ArenaScene : Node2D
         return view;
     }
 
-    // Resolve the decided match into the player's perspective: their team winning is a win,
-    // a draw or any other team surviving is a loss. Shows a screen-space overlay with a
-    // restart button that reloads the scene for a fresh round.
-    private void ShowGameOver(MatchResult result)
+    // A round was decided: show its outcome (from the player's perspective), this round's kill
+    // score, and the running best-of-N round tally. When the match is over the button restarts
+    // a fresh series; otherwise it loads the next round (the series carries across the reload).
+    private void ShowRoundOver(MatchResult result)
     {
-        var key = _mode == GameMode.TwoPlayerVersus
+        var series = GameSetup.Series;
+
+        var outcomeKey = _mode == GameMode.TwoPlayerVersus
             ? (result.WinningTeam is null ? "hud.draw" : result.WinningTeam == PlayerTeam ? "hud.p1_wins" : "hud.p2_wins")
             : (result.WinningTeam == PlayerTeam ? "hud.you_win" : result.WinningTeam is null ? "hud.draw" : "hud.you_lose");
 
@@ -282,31 +285,43 @@ public partial class ArenaScene : Node2D
         box.GrowHorizontal = Control.GrowDirection.Both;
         box.GrowVertical = Control.GrowDirection.Both;
 
-        box.AddChild(new Label
-        {
-            Name = "Outcome",
-            Text = key,
-            HorizontalAlignment = HorizontalAlignment.Center,
-        });
+        box.AddChild(CentredLabel("Outcome", outcomeKey));
+        box.AddChild(CentredLabel("FinalScore", Format(ScoreOverlay.Key,
+            _scoreBoard.KillsFor(PlayerTeam), _scoreBoard.KillsFor(EnemyTeam))));
+        box.AddChild(CentredLabel("RoundScore", Format("hud.rounds",
+            series.WinsFor(PlayerTeam), series.WinsFor(EnemyTeam))));
 
-        box.AddChild(new Label
+        // Match over → "Play again" starts a brand-new series; otherwise → "Next round" reloads
+        // the scene with the series intact so the tally continues.
+        var button = new Button
         {
-            Name = "FinalScore",
-            Text = string.Format(
-                CultureInfo.InvariantCulture,
-                TranslationServer.Translate(ScoreOverlay.Key),
-                _scoreBoard.KillsFor(PlayerTeam),
-                _scoreBoard.KillsFor(EnemyTeam)),
-            HorizontalAlignment = HorizontalAlignment.Center,
-        });
+            Name = "Restart",
+            Text = series.IsMatchOver ? "hud.restart" : "hud.next_round",
+        };
+        button.Pressed += () =>
+        {
+            if (series.IsMatchOver)
+            {
+                GameSetup.StartNewMatch(_mode);
+            }
 
-        var restart = new Button { Name = "Restart", Text = "hud.restart" };
-        restart.Pressed += () => GetTree().ReloadCurrentScene();
-        box.AddChild(restart);
+            GetTree().ReloadCurrentScene();
+        };
+        box.AddChild(button);
 
         layer.AddChild(box);
         AddChild(layer);
     }
+
+    private static Label CentredLabel(string name, string text) => new()
+    {
+        Name = name,
+        Text = text,
+        HorizontalAlignment = HorizontalAlignment.Center,
+    };
+
+    private static string Format(string key, int a, int b) =>
+        string.Format(CultureInfo.InvariantCulture, TranslationServer.Translate(key), a, b);
 
     private static ProjectileView BuildProjectileView(IProjectile projectile)
     {

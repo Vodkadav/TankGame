@@ -230,8 +230,15 @@ Catalogue and ordering: `docs/research/local-backlog.md`.
   combat targeting/kill-credit, tank–tank collision, AI target acquisition, the fog light, and the
   `TankView` (hidden while down) all key off `Hp > 0` (tangible right now). `MatchTracker` keeps a
   respawning team alive via `IsAlive`. Kills still credit on every destruction (LP8 intact).
+- **LP10 — best-of-N rounds** ✅ a pure-C# `SeriesTracker` (`roundsToWin`, default best-of-three)
+  tallies round wins and reports the match winner. `GameSetup` carries the `Series` across the
+  per-round scene reloads and `StartNewMatch` resets it (title screen and "Play again"). When a
+  round is decided `ArenaScene` records it, then the round-end panel shows the round outcome, the
+  round kill score, and the running round tally (`hud.rounds` EN/ES/DK); the button reads
+  "Next round" (`hud.next_round`) mid-series — reloading with the series intact — and "Play again"
+  once the match is won, starting a fresh series.
 
-Test counts on `main`: GameLogic 106, Domain 22, Infrastructure 8, Architecture 6, 34 GoDotTest
+Test counts on `main`: GameLogic 111, Domain 22, Infrastructure 8, Architecture 6, 34 GoDotTest
 scene tests.
 
 ### Deferred: M3 — 2-player real-time via a single Durable Object
