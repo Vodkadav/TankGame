@@ -13,7 +13,7 @@ dashboard reads — keep it in sync with the detailed sections below.
 - [x] M2 — static labyrinth + destructible walls (ADR-0004)
 - [x] Local-first combat arc — single-player vs AI, local 2-player co-op & versus (ADR-0011)
 - [~] Local polish arc — no new art, no networking
-- [ ] M3 — networked multiplayer (deferred: needs Cloudflare Durable Object + secrets + two-device testing)
+- [~] M3 — networked multiplayer (secret-free scaffolding underway; live deploy needs Cloudflare Durable Object + secrets + two-device testing)
 
 ## Current status: **M1 + S1 + M2 + local-first combat arc complete; local polish arc in progress** (2026-06-03)
 
@@ -298,8 +298,20 @@ post-systems content. Each gets its own ADR before build. Current `LevelMap` alr
 producer seam (`Materials[x,y]`/`Bushes[x,y]`/spawn); the one hardcode to generalise first is
 `ArenaScene`'s 28×16 camera framing.
 
-### Deferred: M3 — 2-player real-time via a single Durable Object
+### M3 — 2-player real-time via a single Durable Object (scaffolding underway)
 
-Still planned (`development-plan.md` M3), but **after** the local-first arc. Needs developer
-involvement (Cloudflare Durable Object + secrets + two-device testing), so it is not
-autonomous; the intent seam and deterministic combat above are what keep it tractable.
+Still gated on developer involvement for the **live** milestone (Cloudflare account + Durable
+Object deploy + GitHub Actions secrets + two-device testing). The **secret-free scaffolding** is
+being built autonomously ahead of that:
+
+- **M3-T1 — `IMatchTransport` + `INetClock` (Domain)** ✅ the client↔server seam:
+  `SendInput(InputFrame)` up, `SnapshotReceived` down; `INetClock` (monotonic `Now` + server
+  `TickRateHz`). Contract tests on hand-written loopback/clock fakes. "Client sends intent, server
+  resolves outcome" — the network analogue of the `IInputSource` seam (ADR-0011).
+- **M3-T2 (C# half) — wire protocol** ✅ `TankGame.Domain.Net`: `InputFrame` / `SnapshotFrame` /
+  `TankState` / `WallDelta` + `ProtocolCodec` (hand-rolled little-endian binary). Roundtrip tests
+  plus **canonical byte-vector** tests that the TypeScript codec must match byte-for-byte (the
+  cross-language parity anchor). TS mirror + Durable Object skeleton land next.
+
+The intent seam and deterministic GameLogic combat from the local arc are what keep this
+tractable. Still **not fully autonomous** — the deploy/secrets/devices remain the developer's.
