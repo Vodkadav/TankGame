@@ -19,3 +19,9 @@ class_name = "MatchRoom"
 [[migrations]]
 tag = "v1"
 new_sqlite_classes = ["MatchRoom"]
+
+# Maps a shareable lobby code → its MatchRoom (M3-T4). The id is a namespace handle, not a
+# secret — safe to commit. Tests use a local Miniflare KV; this id is for the deployed Worker.
+[[kv_namespaces]]
+binding = "LOBBY_KV"
+id = "ac6434bc4bb6481ba24acdd41542f1c6"
