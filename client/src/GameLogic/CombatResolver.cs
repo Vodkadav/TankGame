@@ -23,6 +23,14 @@ public sealed class CombatResolver : ICombatResolver
     /// <see cref="ScoreBoard"/> subscribes to tally per-team kills.</summary>
     public event Action<int>? TankKilled;
 
+    /// <summary>A shot landing on an enemy tank: who shot, who was hit, the damage value, and
+    /// whether it was the killing blow. Feeds the per-team damage / kill-death meters (S9), which
+    /// need more than the kill credit <see cref="TankKilled"/> carries.</summary>
+    public readonly record struct CombatHit(int ShooterTeam, int VictimTeam, int Amount, bool Killed);
+
+    /// <summary>Raised once per shot that lands on an enemy tank, with the full hit detail.</summary>
+    public event Action<CombatHit>? Hit;
+
     public void Resolve(IReadOnlyCollection<IEntity> entities)
     {
         // Only tangible tanks (positive hit points) are targets; a downed tank awaiting respawn
@@ -46,7 +54,9 @@ public sealed class CombatResolver : ICombatResolver
                 {
                     tank.TakeDamage(shot.Damage);
                     shot.Expire();
-                    if (tank.Hp <= 0)
+                    var killed = tank.Hp <= 0;
+                    Hit?.Invoke(new CombatHit(shot.Team, tank.Team, shot.Damage, killed));
+                    if (killed)
                     {
                         TankKilled?.Invoke(shot.Team); // credit the kill to the shooter's team
                     }

@@ -75,6 +75,7 @@ public partial class ArenaScene : Node2D
     private readonly List<(ITank Tank, PointLight2D Light)> _fogLights = new();
     private readonly MatchTracker _matchTracker = new();
     private readonly ScoreBoard _scoreBoard = new();
+    private readonly MeterBoard _meterBoard = new();
     private World _world = null!;
     private GridArena _arena = null!;
     private BushField _bushes = null!;
@@ -94,6 +95,7 @@ public partial class ArenaScene : Node2D
 
         var combat = new CombatResolver(CombatHitRadius);
         combat.TankKilled += _scoreBoard.RecordKill; // credit each kill to the shooter's team
+        combat.Hit += hit => _meterBoard.Record(hit.ShooterTeam, hit.VictimTeam, hit.Amount, hit.Killed);
         _world = new World(combat);
         _world.EntitySpawned += OnEntitySpawned;
         _world.EntityDespawned += OnEntityDespawned;
@@ -115,6 +117,10 @@ public partial class ArenaScene : Node2D
         var scoreOverlay = new ScoreOverlay { Name = "ScoreOverlay" };
         AddChild(scoreOverlay); // runs _Ready (builds the label)
         scoreOverlay.Bind(_scoreBoard);
+
+        var metersOverlay = new MetersOverlay { Name = "MetersOverlay" };
+        AddChild(metersOverlay); // runs _Ready (builds the label)
+        metersOverlay.Bind(_meterBoard);
 
         _camera = new Camera2D { Name = "GameCamera", ProcessCallback = Camera2D.Camera2DProcessCallback.Physics };
         AddChild(_camera);
