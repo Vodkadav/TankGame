@@ -39,16 +39,18 @@ public partial class ArenaScene : Node2D
     private static readonly (int X, int Y)[] EnemySpawns = { (25, 2), (25, 14), (13, 13) };
     private static readonly (int X, int Y) Player2Spawn = (25, 7);
 
-    // Pickups: a tank driving over one collects its timed effect (S4, ADR-0012). Placed on open
-    // floor near the middle so reaching one is a contested choice. Magnitudes/durations and the
-    // pickup radius are tunable balance knobs.
+    // Pickups: a tank driving over one collects its effect — a timed stat boost (S4, ADR-0012)
+    // or an ammo crate that loads a special weapon for a few shots (S2, ADR-0013). Placed on open
+    // floor near the middle so reaching one is a contested choice. Magnitudes/durations, shot
+    // counts, and the pickup radius are tunable balance knobs.
     private const float PickupRadius = 28f;
-    private static readonly StatusEffect SpeedBoostEffect = new(StatKind.Speed, Mult: 1.6f, AddFlat: 0f, Seconds: 6f);
-    private static readonly StatusEffect RapidFireEffect = new(StatKind.FireInterval, Mult: 0.5f, AddFlat: 0f, Seconds: 6f);
-    private static readonly (int X, int Y, PowerupKind Kind, StatusEffect Effect)[] PowerupSpawns =
+    private const int AmmoShots = 5;
+    private static readonly (int X, int Y, PowerupKind Kind, IPickupEffect Effect)[] PowerupSpawns =
     {
-        (10, 8, PowerupKind.SpeedBoost, SpeedBoostEffect),
-        (18, 10, PowerupKind.RapidFire, RapidFireEffect),
+        (10, 8, PowerupKind.SpeedBoost, new StatusEffectPickup(new StatusEffect(StatKind.Speed, Mult: 1.6f, AddFlat: 0f, Seconds: 6f))),
+        (18, 10, PowerupKind.RapidFire, new StatusEffectPickup(new StatusEffect(StatKind.FireInterval, Mult: 0.5f, AddFlat: 0f, Seconds: 6f))),
+        (6, 10, PowerupKind.BouncingAmmo, new AmmoPickup(new BehaviourWeapon(() => new BouncingBehaviour(bounces: 3)), AmmoShots)),
+        (21, 6, PowerupKind.SpreadAmmo, new AmmoPickup(new SpreadWeapon(count: 3, spreadRadians: 0.18f), AmmoShots)),
     };
 
     // Two-player uses a static camera framing the whole field so both tanks stay on screen.

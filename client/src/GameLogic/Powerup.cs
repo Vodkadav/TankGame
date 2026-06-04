@@ -13,15 +13,15 @@ namespace TankGame.GameLogic;
 public sealed class Powerup : IPowerup
 {
     private readonly IWorld _world;
-    private readonly StatusEffect _effect;
+    private readonly IPickupEffect _effect;
     private readonly float _pickupRadius;
 
     /// <param name="world">The world scanned for a collecting tank.</param>
     /// <param name="position">Where it sits on the field.</param>
     /// <param name="kind">Selects its colour (Presentation) and matches its effect.</param>
-    /// <param name="effect">The timed effect granted to the tank that collects it.</param>
+    /// <param name="effect">What it does to the tank that collects it (a stat effect or ammo).</param>
     /// <param name="pickupRadius">World distance within which a tank collects it.</param>
-    public Powerup(IWorld world, Vector2 position, PowerupKind kind, StatusEffect effect, float pickupRadius)
+    public Powerup(IWorld world, Vector2 position, PowerupKind kind, IPickupEffect effect, float pickupRadius)
     {
         Id = Guid.NewGuid();
         _world = world;
@@ -53,7 +53,7 @@ public sealed class Powerup : IPowerup
 
             if (Vector2.DistanceSquared(Position, tank.Position) <= _pickupRadius * _pickupRadius)
             {
-                tank.ApplyEffect(_effect);
+                _effect.ApplyTo(tank);
                 IsAlive = false; // collected → the world reaps it this step
                 return;
             }

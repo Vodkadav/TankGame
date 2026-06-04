@@ -273,10 +273,18 @@ Catalogue and ordering: `docs/research/local-backlog.md`.
   `IProjectileBehaviour` (motion/impact) and just delegates `Step`; `StraightBehaviour` is the
   prior logic (one shared instance). The new `behaviour` ctor arg defaults to straight, so every
   call site is untouched and the refactor is behaviour-preserving. New ammo = a new behaviour only
-  when the motion is genuinely new. **Not decided here:** how a tank acquires a non-straight shell
-  (pickup / slot / modifier) — that gates #14 (bouncing/piercing/spread shells).
+  when the motion is genuinely new.
+- **S2 #14 — bouncing & spread shells via ammo crates** ✅ `BouncingBehaviour` reflects off the
+  hit `Normal` (`v − 2(v·n)n`), decrementing a per-shot bounce budget, then lands like a straight
+  shot when spent. `IWeapon` firing strategy: `BehaviourWeapon` (one shot, a behaviour factory),
+  `SpreadWeapon` (N straight pellets fanned about the aim). `Tank` gains `LoadAmmo(weapon, shots)`
+  + a default straight weapon; it fires the special weapon while ammo lasts, then reverts. The
+  `Powerup` was generalised to carry an `IPickupEffect` (`StatusEffectPickup` | `AmmoPickup`), so
+  ammo **crates reuse the S4 pickup entity/view**; `ArenaScene` lays a purple bouncing crate and a
+  pink spread crate (5 shots each). **Piercing deferred** — it needs pierce-aware combat or
+  wall-skip geometry (a separate decision).
 
-Test counts on `main`: GameLogic 128, Domain 22, Infrastructure 8, Architecture 6, 36 GoDotTest
+Test counts on `main`: GameLogic 136, Domain 22, Infrastructure 8, Architecture 6, 36 GoDotTest
 scene tests.
 
 **Recorded but not started — owner ask (2026-06-04):** map variety + progression. Captured in

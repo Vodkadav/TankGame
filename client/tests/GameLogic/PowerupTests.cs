@@ -18,6 +18,11 @@ public class PowerupTests
         public TankInput Read() => new(new Vector2(1f, 0f), Aim: 0f, Fire: false);
     }
 
+    private sealed class HoldFire : IInputSource
+    {
+        public TankInput Read() => new(Vector2.Zero, Aim: 0f, Fire: true);
+    }
+
     private sealed class OpenArena : IArena
     {
         public RaycastHit? RaycastFirstHit(Vector2 origin, Vector2 direction, float maxDistance) => null;
@@ -33,7 +38,7 @@ public class PowerupTests
         new(input, world, new OpenArena(), pos, speed: 100f, fireInterval: 0.3f, projectileSpeed: 600f, maxHp: hp);
 
     private static Powerup SpeedPowerupAt(IWorld world, Vector2 pos) =>
-        new(world, pos, PowerupKind.SpeedBoost, SpeedBoost, PickupRadius);
+        new(world, pos, PowerupKind.SpeedBoost, new StatusEffectPickup(SpeedBoost), PickupRadius);
 
     [Fact]
     public void Powerup_IsCollected_WhenALiveTankOverlapsIt()
@@ -83,6 +88,23 @@ public class PowerupTests
     {
         Assert.True(TravelWithPowerup(true) > TravelWithPowerup(false),
             "a tank that collected a speed boost should out-travel one that did not");
+    }
+
+    [Fact]
+    public void AnAmmoCrate_LoadsItsSpecialWeapon_OnTheCollectingTank()
+    {
+        var world = new World();
+        var tank = TankAt(world, Vector2.Zero, new HoldFire());
+        var crate = new Powerup(world, Vector2.Zero, PowerupKind.SpreadAmmo,
+            new AmmoPickup(new SpreadWeapon(count: 3, spreadRadians: 0.2f), shots: 1), PickupRadius);
+        world.Spawn(tank);
+        world.Spawn(crate);
+
+        world.Step(0.05f); // tank fires its default shot (1), then collects the crate
+        world.Step(0.4f);  // next shot uses the loaded spread → +3
+
+        Assert.Equal(4, world.Entities.OfType<Projectile>().Count());
+        Assert.DoesNotContain(crate, world.Entities); // crate consumed
     }
 
     private static float TravelWithPowerup(bool withPowerup)

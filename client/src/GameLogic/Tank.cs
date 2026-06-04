@@ -22,6 +22,9 @@ public sealed class Tank : ITank
     private float _pushTimer;
     private int _livesRemaining;
     private float _respawnTimer;
+    private readonly IWeapon _defaultWeapon = new BehaviourWeapon(() => StraightBehaviour.Instance);
+    private IWeapon? _specialWeapon;
+    private int _specialShots;
 
     /// <param name="input">Per-frame intent source.</param>
     /// <param name="world">The world the tank spawns its shots into.</param>
@@ -68,6 +71,15 @@ public sealed class Tank : ITank
     /// it modifies the matching stat until it expires. See
     /// <c>docs/adr/0012-stats-and-status-effects.md</c>.</summary>
     public void ApplyEffect(StatusEffect effect) => _stats.Apply(effect);
+
+    /// <summary>Loads a special weapon for the next <paramref name="shots"/> shots (an ammo
+    /// crate); once spent, the tank reverts to its default straight shot. See
+    /// <c>docs/adr/0013-weapon-behaviour-strategy.md</c>.</summary>
+    public void LoadAmmo(IWeapon weapon, int shots)
+    {
+        _specialWeapon = weapon;
+        _specialShots = shots;
+    }
 
     /// <summary>Half-extent of the tank used for wall collision: its leading edge, not its
     /// centre, is what must clear a wall.</summary>
@@ -199,7 +211,14 @@ public sealed class Tank : ITank
         {
             _fireCooldown = _stats.Current(StatKind.FireInterval);
             var direction = new Vector2(MathF.Cos(TurretRotation), MathF.Sin(TurretRotation));
-            _world.Spawn(new Projectile(_arena, Position, direction, _projectileSpeed, team: Team));
+
+            // Fire the loaded special weapon while ammo lasts, then fall back to the default shot.
+            var weapon = _specialShots > 0 ? _specialWeapon! : _defaultWeapon;
+            weapon.Fire(_world, _arena, Position, direction, _projectileSpeed, Team);
+            if (_specialShots > 0 && --_specialShots == 0)
+            {
+                _specialWeapon = null;
+            }
         }
     }
 
