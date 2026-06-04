@@ -315,20 +315,28 @@ Catalogue and ordering: `docs/research/local-backlog.md`.
   the next. Spec: pierce one target (tank or brick), the next stops it and takes damage, steel always
   stops. `PiercingWeapon` seeds the budget; `PowerupKind.PiercingAmmo` (yellow crate, 5 shots) laid
   at a mid-field floor cell. Ordinary shots (budget 0) are unchanged.
+- **S8 — procedural arena generation (first slice)** ✅ (`docs/adr/0014-procedural-arena-generation.md`)
+  the local battlefield is now generated, not hand-authored. `LevelMap` gains a `FromCells` producer
+  beside `Parse`; `ArenaGenerator.Generate(ArenaGenParams)` returns a **seeded, validated** `LevelMap`
+  — scattered brick/steel/bush inside a steel border, **valid by construction**: spawn + reserved
+  anchor cells locked to floor, unreachable floor pockets filled with steel (so every floor cell is
+  reachable), interior kept ≥80% open, bounded retries then a border-only fallback. `GameSetup.ArenaSeed`
+  is fixed by default (reproducible for tests/dev) and rolled per match by `StartNewMatch`, persisting
+  across round reloads so one series plays one arena. `ArenaScene` generates a 28×16 arena reserving
+  its spawn/Player2/enemy/pickup cells. **Local only** — `NetArenaScene` keeps the shared `Battlefield01`
+  (net map sync is a later concern). Theming / adjustable-size option / procedural spawn placement deferred.
 
-Test counts on `main`: GameLogic 172, Domain 32, Infrastructure 12, Architecture 6, 53 GoDotTest
+Test counts on `main`: GameLogic 181, Domain 32, Infrastructure 12, Architecture 6, 53 GoDotTest
 scene tests.
 
-**Recorded but not started — owner ask (2026-06-04):** map variety + progression. Captured in
-`docs/research/feature-roadmap.md` as two new systems — **S8 arena generation & theming**
-(procedural/random walls incl. steel, adjustable size, swappable background/ground texture) and
-**S9 progression/meters/match-modifiers** (damage + kill/death meters, cosmetic-only unlocks,
-"everyone starts with effect X" / extra-traps / shootable NPC-animal-XP modifiers) — with
-near-term slices (#15–20) queued in `docs/research/local-backlog.md`. Near-term, no-networking:
-the map generator/size/theming and the damage + K/D meters; the deeper XP/cosmetics layer is
-post-systems content. Each gets its own ADR before build. Current `LevelMap` already exposes the
-producer seam (`Materials[x,y]`/`Bushes[x,y]`/spawn); the one hardcode to generalise first is
-`ArenaScene`'s 28×16 camera framing.
+**Owner ask (2026-06-04): map variety + progression — both now under way.** Captured in
+`docs/research/feature-roadmap.md` as two systems. **S8 arena generation & theming** — the
+**generation** slice is done (ADR-0014, generated battlefield above); still deferred: **theming**
+(swappable background/ground, biome palettes), adjustable size as a player option, and procedural
+spawn/pickup placement. **S9 progression/meters/match-modifiers** — the **damage + K/D meters**
+slice is done (HUD above); still deferred: cosmetic-only unlocks, match modifiers ("everyone starts
+with effect X" / extra-traps / shootable NPC-animal-XP) and the XP layer (post-systems content).
+Each remaining slice gets its own ADR before build.
 
 ### M3 — 2-player real-time via a single Durable Object (scaffolding underway)
 

@@ -1,3 +1,4 @@
+using System;
 using TankGame.GameLogic;
 
 namespace TankGame.Presentation;
@@ -29,11 +30,17 @@ public static class GameSetup
     /// <summary>The running best-of-N series; survives per-round scene reloads.</summary>
     public static SeriesTracker Series { get; private set; } = new(RoundsToWin);
 
-    /// <summary>Begins a fresh match in <paramref name="mode"/>: sets the mode and resets the
-    /// series to 0 - 0. Called from the title screen and from "Play again".</summary>
+    /// <summary>Seed for the procedural arena (S8). Fixed by default so a direct launch (tests, dev)
+    /// is reproducible; a new match randomises it so each match gets a fresh battlefield, and it
+    /// then persists across the per-round scene reloads so a best-of-N series plays one arena.</summary>
+    public static int ArenaSeed { get; private set; } = 1;
+
+    /// <summary>Begins a fresh match in <paramref name="mode"/>: sets the mode, resets the series to
+    /// 0 - 0, and rolls a new arena seed. Called from the title screen and from "Play again".</summary>
     public static void StartNewMatch(GameMode mode)
     {
         Mode = mode;
         Series = new SeriesTracker(RoundsToWin);
+        ArenaSeed = Guid.NewGuid().GetHashCode();
     }
 }

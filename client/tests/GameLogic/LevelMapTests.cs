@@ -61,6 +61,35 @@ public class LevelMapTests
         Assert.False(map.Bushes[0, 1]);                         // plain floor is not
     }
 
+    [Fact]
+    public void FromCells_BuildsALevel_FromGeneratedData()
+    {
+        var materials = new CellMaterial[2, 2];
+        materials[0, 0] = CellMaterial.Steel;
+        materials[1, 0] = CellMaterial.Floor;
+        materials[0, 1] = CellMaterial.Brick;
+        materials[1, 1] = CellMaterial.Floor;
+        var bushes = new bool[2, 2];
+        bushes[1, 1] = true;
+
+        var map = LevelMap.FromCells(materials, bushes, spawnX: 1, spawnY: 0);
+
+        Assert.Equal(CellMaterial.Steel, map.Materials[0, 0]);
+        Assert.True(map.Bushes[1, 1]);
+        Assert.Equal(1, map.SpawnX);
+        Assert.Equal(CellMaterial.Floor, map.Materials[map.SpawnX, map.SpawnY]);
+    }
+
+    [Fact]
+    public void FromCells_RejectsASpawnThatIsNotFloor()
+    {
+        var materials = new CellMaterial[2, 1];
+        materials[0, 0] = CellMaterial.Steel; // spawn target is a wall
+        materials[1, 0] = CellMaterial.Floor;
+
+        Assert.Throws<ArgumentException>(() => LevelMap.FromCells(materials, new bool[2, 1], spawnX: 0, spawnY: 0));
+    }
+
     // --- Battlefield01 sanity (the hand-authored open arena the game ships) ---
 
     [Fact]
