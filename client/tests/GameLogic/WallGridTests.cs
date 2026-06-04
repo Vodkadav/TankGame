@@ -44,6 +44,32 @@ public class WallGridTests
     }
 
     [Fact]
+    public void SetCell_OverwritesAbsolutely_AndRaisesCellChanged()
+    {
+        var grid = Grid();
+        var changes = new List<WallCellChanged>();
+        grid.CellChanged += changes.Add;
+
+        grid.SetCell(0, 1, new WallCell(CellMaterial.Floor, 0)); // authoritative break-through
+
+        Assert.Equal(CellMaterial.Floor, grid.GetCell(0, 1).Material);
+        Assert.Equal(new WallCellChanged(0, 1, new WallCell(CellMaterial.Floor, 0)), Assert.Single(changes));
+    }
+
+    [Fact]
+    public void SetCell_ToTheSameState_RaisesNothing()
+    {
+        var grid = Grid();
+        var changes = new List<WallCellChanged>();
+        grid.CellChanged += changes.Add;
+
+        grid.SetCell(0, 1, new WallCell(CellMaterial.Brick, WallGrid.DefaultBrickHp)); // unchanged
+        grid.SetCell(5, 5, new WallCell(CellMaterial.Floor, 0)); // out of bounds
+
+        Assert.Empty(changes);
+    }
+
+    [Fact]
     public void DamageCell_ChipsBrickHp_AndRaisesCellChanged()
     {
         var grid = Grid();

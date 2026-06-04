@@ -52,6 +52,20 @@ public sealed class WallGrid : IWallGrid
 
     public bool IsBlocked(int x, int y) => GetCell(x, y).Material != CellMaterial.Floor;
 
+    /// <summary>Overwrites a cell with an authoritative state and raises <see cref="CellChanged"/>
+    /// if it differs. Unlike <see cref="DamageCell"/> (relative, local damage) this is absolute —
+    /// used to sync the grid to a server snapshot's <c>WallDelta</c> in networked play.</summary>
+    public void SetCell(int x, int y, WallCell cell)
+    {
+        if (!InBounds(x, y) || _cells[x, y] == cell)
+        {
+            return;
+        }
+
+        _cells[x, y] = cell;
+        CellChanged?.Invoke(new WallCellChanged(x, y, cell));
+    }
+
     public void DamageCell(int x, int y, int amount)
     {
         if (!InBounds(x, y))
