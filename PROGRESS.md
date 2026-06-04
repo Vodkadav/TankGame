@@ -330,8 +330,15 @@ being built autonomously ahead of that:
   rate-limited firing), projectiles (travel → brick chip/break with `WallDelta`s, enemy-tank
   damage), and `snapshotFor(slot)` (per-client `ackSeq`). **Anti-cheat clamps live here**: move
   magnitude ≤ 1 and a server-enforced fire interval, so a tampered client cannot move/shoot faster.
-  Spawn cells are injectable for tests. 12 new Vitest cases (worker suite 29). The DO tick-loop
-  wiring (replace the relay → 20 Hz `step` + broadcast) is the next PR.
+  Spawn cells are injectable for tests. 12 new Vitest cases (worker suite 29).
+- **M3-T5 (wiring) — `MatchRoom` runs the sim** ✅ the DO replaced its relay with the authoritative
+  loop: assigns each joiner a slot (host 0 / guest 1, stored via `serializeAttachment` to survive
+  hibernation), decodes `InputFrame`s into `sim.applyInput`, and a 20 Hz `setInterval` steps the sim
+  and sends each client its own `snapshotFor(slot)`. The loop runs only while players are connected
+  (empty room → stop + drop sim → hibernate); a third joiner gets `503`. Miniflare integration test:
+  two sockets join, an input frame moves the host's tank, and a broadcast snapshot reflects it.
+  Worker suite 30 tests. **Server side of M3 is functionally complete** — remaining is the client
+  (T6 `WebSocketTransport`, T7 prediction, T8 `TEST01` join UI, T9 strings) + T11 alarm.
 
 The intent seam and deterministic GameLogic combat from the local arc are what keep this
 tractable. Still **not fully autonomous** — the deploy/secrets/devices remain the developer's.
