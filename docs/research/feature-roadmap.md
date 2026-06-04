@@ -349,8 +349,8 @@ a rough milestone band. "Band" is indicative; the milestone plan in
 ### Maps, generation & theming (S8)
 | Feature | Needs | Band |
 |---|---|---|
-| Random wall placement (brick **and** steel), validated connectivity | S8 generator + existing `LevelMap` validator | local-arc |
-| Adjustable map size | S8 + generalise `ArenaScene`'s 28×16 framing | local-arc |
+| Random wall placement (brick **and** steel), validated connectivity ✅ | S8 `ArenaGenerator` (ADR-0014) | done |
+| Adjustable map size ✅ (engine; title control pending) | `GameSetup.ArenaWidth/Height` + size-fit camera | done |
 | Swappable background / ground texture (themes) | S8 theme (Presentation) | local-arc |
 | Multiple authored map layouts | S8 (more `ILevelSource`s) | local-arc |
 | Biome/theme variety (desert, snow, arena, ruins) | S8 theme + art | post-M5 |

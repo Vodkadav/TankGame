@@ -35,20 +35,14 @@ public partial class ArenaScene : Node2D
 
     private static readonly NVector2 GridOrigin = NVector2.Zero;
 
-    // The procedural battlefield is generated at this size (S8); the camera framing below assumes it.
-    private const int ArenaWidth = 28;
-    private const int ArenaHeight = 16;
-    private static readonly (int X, int Y) PlayerSpawn = (2, 1);
-
-    // Spawn/pickup anchor cells, spread across the field. The generator keeps every one open floor
-    // (and reachable) so a procedural arena never strands a tank or buries a pickup behind a wall.
-    private static readonly (int X, int Y)[] EnemySpawns = { (25, 2), (25, 14), (13, 13) };
-    private static readonly (int X, int Y) Player2Spawn = (25, 7);
+    // The procedural battlefield (S8) places its own spawns and pickups; the scene only says how
+    // many adversaries to field. The map size comes from GameSetup so it is adjustable per match.
+    private const int EnemyCount = 3;
 
     // Pickups: a tank driving over one collects its effect — a timed stat boost (S4, ADR-0012)
-    // or an ammo crate that loads a special weapon for a few shots (S2, ADR-0013). Placed on open
-    // floor near the middle so reaching one is a contested choice. Magnitudes/durations, shot
-    // counts, and the pickup radius are tunable balance knobs.
+    // or an ammo crate that loads a special weapon for a few shots (S2, ADR-0013). The generator
+    // chooses where each lands; this catalogue is just what to lay (kind + effect). Magnitudes,
+    // shot counts, and the pickup radius are tunable balance knobs.
     private const float PickupRadius = 28f;
     private const int AmmoShots = 5;
     private const int RepairAmount = 2;
@@ -56,20 +50,19 @@ public partial class ArenaScene : Node2D
     // Seconds before a collected pickup returns to the field — keeps the field stocked across a
     // long round instead of one-per-round. Tunable balance knob.
     private const float PickupRespawnDelay = 12f;
-    private static readonly (int X, int Y, PowerupKind Kind, IPickupEffect Effect)[] PowerupSpawns =
+    private static readonly (PowerupKind Kind, IPickupEffect Effect)[] PowerupCatalogue =
     {
-        (10, 8, PowerupKind.SpeedBoost, new StatusEffectPickup(new StatusEffect(StatKind.Speed, Mult: 1.6f, AddFlat: 0f, Seconds: 6f))),
-        (18, 10, PowerupKind.RapidFire, new StatusEffectPickup(new StatusEffect(StatKind.FireInterval, Mult: 0.5f, AddFlat: 0f, Seconds: 6f))),
-        (6, 10, PowerupKind.BouncingAmmo, new AmmoPickup(new BehaviourWeapon(() => new BouncingBehaviour(bounces: 3)), AmmoShots)),
-        (21, 6, PowerupKind.SpreadAmmo, new AmmoPickup(new SpreadWeapon(count: 3, spreadRadians: 0.18f), AmmoShots)),
-        (13, 13, PowerupKind.Repair, new RepairPickup(RepairAmount)),
-        (14, 4, PowerupKind.Shield, new ShieldPickup(ShieldAmount)),
-        (8, 6, PowerupKind.PiercingAmmo, new AmmoPickup(new PiercingWeapon(pierces: 1, TileSize), AmmoShots)),
+        (PowerupKind.SpeedBoost, new StatusEffectPickup(new StatusEffect(StatKind.Speed, Mult: 1.6f, AddFlat: 0f, Seconds: 6f))),
+        (PowerupKind.RapidFire, new StatusEffectPickup(new StatusEffect(StatKind.FireInterval, Mult: 0.5f, AddFlat: 0f, Seconds: 6f))),
+        (PowerupKind.BouncingAmmo, new AmmoPickup(new BehaviourWeapon(() => new BouncingBehaviour(bounces: 3)), AmmoShots)),
+        (PowerupKind.SpreadAmmo, new AmmoPickup(new SpreadWeapon(count: 3, spreadRadians: 0.18f), AmmoShots)),
+        (PowerupKind.Repair, new RepairPickup(RepairAmount)),
+        (PowerupKind.Shield, new ShieldPickup(ShieldAmount)),
+        (PowerupKind.PiercingAmmo, new AmmoPickup(new PiercingWeapon(pierces: 1, TileSize), AmmoShots)),
     };
 
-    // Two-player uses a static camera framing the whole field so both tanks stay on screen.
-    private static readonly Vector2 ArenaCentre = new(GridOrigin.X + (ArenaWidth * TileSize / 2f), GridOrigin.Y + (ArenaHeight * TileSize / 2f));
-    private static readonly Vector2 TwoPlayerZoom = new(0.55f, 0.55f);
+    // Two-player frames the whole field; the zoom is computed per map so any size fits on screen.
+    private const float TwoPlayerViewMargin = 1.08f;
 
     // Fog of war: a dark ambient the player's light cuts a hole in. Radius ≈ the AI fire range
     // so you can see roughly as far as a hidden enemy can hit you. No wall shadows yet — a soft
@@ -88,6 +81,7 @@ public partial class ArenaScene : Node2D
     private BushField _bushes = null!;
     private Camera2D _camera = null!;
     private ITank _player = null!;
+    private GeneratedArena _layout = null!;
     private GameMode _mode;
     private bool _matchOver;
 
@@ -95,7 +89,8 @@ public partial class ArenaScene : Node2D
     {
         _mode = GameSetup.Mode;
 
-        var level = new ArenaGenerator().Generate(BuildArenaParams(GameSetup.ArenaSeed));
+        _layout = new ArenaGenerator().Generate(BuildArenaParams(GameSetup.ArenaSeed));
+        var level = _layout.Map;
         var grid = level.BuildGrid();
         _arena = new GridArena(grid, TileSize, GridOrigin);
         _bushes = new BushField(level.Bushes, TileSize, GridOrigin);
@@ -133,33 +128,23 @@ public partial class ArenaScene : Node2D
         AddChild(_camera);
 
         SpawnPowerups(); // before the tanks so pickup diamonds render beneath them
-        SpawnTanks(level);
+        SpawnTanks();
     }
 
-    // The procedural-arena recipe (S8): a 28x16 battlefield from the match seed, keeping the player
-    // spawn and every spawn/pickup anchor as reachable open floor.
-    private static ArenaGenParams BuildArenaParams(int seed)
-    {
-        var reserved = new List<(int X, int Y)> { Player2Spawn };
-        foreach (var (ex, ey) in EnemySpawns)
-        {
-            reserved.Add((ex, ey));
-        }
+    // The procedural-arena recipe (S8): a battlefield of the match's size, from the match seed,
+    // with the generator placing the spawns and one cell per pickup in the catalogue.
+    private static ArenaGenParams BuildArenaParams(int seed) =>
+        new(GameSetup.ArenaWidth, GameSetup.ArenaHeight, seed, EnemyCount, PowerupCatalogue.Length);
 
-        foreach (var (x, y, _, _) in PowerupSpawns)
-        {
-            reserved.Add((x, y));
-        }
-
-        return new ArenaGenParams(ArenaWidth, ArenaHeight, seed, PlayerSpawn.X, PlayerSpawn.Y, reserved);
-    }
-
-    // Spawn the field's pickups through the world so each reaches the screen by the same
-    // spawn-event path as every other entity (a PowerupView via the type-switch).
+    // Lay each catalogue pickup at the cell the generator chose for it (same count by construction),
+    // spawning it through the world so it reaches the screen by the same spawn-event path as every
+    // other entity (a PowerupView via the type-switch).
     private void SpawnPowerups()
     {
-        foreach (var (x, y, kind, effect) in PowerupSpawns)
+        for (var i = 0; i < PowerupCatalogue.Length; i++)
         {
+            var (kind, effect) = PowerupCatalogue[i];
+            var (x, y) = _layout.PickupCells[i];
             _world.Spawn(new Powerup(_world, CellCentre(x, y), kind, effect, PickupRadius, PickupRespawnDelay));
         }
     }
@@ -167,13 +152,13 @@ public partial class ArenaScene : Node2D
     // Spawn through the world so each tank reaches the screen by the same event path as every
     // other entity — no hand-wiring. EntitySpawned fires synchronously. Player 1 is always
     // present; Player 2 and the AI depend on the mode.
-    private void SpawnTanks(LevelMap level)
+    private void SpawnTanks()
     {
         var twoPlayer = _mode != GameMode.OnePlayer;
 
         // In two-player the left mouse button is Player 2's fire, so Player 1 fires with space.
         var p1Input = new KeyboardMouseInputSource(GetViewport(), fireOnClick: !twoPlayer);
-        _player = new Tank(p1Input, _world, _arena, CellCentre(level.SpawnX, level.SpawnY),
+        _player = new Tank(p1Input, _world, _arena, CellCentre(_layout.PlayerSpawn.X, _layout.PlayerSpawn.Y),
             TankSpeed, FireInterval, ProjectileSpeed, maxHp: 3, team: PlayerTeam, lives: StartingLives);
         _world.Spawn(_player);
 
@@ -181,7 +166,7 @@ public partial class ArenaScene : Node2D
         if (twoPlayer)
         {
             var p2Team = _mode == GameMode.TwoPlayerVersus ? EnemyTeam : PlayerTeam;
-            var p2 = new Tank(new Player2InputSource(), _world, _arena, CellCentre(Player2Spawn.X, Player2Spawn.Y),
+            var p2 = new Tank(new Player2InputSource(), _world, _arena, CellCentre(_layout.Player2Spawn.X, _layout.Player2Spawn.Y),
                 TankSpeed, FireInterval, ProjectileSpeed, maxHp: 3, team: p2Team, lives: StartingLives);
             _world.Spawn(p2);
             if (p2Team == PlayerTeam)
@@ -192,7 +177,7 @@ public partial class ArenaScene : Node2D
 
         if (_mode != GameMode.TwoPlayerVersus)
         {
-            foreach (var (ex, ey) in EnemySpawns)
+            foreach (var (ex, ey) in _layout.EnemySpawns)
             {
                 var ai = new AiInputSource(_world, _arena, _bushes);
                 var enemy = new Tank(ai, _world, _arena, CellCentre(ex, ey),
@@ -202,11 +187,14 @@ public partial class ArenaScene : Node2D
             }
         }
 
-        // One-player follows the tank; two-player frames the whole field so both stay on screen.
+        // One-player follows the tank; two-player frames the whole field so both stay on screen —
+        // centred on the arena and zoomed to fit whatever size this match was generated at.
         if (twoPlayer)
         {
-            _camera.Position = ArenaCentre;
-            _camera.Zoom = TwoPlayerZoom;
+            var fieldW = _layout.Map.Width * TileSize;
+            var fieldH = _layout.Map.Height * TileSize;
+            _camera.Position = new Vector2(GridOrigin.X + (fieldW / 2f), GridOrigin.Y + (fieldH / 2f));
+            _camera.Zoom = FitZoom(fieldW, fieldH);
         }
         else
         {
@@ -219,6 +207,15 @@ public partial class ArenaScene : Node2D
         {
             SetUpFog(viewers);
         }
+    }
+
+    // Zoom that fits the whole field (plus a small margin) in the viewport, so the two-player
+    // whole-field view works at any generated map size rather than a hand-tuned constant.
+    private Vector2 FitZoom(float fieldW, float fieldH)
+    {
+        var view = GetViewportRect().Size;
+        var zoom = Mathf.Min(view.X / fieldW, view.Y / fieldH) / TwoPlayerViewMargin;
+        return new Vector2(zoom, zoom);
     }
 
     // A dark CanvasModulate over the field plus one PointLight2D per ally that follows them,

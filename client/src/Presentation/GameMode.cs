@@ -35,6 +35,11 @@ public static class GameSetup
     /// then persists across the per-round scene reloads so a best-of-N series plays one arena.</summary>
     public static int ArenaSeed { get; private set; } = 1;
 
+    /// <summary>Size of the generated arena, in tiles. Adjustable per match (a title control can set
+    /// it); the camera framing and the generator both follow it, so any sensible size works.</summary>
+    public static int ArenaWidth { get; set; } = 28;
+    public static int ArenaHeight { get; set; } = 16;
+
     /// <summary>Begins a fresh match in <paramref name="mode"/>: sets the mode, resets the series to
     /// 0 - 0, and rolls a new arena seed. Called from the title screen and from "Play again".</summary>
     public static void StartNewMatch(GameMode mode)

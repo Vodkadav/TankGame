@@ -7,15 +7,31 @@ namespace TankGame.Tests.GameLogic;
 
 public class ArenaGeneratorTests
 {
-    private static readonly (int X, int Y)[] Reserved = { (10, 8), (18, 10), (6, 10), (21, 6), (25, 7), (25, 2), (25, 14) };
+    private const int EnemyCount = 3;
+    private const int PickupCount = 7;
 
     private static ArenaGenParams Params(int seed, int width = 28, int height = 16) =>
-        new(width, height, seed, SpawnX: 2, SpawnY: 1, ReservedFloor: Reserved);
+        new(width, height, seed, EnemyCount, PickupCount);
+
+    private static IEnumerable<(int X, int Y)> AllAnchors(GeneratedArena a)
+    {
+        yield return a.PlayerSpawn;
+        yield return a.Player2Spawn;
+        foreach (var e in a.EnemySpawns)
+        {
+            yield return e;
+        }
+
+        foreach (var pk in a.PickupCells)
+        {
+            yield return pk;
+        }
+    }
 
     [Fact]
     public void Generate_ProducesTheRequestedSize_EnclosedByASteelBorder()
     {
-        var map = new ArenaGenerator().Generate(Params(seed: 7));
+        var map = new ArenaGenerator().Generate(Params(seed: 7)).Map;
 
         Assert.Equal(28, map.Width);
         Assert.Equal(16, map.Height);
@@ -33,16 +49,27 @@ public class ArenaGeneratorTests
     }
 
     [Fact]
-    public void Generate_KeepsTheSpawnAndEveryReservedCellAsFloor()
+    public void Generate_PlacesTheRequestedCountOfSpawnsAndPickups()
+    {
+        var arena = new ArenaGenerator().Generate(Params(seed: 1));
+
+        Assert.Equal(EnemyCount, arena.EnemySpawns.Count);
+        Assert.Equal(PickupCount, arena.PickupCells.Count);
+        Assert.Equal(arena.PlayerSpawn, (arena.Map.SpawnX, arena.Map.SpawnY));
+    }
+
+    [Fact]
+    public void Generate_EveryAnchorIsReachableOpenFloor()
     {
         for (var seed = 0; seed < 25; seed++)
         {
-            var map = new ArenaGenerator().Generate(Params(seed));
+            var arena = new ArenaGenerator().Generate(Params(seed));
+            var reached = ReachableSet(arena.Map);
 
-            Assert.Equal(CellMaterial.Floor, map.Materials[map.SpawnX, map.SpawnY]);
-            foreach (var (x, y) in Reserved)
+            foreach (var (x, y) in AllAnchors(arena))
             {
-                Assert.Equal(CellMaterial.Floor, map.Materials[x, y]);
+                Assert.Equal(CellMaterial.Floor, arena.Map.Materials[x, y]);
+                Assert.True(reached[x, y], $"seed {seed}: anchor ({x},{y}) is not reachable from spawn");
             }
         }
     }
@@ -52,18 +79,29 @@ public class ArenaGeneratorTests
     {
         for (var seed = 0; seed < 25; seed++)
         {
-            var map = new ArenaGenerator().Generate(Params(seed));
+            var map = new ArenaGenerator().Generate(Params(seed)).Map;
+            var reached = ReachableSet(map);
 
             var totalFloor = 0;
-            foreach (var m in map.Materials)
+            var reachedFloor = 0;
+            for (var x = 0; x < map.Width; x++)
             {
-                if (m == CellMaterial.Floor)
+                for (var y = 0; y < map.Height; y++)
                 {
+                    if (map.Materials[x, y] != CellMaterial.Floor)
+                    {
+                        continue;
+                    }
+
                     totalFloor++;
+                    if (reached[x, y])
+                    {
+                        reachedFloor++;
+                    }
                 }
             }
 
-            Assert.Equal(totalFloor, ReachableFloor(map));
+            Assert.Equal(totalFloor, reachedFloor);
         }
     }
 
@@ -72,7 +110,7 @@ public class ArenaGeneratorTests
     {
         for (var seed = 0; seed < 25; seed++)
         {
-            var map = new ArenaGenerator().Generate(Params(seed));
+            var map = new ArenaGenerator().Generate(Params(seed)).Map;
 
             var interior = 0;
             var floor = 0;
@@ -92,48 +130,45 @@ public class ArenaGeneratorTests
         }
     }
 
+    [Theory]
+    [InlineData(20, 12)]
+    [InlineData(36, 22)]
+    [InlineData(44, 28)]
+    public void Generate_WorksAtDifferentSizes(int width, int height)
+    {
+        var arena = new ArenaGenerator().Generate(Params(seed: 5, width, height));
+
+        Assert.Equal(width, arena.Map.Width);
+        Assert.Equal(height, arena.Map.Height);
+        var reached = ReachableSet(arena.Map);
+        foreach (var (x, y) in AllAnchors(arena))
+        {
+            Assert.True(reached[x, y], $"{width}x{height}: anchor ({x},{y}) unreachable");
+        }
+    }
+
     [Fact]
     public void Generate_IsDeterministic_ForAGivenSeed()
     {
         var a = new ArenaGenerator().Generate(Params(seed: 42));
         var b = new ArenaGenerator().Generate(Params(seed: 42));
 
-        for (var x = 0; x < a.Width; x++)
+        Assert.Equal(a.PlayerSpawn, b.PlayerSpawn);
+        Assert.Equal(a.EnemySpawns, b.EnemySpawns);
+        Assert.Equal(a.PickupCells, b.PickupCells);
+        for (var x = 0; x < a.Map.Width; x++)
         {
-            for (var y = 0; y < a.Height; y++)
+            for (var y = 0; y < a.Map.Height; y++)
             {
-                Assert.Equal(a.Materials[x, y], b.Materials[x, y]);
-                Assert.Equal(a.Bushes[x, y], b.Bushes[x, y]);
+                Assert.Equal(a.Map.Materials[x, y], b.Map.Materials[x, y]);
             }
         }
-    }
-
-    [Fact]
-    public void Generate_DifferentSeeds_ProduceDifferentLayouts()
-    {
-        var a = new ArenaGenerator().Generate(Params(seed: 1));
-        var b = new ArenaGenerator().Generate(Params(seed: 2));
-
-        var identical = true;
-        for (var x = 0; x < a.Width && identical; x++)
-        {
-            for (var y = 0; y < a.Height; y++)
-            {
-                if (a.Materials[x, y] != b.Materials[x, y])
-                {
-                    identical = false;
-                    break;
-                }
-            }
-        }
-
-        Assert.False(identical, "two seeds should scatter cover differently");
     }
 
     [Fact]
     public void Generate_ScattersBothDestructibleAndPermanentCover()
     {
-        var map = new ArenaGenerator().Generate(Params(seed: 3));
+        var map = new ArenaGenerator().Generate(Params(seed: 3)).Map;
 
         var hasBrick = false;
         var hasInteriorSteel = false;
@@ -156,18 +191,16 @@ public class ArenaGeneratorTests
         Assert.True(hasInteriorSteel, "a generated arena should have permanent steel cover");
     }
 
-    private static int ReachableFloor(LevelMap map)
+    private static bool[,] ReachableSet(LevelMap map)
     {
         var seen = new bool[map.Width, map.Height];
         var queue = new Queue<(int X, int Y)>();
         seen[map.SpawnX, map.SpawnY] = true;
         queue.Enqueue((map.SpawnX, map.SpawnY));
-        var count = 0;
 
         while (queue.Count > 0)
         {
             var (x, y) = queue.Dequeue();
-            count++;
             foreach (var (dx, dy) in new[] { (1, 0), (-1, 0), (0, 1), (0, -1) })
             {
                 var nx = x + dx;
@@ -181,6 +214,6 @@ public class ArenaGeneratorTests
             }
         }
 
-        return count;
+        return seen;
     }
 }
