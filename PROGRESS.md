@@ -265,7 +265,18 @@ Catalogue and ordering: `docs/research/local-backlog.md`.
   them); no respawn yet. **Shield / repair deferred** — they need the `MaxHp`/health-modifier
   path ADR-0012 deferred.
 
-Test counts on `main`: GameLogic 124, Domain 22, Infrastructure 8, Architecture 6, 36 GoDotTest
+- **S2 #13 — weapon-behaviour strategy + raycast normals** ✅
+  (`docs/adr/0013-weapon-behaviour-strategy.md`). Two parts: (a) **raycast normals** (#76) —
+  `RaycastHit` gained `Normal` (unit normal of the struck face, back along the ray), derived from
+  the `GridArena` DDA axis / the `RectArena` exited wall, so a reflection is `dir − 2·(dir·n)·n`;
+  (b) **behaviour strategy** — `Projectile` now holds a `ProjectileState` (data) + an
+  `IProjectileBehaviour` (motion/impact) and just delegates `Step`; `StraightBehaviour` is the
+  prior logic (one shared instance). The new `behaviour` ctor arg defaults to straight, so every
+  call site is untouched and the refactor is behaviour-preserving. New ammo = a new behaviour only
+  when the motion is genuinely new. **Not decided here:** how a tank acquires a non-straight shell
+  (pickup / slot / modifier) — that gates #14 (bouncing/piercing/spread shells).
+
+Test counts on `main`: GameLogic 128, Domain 22, Infrastructure 8, Architecture 6, 36 GoDotTest
 scene tests.
 
 **Recorded but not started — owner ask (2026-06-04):** map variety + progression. Captured in
