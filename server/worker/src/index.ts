@@ -1,11 +1,24 @@
+import * as Sentry from "@sentry/cloudflare";
 import { withSentry } from "@sentry/cloudflare";
 import { MatchRoom } from "./MatchRoom";
 import { createLobby, joinLobby } from "./lobby";
+import {
+  checkRequestBudget,
+  cloudflareAnalytics,
+  monthStart,
+  DEFAULT_DO_REQUEST_BUDGET,
+  type BudgetAlerter,
+} from "./budget";
 
 interface Env {
   SENTRY_DSN_WORKER: string;
   MATCH_ROOM: DurableObjectNamespace;
   LOBBY_KV: KVNamespace;
+  // Read-only Analytics token + account for the request-budget cron (M3-T11). Optional: absent
+  // locally, where the scheduled run is a safe no-op. DO_REQUEST_BUDGET overrides the default cap.
+  CF_API_TOKEN?: string;
+  CF_ACCOUNT_ID?: string;
+  DO_REQUEST_BUDGET?: string;
 }
 
 const JOIN_ROUTE = /^\/lobby\/([^/]+)\/join$/;
@@ -44,6 +57,20 @@ const handler: ExportedHandler<Env> = {
     }
 
     return new Response("not found", { status: 404 });
+  },
+
+  // Cron-triggered request-budget alarm (M3-T11, ADR-0005 §4): read this month's Durable Object
+  // request usage and warn Sentry at 80% of the free-tier budget. The remedy is to refuse new
+  // lobbies, never to enable the paid plan. Wrapped by withSentry, so captureMessage is delivered.
+  async scheduled(event, env, ctx) {
+    const alerter: BudgetAlerter = { alert: (message) => Sentry.captureMessage(message, "warning") };
+    const analytics = cloudflareAnalytics(
+      env.CF_ACCOUNT_ID,
+      env.CF_API_TOKEN,
+      monthStart(new Date(event.scheduledTime)),
+    );
+    const budget = env.DO_REQUEST_BUDGET ? Number(env.DO_REQUEST_BUDGET) : DEFAULT_DO_REQUEST_BUDGET;
+    ctx.waitUntil(checkRequestBudget(analytics, alerter, budget));
   },
 };
 
