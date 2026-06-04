@@ -298,8 +298,16 @@ Catalogue and ordering: `docs/research/local-backlog.md`.
   spawn/despawn churn. `PowerupView` became a per-frame mirror that hides the shape while dormant.
   `ArenaScene` uses a 12 s respawn delay for all field pickups. One-shot collection (the prior
   behaviour) is preserved for `respawnDelay` 0.
+- **S9 — damage + K/D meters (HUD)** ✅ first S9 slice. `CombatResolver` gains a `CombatHit`
+  record (`ShooterTeam`, `VictimTeam`, `Amount`, `Killed`) and a `Hit` event raised on every landed
+  shot — richer than the kill-only `TankKilled` the `ScoreBoard` still uses. A pure-C# `MeterBoard`
+  tallies per-team damage dealt, kills, and deaths from it; `MetersOverlay` (top-left, EN/ES/DK
+  `hud.meters` "Damage L-R  K/D L-R") mirrors it live. Single-responsibility split: `ScoreBoard`
+  owns the round-winning kill score (top-right), `MeterBoard` owns the performance meters. (The
+  layer guard's `IsCompilerGenerated` was hardened to ignore Roslyn's `<>`-named params-span buffer,
+  emitted by the 6-arg `string.Format`.)
 
-Test counts on `main`: GameLogic 158, Domain 32, Infrastructure 12, Architecture 6, 50 GoDotTest
+Test counts on `main`: GameLogic 165, Domain 32, Infrastructure 12, Architecture 6, 53 GoDotTest
 scene tests.
 
 **Recorded but not started — owner ask (2026-06-04):** map variety + progression. Captured in

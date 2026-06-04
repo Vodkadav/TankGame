@@ -169,6 +169,39 @@ public class CombatResolverTests
     }
 
     [Fact]
+    public void AHit_RaisesTheHitEvent_WithShooterVictimAmountAndKillFlag()
+    {
+        var tank = TankAt(Vector2.Zero, team: 0); // full health → survives this hit
+        var shot = ShotAt(Vector2.Zero, team: 1);
+        var resolver = new CombatResolver(HitRadius);
+        CombatResolver.CombatHit? captured = null;
+        resolver.Hit += hit => captured = hit;
+
+        resolver.Resolve(new List<IEntity> { tank, shot });
+
+        Assert.NotNull(captured);
+        Assert.Equal(1, captured!.Value.ShooterTeam);
+        Assert.Equal(0, captured.Value.VictimTeam);
+        Assert.Equal(1, captured.Value.Amount);
+        Assert.False(captured.Value.Killed); // not the killing blow
+    }
+
+    [Fact]
+    public void AFatalHit_RaisesTheHitEvent_WithKilledTrue()
+    {
+        var tank = TankAt(Vector2.Zero, team: 0);
+        tank.TakeDamage(tank.MaxHp - 1); // one hit from death
+        var shot = ShotAt(Vector2.Zero, team: 1);
+        var resolver = new CombatResolver(HitRadius);
+        CombatResolver.CombatHit? captured = null;
+        resolver.Hit += hit => captured = hit;
+
+        resolver.Resolve(new List<IEntity> { tank, shot });
+
+        Assert.True(captured!.Value.Killed);
+    }
+
+    [Fact]
     public void ADownedTank_AwaitingRespawn_IsIntangibleToShots()
     {
         var tank = TankAt(Vector2.Zero, team: 0, lives: 2);

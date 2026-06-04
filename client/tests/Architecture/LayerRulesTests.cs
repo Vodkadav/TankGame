@@ -135,6 +135,15 @@ public class LayerRulesTests
 
     private static bool IsCompilerGenerated(System.Type t)
     {
+        // Most synthesized types carry [CompilerGenerated]; a few Roslyn-lowered helpers do not
+        // (e.g. the `<>y__InlineArray6` buffer emitted for a params-ReadOnlySpan call, or
+        // `<PrivateImplementationDetails>`). They all share an unspeakable name starting with '<',
+        // which is the reliable marker.
+        if (t.Name.StartsWith("<", System.StringComparison.Ordinal))
+        {
+            return true;
+        }
+
         return t.GetCustomAttributes(
             typeof(System.Runtime.CompilerServices.CompilerGeneratedAttribute),
             inherit: false).Length > 0;
