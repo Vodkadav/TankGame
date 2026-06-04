@@ -339,6 +339,19 @@ being built autonomously ahead of that:
   two sockets join, an input frame moves the host's tank, and a broadcast snapshot reflects it.
   Worker suite 30 tests. **Server side of M3 is functionally complete** — remaining is the client
   (T6 `WebSocketTransport`, T7 prediction, T8 `TEST01` join UI, T9 strings) + T11 alarm.
+- **M3-T6 — client `WebSocketTransport`** ✅ `client/src/Infrastructure/Net/`: `WebSocketTransport`
+  implements `IMatchTransport` over an `IMatchSocket` byte seam — `SendInput` encodes via
+  `ProtocolCodec` and `Poll()` decodes each inbound message up as `SnapshotReceived`. Kept free of
+  Godot so it unit-tests against a fake socket (xUnit: send-encodes, poll-raises-per-message,
+  empty-poll-silent); `GodotWebSocket` wraps Godot's `WebSocketPeer` as the live socket (untested
+  wiring — the framing is covered by the transport + codec tests). Infrastructure suite 11 tests.
+- **M3-T8 — hardcoded `TEST01` join flow** ✅ `NetworkSession` (Presentation) joins via a swappable
+  `TransportFactory` (default builds the live `WebSocketTransport`/`GodotWebSocket` to
+  `wss://…workers.dev/room/TEST01`); the title screen gains a "Join TEST01" button (`title.join_test`
+  in en/es/dk) that calls `NetworkSession.Join` and disables itself. GoDotTest exercises the click
+  path against a mock transport (button-present + press-joins-TEST01-and-stores-active). Scene suite
+  38 tests. The networked play-scene swap (rendering remote tanks from snapshots) waits on the T7
+  prediction wiring.
 
 The intent seam and deterministic GameLogic combat from the local arc are what keep this
 tractable. Still **not fully autonomous** — the deploy/secrets/devices remain the developer's.
