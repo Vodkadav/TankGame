@@ -32,4 +32,9 @@ public interface IPowerup : IEntity
 {
     /// <summary>Which powerup this is — selects its colour and the effect it grants.</summary>
     PowerupKind Kind { get; }
+
+    /// <summary>Whether the pickup is currently on the field to be collected. A respawning pickup
+    /// goes unavailable (dormant) for its respawn delay after being collected, then returns; a
+    /// one-shot pickup is simply reaped. The view shows the shape only while available.</summary>
+    bool IsAvailable { get; }
 }
