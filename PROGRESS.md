@@ -306,8 +306,17 @@ Catalogue and ordering: `docs/research/local-backlog.md`.
   owns the round-winning kill score (top-right), `MeterBoard` owns the performance meters. (The
   layer guard's `IsCompilerGenerated` was hardened to ignore Roslyn's `<>`-named params-span buffer,
   emitted by the 6-arg `string.Format`.)
+- **S2 — piercing ammo** ✅ completes the S2 ammo trio (bouncing/spread/piercing), resolving the
+  ADR-0013 deferral. A shared pierce budget lives on `ProjectileState.Pierce`, decremented by both
+  collision paths: `PiercingBehaviour` punches through a destructible (brick) wall and stops on
+  steel/permanent or when the budget runs out (`RaycastHit` gained `Destructible`, default false;
+  `GridArena` flags brick); the `CombatResolver` passes a piercing shot through one tank — tracking
+  already-hit tanks (`Projectile.HasHit`/`RegisterTankHit`) so it damages each once — and stops it on
+  the next. Spec: pierce one target (tank or brick), the next stops it and takes damage, steel always
+  stops. `PiercingWeapon` seeds the budget; `PowerupKind.PiercingAmmo` (yellow crate, 5 shots) laid
+  at a mid-field floor cell. Ordinary shots (budget 0) are unchanged.
 
-Test counts on `main`: GameLogic 165, Domain 32, Infrastructure 12, Architecture 6, 53 GoDotTest
+Test counts on `main`: GameLogic 172, Domain 32, Infrastructure 12, Architecture 6, 53 GoDotTest
 scene tests.
 
 **Recorded but not started — owner ask (2026-06-04):** map variety + progression. Captured in

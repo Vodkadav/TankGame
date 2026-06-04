@@ -29,6 +29,9 @@ public class CombatResolverTests
     private static Projectile ShotAt(Vector2 pos, int team) =>
         new(new OpenArena(), pos, new Vector2(1f, 0f), speed: 600f, damage: 1, team: team);
 
+    private static Projectile PiercingShotAt(Vector2 pos, int team, int pierce) =>
+        new(new OpenArena(), pos, new Vector2(1f, 0f), speed: 600f, damage: 1, team: team, pierce: pierce);
+
     [Fact]
     public void EnemyShot_OnATank_DamagesItAndExpiresTheShot()
     {
@@ -199,6 +202,48 @@ public class CombatResolverTests
         resolver.Resolve(new List<IEntity> { tank, shot });
 
         Assert.True(captured!.Value.Killed);
+    }
+
+    [Fact]
+    public void APiercingShot_DamagesTwoTanksInRange_ThenStops()
+    {
+        var a = TankAt(Vector2.Zero, team: 0);
+        var b = TankAt(new Vector2(10f, 0f), team: 0); // also within the hit radius
+        var shot = PiercingShotAt(Vector2.Zero, team: 1, pierce: 1);
+
+        new CombatResolver(HitRadius).Resolve(new List<IEntity> { shot, a, b });
+
+        Assert.Equal(a.MaxHp - 1, a.Hp); // pierced through the first
+        Assert.Equal(b.MaxHp - 1, b.Hp); // and damaged the second
+        Assert.False(shot.IsAlive);      // which stopped it (budget spent)
+    }
+
+    [Fact]
+    public void APiercingShot_DoesNotReHitTheSameTank_AndLingersUntilItMeetsAnother()
+    {
+        var tank = TankAt(Vector2.Zero, team: 0);
+        var shot = PiercingShotAt(Vector2.Zero, team: 1, pierce: 1);
+        var resolver = new CombatResolver(HitRadius);
+
+        resolver.Resolve(new List<IEntity> { shot, tank });
+        resolver.Resolve(new List<IEntity> { shot, tank }); // still overlapping next tick
+
+        Assert.Equal(tank.MaxHp - 1, tank.Hp); // damaged exactly once, not once per tick
+        Assert.True(shot.IsAlive);             // passed through, still flying for a second target
+    }
+
+    [Fact]
+    public void AnOrdinaryShot_StillStopsOnItsFirstTank()
+    {
+        var a = TankAt(Vector2.Zero, team: 0);
+        var b = TankAt(new Vector2(10f, 0f), team: 0);
+        var shot = ShotAt(Vector2.Zero, team: 1); // no pierce budget
+
+        new CombatResolver(HitRadius).Resolve(new List<IEntity> { shot, a, b });
+
+        Assert.Equal(a.MaxHp - 1, a.Hp); // hit the first
+        Assert.Equal(b.MaxHp, b.Hp);     // the second is untouched
+        Assert.False(shot.IsAlive);
     }
 
     [Fact]

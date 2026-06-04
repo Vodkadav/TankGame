@@ -17,6 +17,9 @@ public enum PowerupKind
     /// <summary>An ammo crate: the next shots fire as a fanned spread.</summary>
     SpreadAmmo,
 
+    /// <summary>An ammo crate: the next shots punch through one target (tank or brick wall).</summary>
+    PiercingAmmo,
+
     /// <summary>Restores hit points on pickup.</summary>
     Repair,
 

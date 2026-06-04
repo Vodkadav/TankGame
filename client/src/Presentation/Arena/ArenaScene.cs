@@ -58,6 +58,7 @@ public partial class ArenaScene : Node2D
         (21, 6, PowerupKind.SpreadAmmo, new AmmoPickup(new SpreadWeapon(count: 3, spreadRadians: 0.18f), AmmoShots)),
         (13, 13, PowerupKind.Repair, new RepairPickup(RepairAmount)),
         (14, 4, PowerupKind.Shield, new ShieldPickup(ShieldAmount)),
+        (8, 6, PowerupKind.PiercingAmmo, new AmmoPickup(new PiercingWeapon(pierces: 1, TileSize), AmmoShots)),
     };
 
     // Two-player uses a static camera framing the whole field so both tanks stay on screen.

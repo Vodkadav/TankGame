@@ -54,6 +54,7 @@ public partial class PowerupView : Node2D
         PowerupKind.RapidFire => new Color(1f, 0.7f, 0.2f),     // orange
         PowerupKind.BouncingAmmo => new Color(0.7f, 0.3f, 1f),  // purple
         PowerupKind.SpreadAmmo => new Color(0.9f, 0.3f, 0.5f),  // pink
+        PowerupKind.PiercingAmmo => new Color(1f, 0.95f, 0.4f), // yellow
         PowerupKind.Repair => new Color(0.2f, 0.9f, 0.3f),      // green
         PowerupKind.Shield => new Color(0.3f, 0.9f, 0.95f),     // cyan
         _ => Colors.White,

@@ -50,6 +50,22 @@ public class WeaponTests
     }
 
     [Fact]
+    public void PiercingWeapon_FiresOneShot_ThatCanPassThroughATank()
+    {
+        var world = new World();
+        new PiercingWeapon(pierces: 1, tileSize: 64f)
+            .Fire(world, new OpenArena(), Vector2.Zero, new Vector2(1f, 0f), Speed, team: 1);
+        var shot = Assert.Single(world.Entities.OfType<Projectile>());
+
+        // It pierces the first tank (stays alive) rather than expiring on contact.
+        shot.RegisterTankHit(System.Guid.NewGuid());
+        Assert.True(shot.IsAlive, "a piercing shot survives its first target");
+
+        shot.RegisterTankHit(System.Guid.NewGuid());
+        Assert.False(shot.IsAlive, "and stops on the next");
+    }
+
+    [Fact]
     public void SpreadWeapon_CentrePellet_TravelsAlongTheAim()
     {
         var world = new World();
