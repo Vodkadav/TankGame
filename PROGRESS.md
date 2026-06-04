@@ -249,8 +249,15 @@ Catalogue and ordering: `docs/research/local-backlog.md`.
   round kill score, and the running round tally (`hud.rounds` EN/ES/DK); the button reads
   "Next round" (`hud.next_round`) mid-series — reloading with the series intact — and "Play again"
   once the match is won, starting a fresh series.
+- **S4 #11 — stats + timed status effects** ✅ (`docs/adr/0012-stats-and-status-effects.md`) a
+  pure-C# `Stats` block (base value per `StatKind` ∘ a list of expiring `StatusEffect` modifiers)
+  replaces the tank's raw `_speed`/`_fireInterval` fields. `Current(kind) = (base + Σ AddFlat) ×
+  Π Mult` over live effects; `Stats.Step` ages them in real time. `Tank.ApplyEffect(StatusEffect)`
+  is the single entry point — powerups/traps (#12) become "apply an effect", not new mechanics.
+  The `Tank` ctor is unchanged (seeds `Stats` from the same args). Foundation only; over-shield /
+  damage-over-time (which touch `MaxHp`/`IDamageable`) are deferred per the ADR.
 
-Test counts on `main`: GameLogic 111, Domain 22, Infrastructure 8, Architecture 6, 34 GoDotTest
+Test counts on `main`: GameLogic 120, Domain 22, Infrastructure 8, Architecture 6, 34 GoDotTest
 scene tests.
 
 ### Deferred: M3 — 2-player real-time via a single Durable Object

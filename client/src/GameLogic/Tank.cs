@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Numerics;
 using TankGame.Domain;
 
@@ -15,8 +16,7 @@ public sealed class Tank : ITank
     private readonly IWorld _world;
     private readonly IArena _arena;
     private readonly Vector2 _spawnPosition;
-    private readonly float _speed;
-    private readonly float _fireInterval;
+    private readonly Stats _stats;
     private readonly float _projectileSpeed;
     private float _fireCooldown;
     private float _pushTimer;
@@ -56,10 +56,18 @@ public sealed class Tank : ITank
         _arena = arena;
         Position = startPosition;
         _spawnPosition = startPosition;
-        _speed = speed;
-        _fireInterval = fireInterval;
+        _stats = new Stats(new Dictionary<StatKind, float>
+        {
+            [StatKind.Speed] = speed,
+            [StatKind.FireInterval] = fireInterval,
+        });
         _projectileSpeed = projectileSpeed;
     }
+
+    /// <summary>Applies a timed <see cref="StatusEffect"/> to this tank (a powerup or trap):
+    /// it modifies the matching stat until it expires. See
+    /// <c>docs/adr/0012-stats-and-status-effects.md</c>.</summary>
+    public void ApplyEffect(StatusEffect effect) => _stats.Apply(effect);
 
     /// <summary>Half-extent of the tank used for wall collision: its leading edge, not its
     /// centre, is what must clear a wall.</summary>
@@ -109,6 +117,8 @@ public sealed class Tank : ITank
 
     public void Step(float deltaSeconds)
     {
+        _stats.Step(deltaSeconds); // age timed effects in real time, even while down
+
         if (Hp <= 0)
         {
             // Down: inert (no movement, aim, or fire) until the respawn timer elapses, then
@@ -137,7 +147,7 @@ public sealed class Tank : ITank
             move = Vector2.Normalize(move); // a (1,1) keyboard diagonal must not be faster
         }
 
-        var desired = Position + (move * _speed * deltaSeconds);
+        var desired = Position + (move * _stats.Current(StatKind.Speed) * deltaSeconds);
 
         // Resolve each axis independently so the tank slides along a wall instead of sticking.
         // A move is allowed only if the leading edge (centre + radius) clears walls and the new
@@ -187,7 +197,7 @@ public sealed class Tank : ITank
         _fireCooldown -= deltaSeconds;
         if (_fireCooldown <= 0f && input.Fire)
         {
-            _fireCooldown = _fireInterval;
+            _fireCooldown = _stats.Current(StatKind.FireInterval);
             var direction = new Vector2(MathF.Cos(TurretRotation), MathF.Sin(TurretRotation));
             _world.Spawn(new Projectile(_arena, Position, direction, _projectileSpeed, team: Team));
         }
