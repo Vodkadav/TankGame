@@ -34,8 +34,10 @@ public partial class PowerupView : Node2D
     /// <summary>The on-screen colour for each kind — public so a test can assert the mapping.</summary>
     public static Color ColourFor(PowerupKind kind) => kind switch
     {
-        PowerupKind.SpeedBoost => new Color(0.3f, 0.7f, 1f),  // blue
-        PowerupKind.RapidFire => new Color(1f, 0.7f, 0.2f),   // orange
+        PowerupKind.SpeedBoost => new Color(0.3f, 0.7f, 1f),    // blue
+        PowerupKind.RapidFire => new Color(1f, 0.7f, 0.2f),     // orange
+        PowerupKind.BouncingAmmo => new Color(0.7f, 0.3f, 1f),  // purple
+        PowerupKind.SpreadAmmo => new Color(0.9f, 0.3f, 0.5f),  // pink
         _ => Colors.White,
     };
 }

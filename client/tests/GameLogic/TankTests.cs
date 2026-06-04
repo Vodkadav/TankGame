@@ -139,6 +139,20 @@ public class TankTests
     }
 
     [Fact]
+    public void LoadAmmo_MakesTheNextShotsUseTheSpecialWeapon_ThenRevertsToDefault()
+    {
+        var world = new World();
+        var tank = NewTank(new ScriptedInput(new TankInput(Vector2.Zero, Aim: 0f, Fire: true)), world);
+        tank.LoadAmmo(new SpreadWeapon(count: 3, spreadRadians: 0.2f), shots: 1);
+
+        tank.Step(0.05f); // fires the spread → 3 pellets
+        Assert.Equal(3, world.Entities.OfType<Projectile>().Count());
+
+        tank.Step(0.4f); // special ammo spent → back to the default single shot
+        Assert.Equal(4, world.Entities.OfType<Projectile>().Count());
+    }
+
+    [Fact]
     public void Step_MovesFasterUnderASpeedBoost_UntilItExpires()
     {
         var input = new ScriptedInput(new TankInput(new Vector2(1f, 0f), Aim: 0f, Fire: false));

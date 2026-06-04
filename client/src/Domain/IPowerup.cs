@@ -10,6 +10,12 @@ public enum PowerupKind
 
     /// <summary>A temporary fire-rate boost (shorter fire interval).</summary>
     RapidFire,
+
+    /// <summary>An ammo crate: the next shots ricochet off walls.</summary>
+    BouncingAmmo,
+
+    /// <summary>An ammo crate: the next shots fire as a fanned spread.</summary>
+    SpreadAmmo,
 }
 
 /// <summary>A collectible sitting on the field — a world <see cref="IEntity"/>. The
