@@ -16,6 +16,7 @@ public class PowerupViewTests : TestClass
         public NVector2 Position { get; }
         public PowerupKind Kind { get; }
         public bool IsAlive => true;
+        public bool IsAvailable { get; set; } = true;
         public void Step(float deltaSeconds) { }
     }
 
@@ -50,6 +51,32 @@ public class PowerupViewTests : TestClass
         if (shape.Color != PowerupView.ColourFor(PowerupKind.RapidFire))
         {
             throw new Exception($"Shape colour should match the kind; was {shape.Color}.");
+        }
+    }
+
+    [Test]
+    public void View_HidesTheShape_WhileThePowerupIsUnavailable()
+    {
+        var powerup = new StubPowerup(new NVector2(0f, 0f), PowerupKind.SpeedBoost);
+        _view.Bind(powerup);
+
+        if (!_view.Visible)
+        {
+            throw new Exception("An available powerup's view should be visible.");
+        }
+
+        powerup.IsAvailable = false; // collected → dormant on its respawn cooldown
+        _view.UpdateFromModel();
+        if (_view.Visible)
+        {
+            throw new Exception("A dormant (respawning) powerup's view should be hidden.");
+        }
+
+        powerup.IsAvailable = true; // respawned
+        _view.UpdateFromModel();
+        if (!_view.Visible)
+        {
+            throw new Exception("A respawned powerup's view should be visible again.");
         }
     }
 

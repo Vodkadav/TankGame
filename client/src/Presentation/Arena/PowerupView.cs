@@ -11,11 +11,27 @@ public partial class PowerupView : Node2D
 {
     private const float HalfSize = 14f;
 
+    private IPowerup? _powerup;
+
     /// <summary>Builds the coloured shape and places the node at the powerup's position.</summary>
     public void Bind(IPowerup powerup)
     {
+        _powerup = powerup;
         Position = new Vector2(powerup.Position.X, powerup.Position.Y);
         AddChild(BuildShape(powerup.Kind));
+        UpdateFromModel();
+    }
+
+    public override void _Process(double delta) => UpdateFromModel();
+
+    /// <summary>Mirrors the powerup's availability: a respawning pickup hides while dormant and
+    /// reappears when it returns. Public so a test can assert the mirror without frame timing.</summary>
+    public void UpdateFromModel()
+    {
+        if (_powerup is not null)
+        {
+            Visible = _powerup.IsAvailable;
+        }
     }
 
     private static Polygon2D BuildShape(PowerupKind kind) => new()

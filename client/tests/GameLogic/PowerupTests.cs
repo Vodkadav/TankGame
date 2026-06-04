@@ -138,6 +138,66 @@ public class PowerupTests
         Assert.DoesNotContain(crate, world.Entities); // crate consumed
     }
 
+    [Fact]
+    public void ARespawningPowerup_StaysInTheWorld_AndReturnsAfterItsDelay()
+    {
+        var world = new World();
+        var tank = TankAt(world, Vector2.Zero, new NoInput());
+        var powerup = new Powerup(world, Vector2.Zero, PowerupKind.SpeedBoost,
+            new StatusEffectPickup(SpeedBoost), PickupRadius, respawnDelay: 5f);
+        world.Spawn(tank);
+        world.Spawn(powerup);
+
+        world.Step(0.016f); // collected
+        Assert.Contains(powerup, world.Entities); // not reaped — it respawns
+        Assert.False(powerup.IsAvailable);        // dormant on its cooldown
+
+        world.Step(2f);
+        Assert.False(powerup.IsAvailable); // still cooling down
+
+        world.Step(3.1f);
+        Assert.True(powerup.IsAvailable); // back on the field after the delay
+    }
+
+    [Fact]
+    public void ADormantRespawningPowerup_CannotBeCollected()
+    {
+        var world = new World();
+        var collector = TankAt(world, Vector2.Zero, new NoInput(), hp: 3);
+        collector.TakeDamage(2); // Hp 1, so a repair would be observable
+        var powerup = new Powerup(world, Vector2.Zero, PowerupKind.Repair,
+            new RepairPickup(2), PickupRadius, respawnDelay: 5f);
+        world.Spawn(collector);
+        world.Spawn(powerup);
+
+        world.Step(0.016f); // first collect → Hp back to 3, now dormant
+        Assert.Equal(3, collector.Hp);
+
+        collector.TakeDamage(2); // Hp 1 again
+        world.Step(0.016f); // overlapping but dormant → no second collect
+
+        Assert.Equal(1, collector.Hp);
+    }
+
+    [Fact]
+    public void ARespawnedPowerup_CanBeCollectedAgain()
+    {
+        var world = new World();
+        var tank = TankAt(world, Vector2.Zero, new NoInput(), hp: 3);
+        var powerup = new Powerup(world, Vector2.Zero, PowerupKind.Shield,
+            new ShieldPickup(2), PickupRadius, respawnDelay: 1f);
+        world.Spawn(tank);
+        world.Spawn(powerup);
+
+        world.Step(0.016f); // collect → +2 shield
+        Assert.Equal(2, tank.Shield);
+
+        world.Step(1.1f);   // cooldown elapses → available again (no collect on the respawn step)
+        Assert.True(powerup.IsAvailable);
+        world.Step(0.016f); // now the overlapping tank collects it a second time
+        Assert.Equal(4, tank.Shield);
+    }
+
     private static float TravelWithPowerup(bool withPowerup)
     {
         var world = new World();

@@ -291,8 +291,15 @@ Catalogue and ordering: `docs/research/local-backlog.md`.
   (cyan); `TankView` draws a cyan over-shield bar above the health bar (hidden when unshielded).
   `ArenaScene` lays a repair (+2 Hp) and shield (+3) pickup. Shield is local-combat only for now
   (not in the net `TankState`); `NetTank.Shield` defaults to 0.
+- **Pickup respawn** ✅ a collected pickup now returns to the field after a delay instead of being
+  gone for the round. `Powerup` gained a `respawnDelay` ctor arg (default 0 = one-shot, unchanged):
+  with a positive delay the entity stays in the world and toggles an `IsAvailable` flag (added to
+  `IPowerup`) — collected → dormant for the delay → available again at the same spot — rather than
+  spawn/despawn churn. `PowerupView` became a per-frame mirror that hides the shape while dormant.
+  `ArenaScene` uses a 12 s respawn delay for all field pickups. One-shot collection (the prior
+  behaviour) is preserved for `respawnDelay` 0.
 
-Test counts on `main`: GameLogic 155, Domain 32, Infrastructure 12, Architecture 6, 49 GoDotTest
+Test counts on `main`: GameLogic 158, Domain 32, Infrastructure 12, Architecture 6, 50 GoDotTest
 scene tests.
 
 **Recorded but not started — owner ask (2026-06-04):** map variety + progression. Captured in
