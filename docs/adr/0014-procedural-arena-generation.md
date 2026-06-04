@@ -26,8 +26,9 @@ guarantee mechanically:
 
 1. **No stranding.** Every floor cell must be reachable from the spawn, or a tank could spawn (or
    a pickup could sit) in a walled-off pocket.
-2. **Anchors stay valid.** The scene places the player, Player 2, the AI, and seven pickups at
-   fixed cells. A random layout must not drop a wall on any of them.
+2. **Anchors stay valid.** The player, Player 2, the AI, and the pickups need open, reachable floor
+   to sit on. The generator chooses those cells itself (spread out) and guarantees them — the scene
+   no longer hard-codes any cell, so generation works at any size.
 
 ## Decision
 
@@ -44,8 +45,10 @@ shipping the map).
 `Generate` scatters brick (≈12%), a little steel (≈4%), and bush hide-spots over an open interior
 inside a steel border, then **repairs** the result rather than trusting it:
 
-- Cells the scene depends on — the spawn (plus a one-cell clearing) and every reserved anchor — are
-  locked to floor before scattering and never receive a wall.
+- The generator first chooses the anchor cells it needs — player and Player 2 spawns in opposite
+  corners, the enemies and pickups spread across the field with a separation preference — and locks
+  them (plus a clearing around the player spawn) to floor before scattering, so a wall never lands
+  on one.
 - A flood-fill from the spawn finds every reachable floor cell; any **unreachable** floor pocket is
   filled with steel (so "every floor cell is reachable" holds trivially), unless it contains a
   locked cell — in which case the layout is rejected and re-rolled.
@@ -59,22 +62,23 @@ succeed almost always.
 
 `GameSetup.ArenaSeed` is fixed by default (so a direct launch — tests, dev — is reproducible) and
 rolled fresh by `StartNewMatch`, then held across the per-round scene reloads so one best-of-N
-series plays a single arena. `ArenaScene` generates its level from that seed, reserving its spawn
-and pickup cells. The networked `NetArenaScene` keeps loading the shared `Battlefield01` — server
-and client must agree on the same map, which is its own (later) concern, so procedural generation
-is local-only for now.
+series plays a single arena. The map size lives in `GameSetup` too (`ArenaWidth`/`ArenaHeight`,
+default 28×16), so it is adjustable per match; `ArenaScene` reads the generated spawn/pickup
+placements from the result and fits the two-player camera to whatever size was generated. The
+networked `NetArenaScene` keeps loading the shared `Battlefield01` — server and client must agree on
+the same map, which is its own (later) concern, so procedural generation is local-only for now.
 
 ## Consequences
 
 - **Positive:** map variety with no new authoring; `LevelMap` stays the single seam, so the arena,
-  views, and spawns are untouched. Determinism keeps it testable and sets up seed-based networked
-  map sync later. The reserved-cell mechanism means the scene's fixed spawns/pickups never need to
-  move.
+  views, and pickups are untouched. The generator owning placement means the scene hard-codes no
+  cell and works at any size. Determinism keeps it testable and sets up seed-based networked map
+  sync later.
 - **Negative / cost:** a generated arena loses the deliberate composition of a hand-tuned map; the
   density/validity knobs are balance values that will want a playtest. Filling unreachable pockets
   with steel can leave small solid blobs — acceptable, but a cosmetic follow-up could smooth them.
-- **Deferred:** theming (swappable ground/background, biome palettes), adjustable size as a player
-  option, symmetry/fairness guarantees for versus, and procedural placement of the spawns/pickups
-  themselves (today they are still fixed cells the generator works around). Networked procedural
-  arenas wait on a shared-seed handshake. `Battlefield01` is retained — `NetArenaScene` and the
-  `LevelMap` tests still use it as the reference hand-authored map.
+- **Deferred:** theming (swappable ground/background, biome palettes), a player-facing size control
+  on the title screen (the size is adjustable in `GameSetup`, but nothing exposes it yet),
+  symmetry/fairness guarantees for versus, and weighting placement by quadrant for better spread.
+  Networked procedural arenas wait on a shared-seed handshake. `Battlefield01` is retained —
+  `NetArenaScene` and the `LevelMap` tests still use it as the reference hand-authored map.

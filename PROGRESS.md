@@ -315,18 +315,18 @@ Catalogue and ordering: `docs/research/local-backlog.md`.
   the next. Spec: pierce one target (tank or brick), the next stops it and takes damage, steel always
   stops. `PiercingWeapon` seeds the budget; `PowerupKind.PiercingAmmo` (yellow crate, 5 shots) laid
   at a mid-field floor cell. Ordinary shots (budget 0) are unchanged.
-- **S8 — procedural arena generation (first slice)** ✅ (`docs/adr/0014-procedural-arena-generation.md`)
-  the local battlefield is now generated, not hand-authored. `LevelMap` gains a `FromCells` producer
-  beside `Parse`; `ArenaGenerator.Generate(ArenaGenParams)` returns a **seeded, validated** `LevelMap`
-  — scattered brick/steel/bush inside a steel border, **valid by construction**: spawn + reserved
-  anchor cells locked to floor, unreachable floor pockets filled with steel (so every floor cell is
-  reachable), interior kept ≥80% open, bounded retries then a border-only fallback. `GameSetup.ArenaSeed`
-  is fixed by default (reproducible for tests/dev) and rolled per match by `StartNewMatch`, persisting
-  across round reloads so one series plays one arena. `ArenaScene` generates a 28×16 arena reserving
-  its spawn/Player2/enemy/pickup cells. **Local only** — `NetArenaScene` keeps the shared `Battlefield01`
-  (net map sync is a later concern). Theming / adjustable-size option / procedural spawn placement deferred.
+- **S8 — procedural arena generation** ✅ (`docs/adr/0014-procedural-arena-generation.md`) the local
+  battlefield is generated, not hand-authored. `LevelMap` gains a `FromCells` producer beside `Parse`;
+  `ArenaGenerator.Generate(ArenaGenParams)` returns a **seeded, validated** `GeneratedArena` — scattered
+  brick/steel/bush in a steel border, **valid by construction**: the generator **places its own spawns
+  and one cell per pickup** (spread out, locked to floor before scattering), fills unreachable floor
+  pockets with steel (every floor cell reachable), keeps the interior ≥80% open, bounded retries then a
+  fallback. `GameSetup.ArenaSeed` is rolled per match by `StartNewMatch` (fixed by default for tests),
+  and **`GameSetup.ArenaWidth/Height` make the size adjustable** — the scene hard-codes no cell and the
+  two-player camera fits whatever size was generated. **Local only** — `NetArenaScene` keeps the shared
+  `Battlefield01`. Deferred: theming, a title-screen size control, versus symmetry.
 
-Test counts on `main`: GameLogic 181, Domain 32, Infrastructure 12, Architecture 6, 53 GoDotTest
+Test counts on `main`: GameLogic 184, Domain 32, Infrastructure 12, Architecture 6, 53 GoDotTest
 scene tests.
 
 **Owner ask (2026-06-04): map variety + progression — both now under way.** Captured in
