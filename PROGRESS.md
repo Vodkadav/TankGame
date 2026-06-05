@@ -410,8 +410,14 @@ Catalogue and ordering: `docs/research/local-backlog.md`.
   player. `AiInputSource` now targets the nearest visible tank that is not itself (any team).
   `ArenaScene` builds the resolver with `alliedTeam: PlayerTeam`, so co-op players never hurt each other.
   GameLogic 200 → 203.
+- **Sandbags slow movement** ✅ a new passable terrain that slows tanks. `ITerrain.SpeedFactorAt(point)`
+  (Domain) + `SandbagField` (GameLogic, `SlowFactor` 0.5 on a sandbag cell); `Tank` takes an optional
+  `ITerrain` and scales its move speed by the factor at its position. `ArenaGenerator` scatters sandbags
+  (`SandbagDensity`) on floor cells, returned in `GeneratedArena.Sandbags`; `ArenaScene` builds the
+  field, passes it to every tank, and renders a `SandbagOverlay` (khaki patches). Bushes and sandbags
+  are mutually exclusive per cell. GameLogic 203 → 207, scene 70 → 71.
 
-Test counts on `main`: GameLogic 203, Domain 32, Infrastructure 12, Architecture 6, 70 GoDotTest
+Test counts on `main`: GameLogic 207, Domain 32, Infrastructure 12, Architecture 6, 71 GoDotTest
 scene tests.
 
 **Owner ask (2026-06-04): map variety + progression — both now under way.** Captured in

@@ -230,6 +230,25 @@ public class TankTests
         Assert.Equal(3, world.Entities.OfType<Projectile>().Count()); // a fan, not a single shot
     }
 
+    private sealed class SlowGround : ITerrain
+    {
+        public float SpeedFactorAt(System.Numerics.Vector2 point) => 0.5f;
+    }
+
+    [Fact]
+    public void Step_MovesSlower_OverSlowingTerrain()
+    {
+        var input = new ScriptedInput(new TankInput(new Vector2(1f, 0f), Aim: 0f, Fire: false));
+        var plain = NewTank(input);
+        var slowed = new Tank(input, new World(), new OpenArena(), Vector2.Zero, Speed, FireInterval,
+            ProjectileSpeed, terrain: new SlowGround());
+
+        plain.Step(0.1f);
+        slowed.Step(0.1f);
+
+        Assert.Equal(plain.Position.X * 0.5f, slowed.Position.X, precision: 3); // half speed on sandbags
+    }
+
     [Fact]
     public void Step_MovesFasterUnderASpeedBoost_UntilItExpires()
     {

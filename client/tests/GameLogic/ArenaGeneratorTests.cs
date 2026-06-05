@@ -29,6 +29,26 @@ public class ArenaGeneratorTests
     }
 
     [Fact]
+    public void Generate_PlacesSandbags_OnlyOnFloorCells()
+    {
+        var arena = new ArenaGenerator().Generate(Params(seed: 3));
+        var sandbags = arena.Sandbags;
+
+        Assert.Equal(arena.Map.Width, sandbags.GetLength(0));
+        Assert.Equal(arena.Map.Height, sandbags.GetLength(1));
+        for (var x = 0; x < arena.Map.Width; x++)
+        {
+            for (var y = 0; y < arena.Map.Height; y++)
+            {
+                if (sandbags[x, y])
+                {
+                    Assert.Equal(CellMaterial.Floor, arena.Map.Materials[x, y]); // passable floor only
+                }
+            }
+        }
+    }
+
+    [Fact]
     public void Generate_ProducesTheRequestedSize_EnclosedByASteelBorder()
     {
         var map = new ArenaGenerator().Generate(Params(seed: 7)).Map;

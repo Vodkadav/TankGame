@@ -79,6 +79,7 @@ public partial class ArenaScene : Node2D
     private World _world = null!;
     private GridArena _arena = null!;
     private BushField _bushes = null!;
+    private SandbagField _sandbags = null!;
     private Camera2D _camera = null!;
     private ITank _player = null!;
     private GeneratedArena _layout = null!;
@@ -94,6 +95,7 @@ public partial class ArenaScene : Node2D
         var grid = level.BuildGrid();
         _arena = new GridArena(grid, TileSize, GridOrigin);
         _bushes = new BushField(level.Bushes, TileSize, GridOrigin);
+        _sandbags = new SandbagField(_layout.Sandbags, TileSize, GridOrigin);
 
         // The player team never friendly-fires (co-op stays friendly); the AI tanks are free-for-all,
         // so they fight each other as well as the player.
@@ -115,6 +117,10 @@ public partial class ArenaScene : Node2D
         var bushView = new BushOverlay { Name = "BushOverlay" };
         AddChild(bushView);     // beneath the tanks so a hidden tank shows over its bush
         bushView.Bind(level.Bushes, TileSize);
+
+        var sandbagView = new SandbagOverlay { Name = "SandbagOverlay" };
+        AddChild(sandbagView);  // beneath the tanks, marking the slow-going patches
+        sandbagView.Bind(_layout.Sandbags, TileSize);
 
         AddChild(BuildInstructionsOverlay());
 
@@ -165,7 +171,7 @@ public partial class ArenaScene : Node2D
         // In two-player the left mouse button is Player 2's fire, so Player 1 fires with space.
         var p1Input = new KeyboardMouseInputSource(GetViewport(), fireOnClick: !twoPlayer);
         var player = new Tank(p1Input, _world, _arena, CellCentre(_layout.PlayerSpawn.X, _layout.PlayerSpawn.Y),
-            TankSpeed, FireInterval, ProjectileSpeed, maxHp: 3, team: PlayerTeam, lives: StartingLives);
+            TankSpeed, FireInterval, ProjectileSpeed, maxHp: 3, team: PlayerTeam, lives: StartingLives, terrain: _sandbags);
         _player = player;
         SpawnTank(player);
 
@@ -174,7 +180,7 @@ public partial class ArenaScene : Node2D
         {
             var p2Team = _mode == GameMode.TwoPlayerVersus ? EnemyTeam : PlayerTeam;
             var p2 = new Tank(new Player2InputSource(), _world, _arena, CellCentre(_layout.Player2Spawn.X, _layout.Player2Spawn.Y),
-                TankSpeed, FireInterval, ProjectileSpeed, maxHp: 3, team: p2Team, lives: StartingLives);
+                TankSpeed, FireInterval, ProjectileSpeed, maxHp: 3, team: p2Team, lives: StartingLives, terrain: _sandbags);
             SpawnTank(p2);
             if (p2Team == PlayerTeam)
             {
@@ -190,7 +196,7 @@ public partial class ArenaScene : Node2D
                 var ambusher = enemyIndex % 2 == 1; // every other enemy lies in wait in the grass
                 var ai = new AiInputSource(_world, _arena, _bushes, ambusher);
                 var enemy = new Tank(ai, _world, _arena, CellCentre(ex, ey),
-                    EnemySpeed, FireInterval, ProjectileSpeed, maxHp: 3, team: EnemyTeam, lives: StartingLives);
+                    EnemySpeed, FireInterval, ProjectileSpeed, maxHp: 3, team: EnemyTeam, lives: StartingLives, terrain: _sandbags);
                 ai.Bind(enemy); // resolve the input-source ↔ tank construction cycle
                 SpawnTank(enemy);
                 enemyIndex++;
