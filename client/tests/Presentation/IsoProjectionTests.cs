@@ -1,0 +1,58 @@
+using Godot;
+using Chickensoft.GoDotTest;
+using NVector2 = System.Numerics.Vector2;
+using TankGame.Presentation;
+
+namespace TankGame.Tests.Presentation;
+
+// Exercises the pure isometric projection (grid↔screen) the Phase-1 iso pivot is built on.
+public class IsoProjectionTests : TestClass
+{
+    public IsoProjectionTests(Node testScene) : base(testScene) { }
+
+    [Test]
+    public void WorldToScreen_Maps2To1Dimetric()
+    {
+        // One world unit east shifts half a tile right and a quarter down; one unit south shifts
+        // half left and a quarter down — the 2:1 diamond.
+        var screen = IsoProjection.WorldToScreen(new NVector2(130f, 64f));
+        if (Mathf.Abs(screen.X - 33f) > 0.001f || Mathf.Abs(screen.Y - 48.5f) > 0.001f)
+        {
+            throw new System.Exception($"(130,64) should project to (33,48.5); was {screen}.");
+        }
+    }
+
+    [Test]
+    public void ScreenToWorld_IsTheInverseOfWorldToScreen()
+    {
+        var world = new NVector2(130f, 64f);
+        var round = IsoProjection.ScreenToWorld(IsoProjection.WorldToScreen(world));
+        if (Mathf.Abs(round.X - world.X) > 0.001f || Mathf.Abs(round.Y - world.Y) > 0.001f)
+        {
+            throw new System.Exception($"Round-trip should recover {world}; was {round}.");
+        }
+    }
+
+    [Test]
+    public void DepthOf_OrdersNearerOverFarther()
+    {
+        // Greater x+y is nearer the camera, so it must sort above a smaller x+y.
+        if (IsoProjection.DepthOf(new NVector2(100f, 50f)) <= IsoProjection.DepthOf(new NVector2(10f, 10f)))
+        {
+            throw new System.Exception("A nearer (greater x+y) world point must carry a higher depth.");
+        }
+    }
+
+    [Test]
+    public void ScreenTransform_ShearsALocalPointToItsProjection()
+    {
+        // Applying the affine to a flat local position must equal WorldToScreen of that position.
+        var point = new Vector2(130f, 64f);
+        var sheared = IsoProjection.ScreenTransform * point;
+        var expected = IsoProjection.WorldToScreen(new NVector2(point.X, point.Y));
+        if (Mathf.Abs(sheared.X - expected.X) > 0.001f || Mathf.Abs(sheared.Y - expected.Y) > 0.001f)
+        {
+            throw new System.Exception($"ScreenTransform must match WorldToScreen; got {sheared} vs {expected}.");
+        }
+    }
+}

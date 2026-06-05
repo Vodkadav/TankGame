@@ -27,7 +27,11 @@ public partial class WallGridView : TileMapLayer
     /// larger to scale the placeholder art up to the gameplay grid (the arena uses 64).</summary>
     public int RenderTileSize { get; set; } = AtlasTile;
 
-    public override void _Ready() => EnsureTileSet();
+    public override void _Ready()
+    {
+        EnsureTileSet();
+        Transform = IsoProjection.ScreenTransform; // Phase 1: shear the square tilemap into iso
+    }
 
     /// <summary>Binds the grid, draws it once, and tracks future cell changes.</summary>
     public void Bind(IWallGrid grid)

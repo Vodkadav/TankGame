@@ -14,7 +14,9 @@ public partial class AirstrikeView : Node2D
 
     public void Bind(IAirstrike strike)
     {
-        Position = new Vector2(strike.Position.X, strike.Position.Y);
+        var screen = IsoProjection.WorldToScreen(strike.Position);
+        Position = new Vector2(screen.X, screen.Y);
+        ZIndex = IsoProjection.DepthOf(strike.Position);
         AddChild(BuildRing(strike.Radius));
     }
 

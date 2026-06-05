@@ -221,12 +221,12 @@ public partial class ArenaScene : Node2D
         {
             var fieldW = _layout.Map.Width * TileSize;
             var fieldH = _layout.Map.Height * TileSize;
-            _camera.Position = new Vector2(GridOrigin.X + (fieldW / 2f), GridOrigin.Y + (fieldH / 2f));
+            _camera.Position = Screen(new NVector2(fieldW / 2f, fieldH / 2f));
             _camera.Zoom = FitZoom(fieldW, fieldH);
         }
         else
         {
-            _camera.Position = new Vector2(_player.Position.X, _player.Position.Y);
+            _camera.Position = Screen(_player.Position);
         }
 
         // Versus shares one screen between rivals, so fogging it would blind one of them; every
@@ -250,7 +250,10 @@ public partial class ArenaScene : Node2D
     private Vector2 FitZoom(float fieldW, float fieldH)
     {
         var view = GetViewportRect().Size;
-        var zoom = Mathf.Min(view.X / fieldW, view.Y / fieldH) / TwoPlayerViewMargin;
+        // The field projects to an iso diamond: width (w+h)/2, height (w+h)/4 — fit that, not the square.
+        var isoW = (fieldW + fieldH) * 0.5f;
+        var isoH = (fieldW + fieldH) * 0.25f;
+        var zoom = Mathf.Min(view.X / isoW, view.Y / isoH) / TwoPlayerViewMargin;
         return new Vector2(zoom, zoom);
     }
 
@@ -269,7 +272,7 @@ public partial class ArenaScene : Node2D
                 Name = "FogLight",
                 Texture = texture,
                 TextureScale = FogLightRadius / (LightTextureSize / 2f),
-                Position = new Vector2(viewer.Position.X, viewer.Position.Y),
+                Position = Screen(viewer.Position),
             };
             AddChild(light);
             _fogLights.Add((viewer, light));
@@ -308,7 +311,7 @@ public partial class ArenaScene : Node2D
         // While the player is down (awaiting respawn) the camera holds its last position.
         if (_mode == GameMode.OnePlayer && _player.Hp > 0)
         {
-            _camera.Position = new Vector2(_player.Position.X, _player.Position.Y);
+            _camera.Position = Screen(_player.Position);
         }
 
         // Each ally's vision light rides their tank; a downed (or fallen) ally's light goes dark.
@@ -317,7 +320,7 @@ public partial class ArenaScene : Node2D
             light.Visible = tank.Hp > 0;
             if (tank.Hp > 0)
             {
-                light.Position = new Vector2(tank.Position.X, tank.Position.Y);
+                light.Position = Screen(tank.Position);
             }
         }
 
@@ -403,7 +406,7 @@ public partial class ArenaScene : Node2D
     private void ShowFireArrow(NVector2 shooterWorld)
     {
         var viewportCentre = GetViewportRect().Size * 0.5f;
-        var toShooter = new Vector2(shooterWorld.X, shooterWorld.Y) - _camera.GetScreenCenterPosition();
+        var toShooter = Screen(shooterWorld) - _camera.GetScreenCenterPosition();
         if (toShooter.LengthSquared() < 1f)
         {
             return;
@@ -420,7 +423,7 @@ public partial class ArenaScene : Node2D
     {
         var floater = new PickupFloater { Name = "PickupFloater" };
         AddChild(floater);
-        floater.Show(new Vector2(position.X, position.Y), PickupFloater.LabelKeyFor(kind));
+        floater.Show(Screen(position), PickupFloater.LabelKeyFor(kind));
     }
 
     private void OnEntityDespawned(IEntity entity)
@@ -549,12 +552,20 @@ public partial class ArenaScene : Node2D
             Name = "Ground",
             Color = colour,
             ZIndex = -10,
-            Position = new Vector2(GridOrigin.X, GridOrigin.Y),
+            Transform = IsoProjection.ScreenTransform, // shear the field rectangle into an iso diamond
             Polygon = corners,
             Texture = GD.Load<Texture2D>(AssetCatalogue.Active.GroundTile),
             UV = corners, // UV in texture pixels; with repeat this tiles once per ground-tile width
             TextureRepeat = CanvasItem.TextureRepeatEnum.Enabled,
         };
+    }
+
+    // Project a flat world position into isometric screen space for a node placed directly under the
+    // scene (entities and the camera live in screen space; the static layers shear themselves instead).
+    private static Vector2 Screen(NVector2 world)
+    {
+        var s = IsoProjection.WorldToScreen(world);
+        return new Vector2(s.X, s.Y);
     }
 
     // World-space centre of cell (x, y) — where the tank starts and where shots land.

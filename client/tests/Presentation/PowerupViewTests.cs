@@ -42,9 +42,10 @@ public class PowerupViewTests : TestClass
 
         _view.Bind(powerup);
 
-        if (Mathf.Abs(_view.Position.X - 120f) > 0.01f || Mathf.Abs(_view.Position.Y - 64f) > 0.01f)
+        // World (120,64) projects to iso ((120-64)*0.5, (120+64)*0.25) = (28, 46).
+        if (Mathf.Abs(_view.Position.X - 28f) > 0.01f || Mathf.Abs(_view.Position.Y - 46f) > 0.01f)
         {
-            throw new Exception($"View should sit at the powerup's position; was {_view.Position}.");
+            throw new Exception($"View should sit at the powerup's projected position; was {_view.Position}.");
         }
 
         var disc = _view.GetNodeOrNull<Sprite2D>("Disc")

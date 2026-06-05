@@ -44,11 +44,16 @@ public sealed class KeyboardMouseInputSource(Viewport viewport, bool fireOnClick
         return move;
     }
 
-    /// <summary>Aim angle (radians) from the viewport centre toward the mouse — valid while
-    /// the camera keeps the tank centred.</summary>
+    /// <summary>Aim angle (radians) toward the flat-world point under the mouse — valid while the
+    /// camera keeps the tank centred. The screen offset from centre is run back through the inverse
+    /// isometric projection (mirroring Presentation.IsoProjection.ScreenToWorld, which Infrastructure
+    /// may not reference across the layer boundary) so the turret points at the world location under
+    /// the cursor rather than its on-screen direction.</summary>
     public static float ComputeAim(NVector2 mouse, NVector2 viewportSize)
     {
         var centre = viewportSize * 0.5f;
-        return MathF.Atan2(mouse.Y - centre.Y, mouse.X - centre.X);
+        var screen = mouse - centre;
+        var world = new NVector2(screen.X + (2f * screen.Y), (2f * screen.Y) - screen.X);
+        return MathF.Atan2(world.Y, world.X);
     }
 }

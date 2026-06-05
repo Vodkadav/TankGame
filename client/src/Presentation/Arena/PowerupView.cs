@@ -19,7 +19,8 @@ public partial class PowerupView : Node2D
     public void Bind(IPowerup powerup)
     {
         _powerup = powerup;
-        Position = new Vector2(powerup.Position.X, powerup.Position.Y);
+        var screen = IsoProjection.WorldToScreen(powerup.Position);
+        Position = new Vector2(screen.X, screen.Y);
         AddChild(BuildDisc(powerup.Kind));
         UpdateFromModel();
     }
@@ -33,7 +34,9 @@ public partial class PowerupView : Node2D
         if (_powerup is not null)
         {
             Visible = _powerup.IsAvailable;
-            Position = new Vector2(_powerup.Position.X, _powerup.Position.Y); // it moves when it drops
+            var screen = IsoProjection.WorldToScreen(_powerup.Position); // it moves when it drops
+            Position = new Vector2(screen.X, screen.Y);
+            ZIndex = IsoProjection.DepthOf(_powerup.Position);
         }
     }
 

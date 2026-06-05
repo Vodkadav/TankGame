@@ -15,6 +15,7 @@ public partial class SandbagOverlay : Node2D
     /// <c>[x, y]</c>; <paramref name="tileSize"/> is the world-space size of one cell.</summary>
     public void Bind(bool[,] sandbags, float tileSize)
     {
+        Transform = IsoProjection.ScreenTransform; // shear the square patches into iso diamonds
         var width = sandbags.GetLength(0);
         var height = sandbags.GetLength(1);
         for (var x = 0; x < width; x++)

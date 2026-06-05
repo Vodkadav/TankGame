@@ -16,7 +16,8 @@ public partial class ProjectileView : Node2D
     public void Bind(IProjectile projectile)
     {
         _projectile = projectile;
-        Position = new Vector2(projectile.Position.X, projectile.Position.Y);
+        var screen = IsoProjection.WorldToScreen(projectile.Position);
+        Position = new Vector2(screen.X, screen.Y);
     }
 
     public override void _Process(double delta) => UpdateFromModel();
@@ -30,7 +31,9 @@ public partial class ProjectileView : Node2D
             return;
         }
 
-        Position = new Vector2(_projectile.Position.X, _projectile.Position.Y);
+        var screen = IsoProjection.WorldToScreen(_projectile.Position);
+        Position = new Vector2(screen.X, screen.Y);
+        ZIndex = IsoProjection.DepthOf(_projectile.Position);
         // The bullet art faces east at rotation 0; point it the way the shot is travelling.
         Rotation = Mathf.Atan2(_projectile.Direction.Y, _projectile.Direction.X);
     }

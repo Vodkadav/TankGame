@@ -51,12 +51,13 @@ public class TankViewTests : TestClass
         var tank = new Tank(input, new World(), arena, NVector2.Zero, speed: 100f, fireInterval: 0.3f, projectileSpeed: 600f);
         _view.Bind(tank);
 
-        tank.Step(0.1f); // the model advances 10 units along +X; the view only mirrors
+        tank.Step(0.1f); // the model advances 10 units along +X; the view mirrors it, projected to iso
         _view.UpdateFromModel();
 
-        if (Mathf.Abs(_view.Position.X - 10f) > 0.01f)
+        // World (10,0) projects to iso ((10-0)*0.5, (10+0)*0.25) = (5, 2.5).
+        if (Mathf.Abs(_view.Position.X - 5f) > 0.01f || Mathf.Abs(_view.Position.Y - 2.5f) > 0.01f)
         {
-            throw new System.Exception($"View should mirror the tank to x=10; was {_view.Position.X}.");
+            throw new System.Exception($"View should mirror the tank to iso (5,2.5); was {_view.Position}.");
         }
 
         var turret = _view.GetNode<Sprite2D>("Turret");
