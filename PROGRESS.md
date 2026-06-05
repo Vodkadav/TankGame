@@ -476,8 +476,13 @@ Catalogue and ordering: `docs/research/local-backlog.md`.
   free cells, claimed so nothing else lands on them and kept off anchors / river / bridge approaches.
   Excluded from the open-floor metric like the river. `WallGridView` + atlas add a mountain frame (7) →
   8-frame atlas. GameLogic 218 → 219.
+- **Solid buildings** ✅ `CellMaterial.Building` (solid — impassable + blocks shots, indestructible).
+  `ArenaGenerator.PlaceBuildings` drops 1–3 rectangles (2–3 cells/side) where the whole footprint is
+  unclaimed + unlocked, claiming them — so never on an anchor, the river, or a bridge approach. Excluded
+  from the open-floor metric. `WallGridView` + atlas add a building frame (8) → 9-frame atlas.
+  GameLogic 219 → 220. **The terrain expansion (water/bridges/rivers, mountains, buildings) is in.**
 
-Test counts on `main`: GameLogic 219, Domain 38, Infrastructure 12, Architecture 6, 77 GoDotTest
+Test counts on `main`: GameLogic 220, Domain 38, Infrastructure 12, Architecture 6, 77 GoDotTest
 scene tests.
 
 **Owner ask (2026-06-04): map variety + progression — both now under way.** Captured in

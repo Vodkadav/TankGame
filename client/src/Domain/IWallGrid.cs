@@ -22,6 +22,9 @@ public enum CellMaterial
 
     /// <summary>A mountain — impassable and blocks shots (like steel), generated in clumps.</summary>
     Mountain,
+
+    /// <summary>A building — a solid, indestructible block; generated as small rectangles.</summary>
+    Building,
 }
 
 /// <summary>Per-material blocking rules. A cell can block movement, shots, both, or neither, so terrain
