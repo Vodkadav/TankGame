@@ -54,11 +54,11 @@ public partial class ArenaScene : Node2D
     {
         (PowerupKind.SpeedBoost, new StatusEffectPickup(new StatusEffect(StatKind.Speed, Mult: 1.6f, AddFlat: 0f, Seconds: 6f))),
         (PowerupKind.RapidFire, new StatusEffectPickup(new StatusEffect(StatKind.FireInterval, Mult: 0.5f, AddFlat: 0f, Seconds: 6f))),
-        (PowerupKind.BouncingAmmo, new AmmoPickup(new BehaviourWeapon(() => new BouncingBehaviour(bounces: 3)), AmmoShots)),
-        (PowerupKind.SpreadAmmo, new AmmoPickup(new SpreadWeapon(count: 3, spreadRadians: 0.18f), AmmoShots)),
+        (PowerupKind.BouncingAmmo, new AmmoPickup(new BouncingAmmo(bounces: 3), AmmoShots)),
+        (PowerupKind.SpreadAmmo, new AmmoPickup(new SpreadAmmo(count: 3, radians: 0.18f), AmmoShots)),
         (PowerupKind.Repair, new RepairPickup(RepairAmount)),
         (PowerupKind.Shield, new ShieldPickup(ShieldAmount)),
-        (PowerupKind.PiercingAmmo, new AmmoPickup(new PiercingWeapon(pierces: 1, TileSize), AmmoShots)),
+        (PowerupKind.PiercingAmmo, new AmmoPickup(new PiercingAmmo(pierces: 1, TileSize), AmmoShots)),
     };
 
     // Two-player frames the whole field; the zoom is computed per map so any size fits on screen.

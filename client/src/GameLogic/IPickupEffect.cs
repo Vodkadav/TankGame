@@ -40,18 +40,18 @@ public sealed class ShieldPickup : IPickupEffect
     public void ApplyTo(Tank tank) => tank.AddShield(_amount);
 }
 
-/// <summary>A pickup that loads a special weapon for the tank's next <c>shots</c> shots
-/// (a bouncing / spread ammo crate).</summary>
+/// <summary>An ammo crate: applies an <see cref="AmmoModifier"/> to the tank's loadout for its next
+/// <c>shots</c> shots. Because the modifier sets only its own axis, crates stack (spread + bouncing).</summary>
 public sealed class AmmoPickup : IPickupEffect
 {
-    private readonly IWeapon _weapon;
+    private readonly AmmoModifier _modifier;
     private readonly int _shots;
 
-    public AmmoPickup(IWeapon weapon, int shots)
+    public AmmoPickup(AmmoModifier modifier, int shots)
     {
-        _weapon = weapon;
+        _modifier = modifier;
         _shots = shots;
     }
 
-    public void ApplyTo(Tank tank) => tank.LoadAmmo(_weapon, _shots);
+    public void ApplyTo(Tank tank) => tank.LoadAmmo(_modifier, _shots);
 }
