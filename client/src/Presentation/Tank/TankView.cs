@@ -24,6 +24,8 @@ public partial class TankView : Node2D
     {
         _body = GetNode<Sprite2D>("Body");
         _turret = GetNode<Sprite2D>("Turret");
+        _body.Texture = GD.Load<Texture2D>(AssetCatalogue.Active.TankBody);
+        _turret.Texture = GD.Load<Texture2D>(AssetCatalogue.Active.TankTurret);
         BuildHealthBar();
     }
 

@@ -1,14 +1,10 @@
-[gd_scene load_steps=4 format=3 uid="uid://b0000000003"]
+[gd_scene load_steps=2 format=3 uid="uid://b0000000003"]
 
 [ext_resource type="Script" path="res://src/Presentation/Tank/TankView.cs" id="1_view"]
-[ext_resource type="Texture2D" path="res://src/Presentation/Tank/TankBody.png" id="2_body"]
-[ext_resource type="Texture2D" path="res://src/Presentation/Tank/TankTurret.png" id="3_turret"]
 
 [node name="TankView" type="Node2D"]
 script = ExtResource("1_view")
 
 [node name="Body" type="Sprite2D" parent="."]
-texture = ExtResource("2_body")
 
 [node name="Turret" type="Sprite2D" parent="."]
-texture = ExtResource("3_turret")

@@ -346,8 +346,16 @@ Catalogue and ordering: `docs/research/local-backlog.md`.
   Series / Seed / size / Theme); `ArenaScene.SpawnTank` applies it uniformly to player, P2, and AI.
   Local only — `NetArenaScene` (authoritative) untouched. Deferred: a title-screen selector, the
   mine/oil-slick trap modifiers (need art + hazard entities), NPC-animal XP.
+- **Art-pass prep — asset catalogue (swap seam)** ✅ `AssetCatalogue` (Presentation) is the single
+  source of truth for every sprite `res://` path (`Active` set, `Default` = the current placeholders).
+  `TankView`, `ProjectileView`, and `WallGridView` now load their textures from the catalogue in code,
+  and the embedded textures were stripped from `TankView.tscn`/`ProjectileView.tscn`, so nothing
+  hardcodes a path in a scene or a view. Swapping one asset is `Active = Default with { … }`; swapping a
+  whole set is one assignment — ready to repoint at the imported **Kenney CC0** pack (owner picked the
+  hybrid: Kenney base sprites + generated glowing pickup discs). Behaviour-preserving (still the
+  placeholder art).
 
-Test counts on `main`: GameLogic 187, Domain 32, Infrastructure 12, Architecture 6, 61 GoDotTest
+Test counts on `main`: GameLogic 187, Domain 32, Infrastructure 12, Architecture 6, 65 GoDotTest
 scene tests.
 
 **Owner ask (2026-06-04): map variety + progression — both now under way.** Captured in
