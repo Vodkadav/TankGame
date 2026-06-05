@@ -59,7 +59,9 @@ public sealed class WallGrid : IWallGrid
     public WallCell GetCell(int x, int y) =>
         InBounds(x, y) ? _cells[x, y] : new WallCell(CellMaterial.Steel, 0);
 
-    public bool IsBlocked(int x, int y) => GetCell(x, y).Material != CellMaterial.Floor;
+    public bool IsBlocked(int x, int y) => CellMaterials.BlocksMovement(GetCell(x, y).Material);
+
+    public bool BlocksShots(int x, int y) => CellMaterials.BlocksShots(GetCell(x, y).Material);
 
     /// <summary>Overwrites a cell with an authoritative state and raises <see cref="CellChanged"/>
     /// if it differs. Unlike <see cref="DamageCell"/> (relative, local damage) this is absolute —

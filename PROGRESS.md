@@ -458,8 +458,15 @@ Catalogue and ordering: `docs/research/local-backlog.md`.
   the caller's team (co-op allies + self spared), then expires. `AirstrikeView` draws a pulsing red
   blast circle; `ArenaScene` lays a telephone crate (magenta, `pickup.telephone` EN/ES/DK). Field
   pickups 8 → 9. GameLogic 210 → 215, scene 76 → 77.
+- **Water + bridges + move-vs-shot blocking (foundation)** ✅ first slice of the terrain expansion.
+  `CellMaterial.Water` (blocks movement, NOT shots) + `Bridge` (passable to both); `CellMaterials.
+  BlocksMovement`/`BlocksShots` (Domain) define per-material rules; `WallGrid.IsBlocked` is now movement,
+  `BlocksShots` is new; `GridArena` raycasts shots against `BlocksShots` (so shots fly over water) and
+  treats crates as destructible-pierceable too. `WallGridView` + `gen_wall_atlas.py` add a water frame
+  (5) and a bridge frame (6) → 7-frame atlas. Not generated yet — the river generator places them next.
+  GameLogic 215 → 217, Domain 32 → 38.
 
-Test counts on `main`: GameLogic 215, Domain 32, Infrastructure 12, Architecture 6, 77 GoDotTest
+Test counts on `main`: GameLogic 217, Domain 38, Infrastructure 12, Architecture 6, 77 GoDotTest
 scene tests.
 
 **Owner ask (2026-06-04): map variety + progression — both now under way.** Captured in

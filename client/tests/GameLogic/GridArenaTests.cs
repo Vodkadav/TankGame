@@ -25,6 +25,44 @@ public class GridArenaTests
     }
 
     [Fact]
+    public void Water_BlocksMovement_ButShotsFlyOverIt_ToTheWallBehind()
+    {
+        // floor, water, floor, brick: a shot from column 0 should pass over the water (col 1) and
+        // stop at the brick (col 3); a tank cannot stand on the water cell.
+        var grid = WallGrid.FromMaterials(new[,]
+        {
+            { CellMaterial.Floor },
+            { CellMaterial.Water },
+            { CellMaterial.Floor },
+            { CellMaterial.Brick },
+        });
+        var arena = new GridArena(grid, Tile, Vector2.Zero);
+
+        var hit = arena.RaycastFirstHit(new Vector2(5f, 5f), new Vector2(1f, 0f), maxDistance: 100f);
+        Assert.NotNull(hit);
+        Assert.Equal(30f, hit!.Value.Point.X, precision: 3); // flew over the water, stopped at the brick
+
+        Assert.True(arena.IsBlocked(new Vector2(15f, 5f)));   // a tank cannot drive onto the water
+        Assert.False(arena.IsBlocked(new Vector2(5f, 5f)));   // but can on the floor
+    }
+
+    [Fact]
+    public void Bridge_IsPassable_ToBothMovementAndShots()
+    {
+        var grid = WallGrid.FromMaterials(new[,]
+        {
+            { CellMaterial.Floor },
+            { CellMaterial.Bridge },
+            { CellMaterial.Brick },
+        });
+        var arena = new GridArena(grid, Tile, Vector2.Zero);
+
+        Assert.False(arena.IsBlocked(new Vector2(15f, 5f))); // a tank can cross the bridge
+        var hit = arena.RaycastFirstHit(new Vector2(5f, 5f), new Vector2(1f, 0f), maxDistance: 100f);
+        Assert.Equal(20f, hit!.Value.Point.X, precision: 3); // a shot passes over the bridge to the brick
+    }
+
+    [Fact]
     public void RaycastFirstHit_StopsAtTheFirstBlockedCellFace()
     {
         var (arena, _) = RowWithBrickAtColumn3();

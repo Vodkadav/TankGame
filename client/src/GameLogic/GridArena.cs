@@ -38,9 +38,9 @@ public sealed class GridArena : IArena
         var cellX = FloorDiv(local.X);
         var cellY = FloorDiv(local.Y);
 
-        if (_grid.IsBlocked(cellX, cellY))
+        if (_grid.BlocksShots(cellX, cellY))
         {
-            // already inside a wall — face back along the ray
+            // already inside a shot-blocking wall — face back along the ray
             return new RaycastHit(origin, 0f, -dir, IsDestructible(cellX, cellY));
         }
 
@@ -71,16 +71,18 @@ public sealed class GridArena : IArena
                 return null;
             }
 
-            if (_grid.IsBlocked(cellX, cellY))
+            if (_grid.BlocksShots(cellX, cellY))
             {
                 return new RaycastHit(origin + (dir * t), t, normal, IsDestructible(cellX, cellY));
             }
         }
     }
 
-    // Brick is the only destructible material; steel and the implicit out-of-bounds border are
-    // permanent. A piercing shot uses this to decide whether it can punch through.
-    private bool IsDestructible(int cellX, int cellY) => _grid.GetCell(cellX, cellY).Material == CellMaterial.Brick;
+    // Brick and crates are destructible; steel and the implicit out-of-bounds border are permanent.
+    // A piercing shot uses this to decide whether it can punch through. (Water never blocks a shot,
+    // so it is never the struck cell.)
+    private bool IsDestructible(int cellX, int cellY) =>
+        _grid.GetCell(cellX, cellY).Material is CellMaterial.Brick or CellMaterial.Crate;
 
     public void DamageAt(Vector2 point, Vector2 direction, int amount)
     {
