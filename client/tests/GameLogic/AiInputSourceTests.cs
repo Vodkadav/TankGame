@@ -57,6 +57,18 @@ public class AiInputSourceTests
         public void Step(float deltaSeconds) { }
     }
 
+    // A teamed shot in flight — enough for the AI to hear and investigate.
+    private sealed class StubProjectile : IProjectile
+    {
+        public StubProjectile(Vector2 position, int team) { Position = position; Team = team; Id = Guid.NewGuid(); }
+        public Guid Id { get; }
+        public Vector2 Position { get; }
+        public int Team { get; }
+        public Vector2 Direction => Vector2.UnitX;
+        public bool IsAlive => true;
+        public void Step(float deltaSeconds) { }
+    }
+
     // Concealment everywhere — isolates the AI's "spot a bushed target only up close" rule.
     private sealed class AllConcealing : IConcealment
     {
@@ -210,6 +222,36 @@ public class AiInputSourceTests
 
         Assert.False(intent.Fire);
         Assert.NotEqual(new Vector2(1f, 0f), intent.Move); // not closing in on the unseen enemy
+    }
+
+    [Fact]
+    public void InvestigatesGunfire_WhenNoTargetIsInItsCircle()
+    {
+        // No enemy in sight, but an enemy shot streaks by on +X within earshot — the AI is drawn
+        // toward the gunfire to investigate.
+        var world = new World();
+        var self = new StubTank(Vector2.Zero, team: 1);
+        world.Spawn(self);
+        world.Spawn(new StubProjectile(new Vector2(700f, 0f), team: 0)); // enemy fire on +X
+        var ai = AiDriving(self, world);
+
+        var intent = ai.Read();
+
+        Assert.True(intent.Move.X > 0.5f); // heading toward the shot, not roaming randomly
+    }
+
+    [Fact]
+    public void IgnoresGunfire_BeyondEarshot()
+    {
+        var world = new World();
+        var self = new StubTank(Vector2.Zero, team: 1);
+        world.Spawn(self);
+        world.Spawn(new StubProjectile(new Vector2(2000f, 0f), team: 0)); // far past earshot
+        var ai = AiDriving(self, world);
+
+        var intent = ai.Read();
+
+        Assert.NotEqual(new Vector2(1f, 0f), intent.Move); // not drawn to a shot it cannot hear
     }
 
     [Fact]
