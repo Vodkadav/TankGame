@@ -18,8 +18,8 @@ SRC = "client/src/Presentation/Arena/IsoMountain.png"        # one PixVoxel moun
 OUT = "client/src/Presentation/Arena/IsoMountainStacked.png"
 
 # Each tier: (scale, lift in px above the base). Bottom tier is full size at the base; higher tiers
-# shrink and rise so the silhouette steps up to a peak.
-TIERS = [(1.00, 0), (0.74, 26), (0.50, 48), (0.30, 66)]
+# shrink and rise so the silhouette steps up to a tall peak — ~3-4 wall-blocks tall, not a bump.
+TIERS = [(1.00, 0), (0.84, 30), (0.69, 58), (0.55, 84), (0.42, 108), (0.30, 128), (0.19, 146)]
 
 
 def main():

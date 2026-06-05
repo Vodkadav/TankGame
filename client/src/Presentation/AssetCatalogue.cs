@@ -21,7 +21,7 @@ public sealed record AssetCatalogue(
         TankBody: "res://src/Presentation/Tank/KenneyTankBody.png",
         TankTurret: "res://src/Presentation/Tank/KenneyTankTurret.png",
         Bullet: "res://src/Presentation/Projectile/KenneyBullet.png",
-        GroundTile: "res://src/Presentation/Arena/IsoGroundDesert.png",
+        GroundTile: "res://src/Presentation/Arena/IsoGroundSeamless.png",
         PickupDisc: "res://src/Presentation/Arena/PickupDisc.png",
         WaterTile: "res://src/Presentation/Arena/IsoWater.png",
         BridgeTile: "res://src/Presentation/Arena/IsoBridge.png",
