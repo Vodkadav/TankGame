@@ -35,6 +35,10 @@ public sealed class AiInputSource : IInputSource
     // How far an ambusher will travel to reach a patch of grass to lie in wait (≈9 tiles).
     private const float AmbushSeekRange = 600f;
 
+    // Gunfire carries farther than sight (≈14 tiles): with no target in its circle the AI is drawn
+    // toward an enemy shot to investigate, even one it cannot see — so firing gives your position away.
+    private const float EarshotRange = 900f;
+
     // Roughly how many ticks the AI holds a wander heading before picking a fresh one, so an idle
     // tank roams the field looking for a fight instead of standing still.
     private const int WanderTicks = 75;
@@ -81,7 +85,13 @@ public sealed class AiInputSource : IInputSource
         var target = NearestVisibleEnemy();
         if (target is null)
         {
-            // No-one to fight: grab a pickup if one is in view, otherwise roam to find a fight.
+            // No target in its circle: investigate the nearest gunfire it can hear (drawn toward a
+            // firing tank), else grab a pickup in view, else roam to find a fight.
+            if (NearestAudibleShot() is { } shot)
+            {
+                return DriveToward(shot);
+            }
+
             var loose = NearestReachablePowerup();
             return loose is null ? Wander() : DriveToward(loose.Position);
         }
@@ -235,6 +245,31 @@ public sealed class AiInputSource : IInputSource
 
             nearestDistance = distance;
             nearest = powerup;
+        }
+
+        return nearest;
+    }
+
+    // The position of the nearest gunfire the AI can hear — any live enemy-team projectile within
+    // EarshotRange. No line-of-sight check: gunfire is heard through walls. Null when all is quiet.
+    private Vector2? NearestAudibleShot()
+    {
+        Vector2? nearest = null;
+        var nearestDistance = float.PositiveInfinity;
+
+        foreach (var entity in _world.Entities)
+        {
+            if (entity is not IProjectile shot || shot.Team == _self!.Team)
+            {
+                continue; // not a shot, or our own team's — only enemy fire draws us
+            }
+
+            var distance = Vector2.Distance(shot.Position, _self.Position);
+            if (distance <= EarshotRange && distance < nearestDistance)
+            {
+                nearestDistance = distance;
+                nearest = shot.Position;
+            }
         }
 
         return nearest;
