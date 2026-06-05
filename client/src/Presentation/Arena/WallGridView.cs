@@ -18,6 +18,7 @@ public partial class WallGridView : TileMapLayer
     private const int WaterFrame = 5;
     private const int BridgeFrame = 6;
     private const int MountainFrame = 7;
+    private const int BuildingFrame = 8;
 
     private int _sourceId = -1;
     private IWallGrid? _grid;
@@ -68,6 +69,7 @@ public partial class WallGridView : TileMapLayer
         CellMaterial.Water => WaterFrame,
         CellMaterial.Bridge => BridgeFrame,
         CellMaterial.Mountain => MountainFrame,
+        CellMaterial.Building => BuildingFrame,
         CellMaterial.Brick => Math.Clamp(WallGrid.DefaultBrickHp - cell.Hp, 0, 2),
         _ => null,
     };
@@ -85,7 +87,7 @@ public partial class WallGridView : TileMapLayer
             Texture = texture,
             TextureRegionSize = new Vector2I(AtlasTile, AtlasTile),
         };
-        for (var frame = 0; frame <= MountainFrame; frame++)
+        for (var frame = 0; frame <= BuildingFrame; frame++)
         {
             source.CreateTile(new Vector2I(frame, 0));
         }

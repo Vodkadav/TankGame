@@ -165,8 +165,9 @@ public class ArenaGeneratorTests
             {
                 for (var y = 1; y < map.Height - 1; y++)
                 {
-                    // The river and mountains are deliberate terrain — measure clutter on the land only.
-                    if (map.Materials[x, y] is CellMaterial.Water or CellMaterial.Bridge or CellMaterial.Mountain)
+                    // The river, mountains, and buildings are deliberate terrain — clutter on land only.
+                    if (map.Materials[x, y] is CellMaterial.Water or CellMaterial.Bridge
+                        or CellMaterial.Mountain or CellMaterial.Building)
                     {
                         continue;
                     }
@@ -251,6 +252,30 @@ public class ArenaGeneratorTests
         foreach (var (x, y) in AllAnchors(arena))
         {
             Assert.NotEqual(CellMaterial.Mountain, arena.Map.Materials[x, y]);
+        }
+    }
+
+    [Fact]
+    public void Generate_PlacesSolidBuildings_OffTheAnchors()
+    {
+        var arena = new ArenaGenerator().Generate(Params(seed: 1));
+        var buildings = 0;
+        for (var x = 0; x < arena.Map.Width; x++)
+        {
+            for (var y = 0; y < arena.Map.Height; y++)
+            {
+                if (arena.Map.Materials[x, y] == CellMaterial.Building)
+                {
+                    buildings++;
+                }
+            }
+        }
+
+        Assert.True(buildings >= 4, $"expected at least one building footprint; only {buildings} cells");
+
+        foreach (var (x, y) in AllAnchors(arena))
+        {
+            Assert.NotEqual(CellMaterial.Building, arena.Map.Materials[x, y]);
         }
     }
 

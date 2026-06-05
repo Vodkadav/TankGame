@@ -95,13 +95,14 @@ public sealed class ArenaGenerator
             Lock(p, locked, ax, ay); // keep the cells leading onto each bridge clear so it is crossable
         }
 
-        // Mountains: a couple of clumps of impassable rock, claimed so nothing else lands on them and
-        // kept off the anchors, the river, and the bridge approaches.
+        // Mountains: a couple of clumps of impassable rock; buildings: a few solid rectangles. Both
+        // are claimed so nothing else lands on them and kept off the anchors, river, and approaches.
         var mountainCells = PlaceMountains(p, rng, claimed, locked);
+        var buildingCells = PlaceBuildings(p, rng, claimed, locked);
 
         var (materials, bushes, sandbags) = Scatter(p, rng, locked, claimed);
 
-        // Lay the river and mountains over the scattered land (their claimed cells are still floor here).
+        // Lay the river, mountains, and buildings over the scattered land (still floor here).
         foreach (var (rx, ry, material) in riverCells)
         {
             materials[rx, ry] = material;
@@ -110,6 +111,11 @@ public sealed class ArenaGenerator
         foreach (var (mx, my) in mountainCells)
         {
             materials[mx, my] = CellMaterial.Mountain;
+        }
+
+        foreach (var (bx, by) in buildingCells)
+        {
+            materials[bx, by] = CellMaterial.Building;
         }
 
         // Wall off any passable land the spawn cannot reach (across the river only via bridges); a
@@ -398,7 +404,8 @@ public sealed class ArenaGenerator
             {
                 // The river (water + bridges) and mountains are deliberate terrain, not clutter —
                 // measure the open-floor fraction over the land only, so they do not trip the invariant.
-                if (materials[x, y] is CellMaterial.Water or CellMaterial.Bridge or CellMaterial.Mountain)
+                if (materials[x, y] is CellMaterial.Water or CellMaterial.Bridge
+                    or CellMaterial.Mountain or CellMaterial.Building)
                 {
                     continue;
                 }
@@ -464,6 +471,59 @@ public sealed class ArenaGenerator
         }
 
         return cells;
+    }
+
+    // Place one to three solid building rectangles (2-3 cells each side) on free interior ground,
+    // claiming them so nothing else generates on top. A building only lands where its whole footprint
+    // is unclaimed and unlocked, so it never sits on an anchor, the river, or a bridge approach.
+    private static System.Collections.Generic.List<(int X, int Y)> PlaceBuildings(
+        ArenaGenParams p, Random rng, bool[,] claimed, bool[,] locked)
+    {
+        var cells = new System.Collections.Generic.List<(int X, int Y)>();
+        var count = rng.Next(1, 4);
+        for (var b = 0; b < count; b++)
+        {
+            var bw = rng.Next(2, 4);
+            var bh = rng.Next(2, 4);
+            for (var attempt = 0; attempt < PlacementTries; attempt++)
+            {
+                var x0 = rng.Next(1, Math.Max(2, p.Width - 1 - bw));
+                var y0 = rng.Next(1, Math.Max(2, p.Height - 1 - bh));
+                if (!FootprintFree(claimed, locked, p, x0, y0, bw, bh))
+                {
+                    continue;
+                }
+
+                for (var x = x0; x < x0 + bw; x++)
+                {
+                    for (var y = y0; y < y0 + bh; y++)
+                    {
+                        claimed[x, y] = true;
+                        cells.Add((x, y));
+                    }
+                }
+
+                break;
+            }
+        }
+
+        return cells;
+    }
+
+    private static bool FootprintFree(bool[,] claimed, bool[,] locked, ArenaGenParams p, int x0, int y0, int bw, int bh)
+    {
+        for (var x = x0; x < x0 + bw; x++)
+        {
+            for (var y = y0; y < y0 + bh; y++)
+            {
+                if (IsBorder(p, x, y) || x >= p.Width || y >= p.Height || claimed[x, y] || locked[x, y])
+                {
+                    return false;
+                }
+            }
+        }
+
+        return true;
     }
 
     private static (int X, int Y)? FreeInteriorCell(ArenaGenParams p, Random rng, bool[,] claimed, bool[,] locked)
