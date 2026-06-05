@@ -471,8 +471,13 @@ Catalogue and ordering: `docs/research/local-backlog.md`.
   `Scatter` skips claimed cells; the flood-fill traverses bridges (passability = `!BlocksMovement`) and
   the open-floor invariant excludes the river. Validity (every anchor reachable across the river) holds
   over 25 seeds. GameLogic 217 → 218. Deferred: a river fork, river width >1.
+- **Mountains** ✅ `CellMaterial.Mountain` (impassable + blocks shots, via the blocking-rule defaults;
+  indestructible). `ArenaGenerator.PlaceMountains` grows 1–2 clumps of 10–15 cells by random flood on
+  free cells, claimed so nothing else lands on them and kept off anchors / river / bridge approaches.
+  Excluded from the open-floor metric like the river. `WallGridView` + atlas add a mountain frame (7) →
+  8-frame atlas. GameLogic 218 → 219.
 
-Test counts on `main`: GameLogic 218, Domain 38, Infrastructure 12, Architecture 6, 77 GoDotTest
+Test counts on `main`: GameLogic 219, Domain 38, Infrastructure 12, Architecture 6, 77 GoDotTest
 scene tests.
 
 **Owner ask (2026-06-04): map variety + progression — both now under way.** Captured in

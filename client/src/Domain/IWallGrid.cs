@@ -19,6 +19,9 @@ public enum CellMaterial
 
     /// <summary>A bridge over water — passable to both movement and shots, like floor.</summary>
     Bridge,
+
+    /// <summary>A mountain — impassable and blocks shots (like steel), generated in clumps.</summary>
+    Mountain,
 }
 
 /// <summary>Per-material blocking rules. A cell can block movement, shots, both, or neither, so terrain
