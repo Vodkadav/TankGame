@@ -165,8 +165,8 @@ public class ArenaGeneratorTests
             {
                 for (var y = 1; y < map.Height - 1; y++)
                 {
-                    // The river (water + bridges) is deliberate terrain — measure clutter on the land.
-                    if (map.Materials[x, y] is CellMaterial.Water or CellMaterial.Bridge)
+                    // The river and mountains are deliberate terrain — measure clutter on the land only.
+                    if (map.Materials[x, y] is CellMaterial.Water or CellMaterial.Bridge or CellMaterial.Mountain)
                     {
                         continue;
                     }
@@ -226,6 +226,31 @@ public class ArenaGeneratorTests
             {
                 Assert.True(reached[x, y], $"seed {seed}: anchor ({x},{y}) cut off by the river");
             }
+        }
+    }
+
+    [Fact]
+    public void Generate_PlacesMountainClumps_OffTheRiverAndAnchors()
+    {
+        var arena = new ArenaGenerator().Generate(Params(seed: 0));
+        var mountains = 0;
+        for (var x = 0; x < arena.Map.Width; x++)
+        {
+            for (var y = 0; y < arena.Map.Height; y++)
+            {
+                if (arena.Map.Materials[x, y] == CellMaterial.Mountain)
+                {
+                    mountains++;
+                }
+            }
+        }
+
+        Assert.True(mountains >= 8, $"expected a mountain clump; only {mountains} mountain cells");
+
+        // Mountains never share a cell with an anchor (claiming keeps them apart).
+        foreach (var (x, y) in AllAnchors(arena))
+        {
+            Assert.NotEqual(CellMaterial.Mountain, arena.Map.Materials[x, y]);
         }
     }
 

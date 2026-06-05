@@ -95,12 +95,21 @@ public sealed class ArenaGenerator
             Lock(p, locked, ax, ay); // keep the cells leading onto each bridge clear so it is crossable
         }
 
+        // Mountains: a couple of clumps of impassable rock, claimed so nothing else lands on them and
+        // kept off the anchors, the river, and the bridge approaches.
+        var mountainCells = PlaceMountains(p, rng, claimed, locked);
+
         var (materials, bushes, sandbags) = Scatter(p, rng, locked, claimed);
 
-        // Lay the river over the scattered land (its claimed cells are still floor here).
+        // Lay the river and mountains over the scattered land (their claimed cells are still floor here).
         foreach (var (rx, ry, material) in riverCells)
         {
             materials[rx, ry] = material;
+        }
+
+        foreach (var (mx, my) in mountainCells)
+        {
+            materials[mx, my] = CellMaterial.Mountain;
         }
 
         // Wall off any passable land the spawn cannot reach (across the river only via bridges); a
@@ -387,9 +396,9 @@ public sealed class ArenaGenerator
         {
             for (var y = 1; y < height - 1; y++)
             {
-                // The river (water + bridges) is deliberate terrain, not clutter — measure the
-                // open-floor fraction over the land only, so a river does not trip the invariant.
-                if (materials[x, y] is CellMaterial.Water or CellMaterial.Bridge)
+                // The river (water + bridges) and mountains are deliberate terrain, not clutter —
+                // measure the open-floor fraction over the land only, so they do not trip the invariant.
+                if (materials[x, y] is CellMaterial.Water or CellMaterial.Bridge or CellMaterial.Mountain)
                 {
                     continue;
                 }
@@ -403,6 +412,73 @@ public sealed class ArenaGenerator
         }
 
         return interior == 0 ? 1d : floor / (double)interior;
+    }
+
+    // Grow one or two mountain clumps of 10-15 cells each on free interior cells, claiming them so
+    // nothing else generates on top. Each clump grows by random flood from a seed, only onto cells that
+    // are unclaimed, unlocked (so never on an anchor, the river, or a bridge approach), and interior.
+    private static System.Collections.Generic.List<(int X, int Y)> PlaceMountains(
+        ArenaGenParams p, Random rng, bool[,] claimed, bool[,] locked)
+    {
+        var cells = new System.Collections.Generic.List<(int X, int Y)>();
+        var clumps = rng.Next(1, 3); // one or two ranges
+        for (var c = 0; c < clumps; c++)
+        {
+            var size = rng.Next(10, 16); // 10-15 blocks at a time
+            var seed = FreeInteriorCell(p, rng, claimed, locked);
+            if (seed is not { } start)
+            {
+                continue;
+            }
+
+            var frontier = new System.Collections.Generic.List<(int X, int Y)> { start };
+            claimed[start.X, start.Y] = true;
+            cells.Add(start);
+            var grownInClump = 1;
+
+            while (grownInClump < size && frontier.Count > 0)
+            {
+                var from = frontier[rng.Next(frontier.Count)];
+                var grew = false;
+                foreach (var (dx, dy) in Neighbours)
+                {
+                    var nx = from.X + dx;
+                    var ny = from.Y + dy;
+                    if (!IsBorder(p, nx, ny) && nx >= 0 && ny >= 0 && nx < p.Width && ny < p.Height
+                        && !claimed[nx, ny] && !locked[nx, ny])
+                    {
+                        claimed[nx, ny] = true;
+                        cells.Add((nx, ny));
+                        frontier.Add((nx, ny));
+                        grownInClump++;
+                        grew = true;
+                        break;
+                    }
+                }
+
+                if (!grew)
+                {
+                    frontier.Remove(from); // this cell has no room left to grow
+                }
+            }
+        }
+
+        return cells;
+    }
+
+    private static (int X, int Y)? FreeInteriorCell(ArenaGenParams p, Random rng, bool[,] claimed, bool[,] locked)
+    {
+        for (var attempt = 0; attempt < PlacementTries; attempt++)
+        {
+            var x = rng.Next(1, p.Width - 1);
+            var y = rng.Next(1, p.Height - 1);
+            if (!claimed[x, y] && !locked[x, y])
+            {
+                return (x, y);
+            }
+        }
+
+        return null;
     }
 
     // Carve a single river across the field with bridge crossings, claiming every cell so nothing else

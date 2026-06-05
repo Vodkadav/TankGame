@@ -5,10 +5,11 @@ Programmer-generated placeholder art — public domain, to be replaced by Kenney
 "Top-down Shooter" CC0 wall tiles (see docs/credits/assets.md). Deterministic (no
 randomness) so re-running reproduces the exact same PNG.
 
-Atlas layout: seven 32x32 tiles in a horizontal strip (224x32), left to right:
+Atlas layout: eight 32x32 tiles in a horizontal strip (256x32), left to right:
   0 brick intact  (hp 3)   1 brick cracked (hp 2)
   2 brick rubble  (hp 1)   3 steel (indestructible)   4 crate (destructible)
   5 water (blocks movement, not shots)   6 bridge (passable crossing)
+  7 mountain (impassable, blocks shots)
 Floor is drawn as no tile, so it is absent from the atlas.
 
 Usage: python scripts/gen_wall_atlas.py
@@ -17,7 +18,7 @@ Usage: python scripts/gen_wall_atlas.py
 from PIL import Image, ImageDraw
 
 TILE = 32
-FRAMES = 7
+FRAMES = 8
 OUT = "client/src/Presentation/Arena/Walls.png"
 
 MORTAR = (60, 55, 52, 255)
@@ -35,6 +36,10 @@ WATER = (54, 110, 170, 255)
 WATER_LIGHT = (92, 150, 205, 255)
 PLANK = (150, 108, 60, 255)
 PLANK_DARK = (104, 72, 38, 255)
+ROCK = (108, 104, 100, 255)
+ROCK_DARK = (74, 70, 66, 255)
+ROCK_LIGHT = (150, 146, 140, 255)
+SNOW = (226, 230, 236, 255)
 
 
 def brick_base(draw):
@@ -115,13 +120,24 @@ def draw_bridge(img):
     draw.line([0, TILE - 5, TILE - 1, TILE - 5], fill=PLANK_DARK)
 
 
+def draw_mountain(img):
+    """A grey rocky block with a darker base and a light/snow cap."""
+    draw = ImageDraw.Draw(img)
+    draw.rectangle([0, 0, TILE - 1, TILE - 1], fill=ROCK)
+    draw.polygon([(2, TILE - 2), (12, 6), (20, 16), (26, 4), (TILE - 2, TILE - 2)], fill=ROCK_DARK)
+    draw.polygon([(8, 12), (12, 6), (16, 12)], fill=SNOW)        # one peak's cap
+    draw.polygon([(22, 10), (26, 4), (30, 10)], fill=SNOW)       # the other
+    draw.line([0, 0, TILE - 1, 0], fill=ROCK_LIGHT)
+
+
 def main():
     atlas = Image.new("RGBA", (TILE * FRAMES, TILE), (0, 0, 0, 0))
     for state in range(3):  # intact, cracked, rubble
         tile = Image.new("RGBA", (TILE, TILE), (0, 0, 0, 0))
         draw_brick(tile, state)
         atlas.paste(tile, (state * TILE, 0))
-    for index, painter in ((3, draw_steel), (4, draw_crate), (5, draw_water), (6, draw_bridge)):
+    for index, painter in ((3, draw_steel), (4, draw_crate), (5, draw_water),
+                           (6, draw_bridge), (7, draw_mountain)):
         tile = Image.new("RGBA", (TILE, TILE), (0, 0, 0, 0))
         painter(tile)
         atlas.paste(tile, (index * TILE, 0))
