@@ -200,6 +200,11 @@ public class ArenaSceneTests : TestClass
         {
             throw new System.Exception("Ground must sit behind the walls and tanks (negative ZIndex).");
         }
+
+        if (ground.Texture is null)
+        {
+            throw new System.Exception("Ground should tile the themed ground texture across the field.");
+        }
     }
 
     [Test]
