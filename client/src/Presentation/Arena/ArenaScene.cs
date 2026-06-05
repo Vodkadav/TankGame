@@ -162,9 +162,10 @@ public partial class ArenaScene : Node2D
 
         // In two-player the left mouse button is Player 2's fire, so Player 1 fires with space.
         var p1Input = new KeyboardMouseInputSource(GetViewport(), fireOnClick: !twoPlayer);
-        _player = new Tank(p1Input, _world, _arena, CellCentre(_layout.PlayerSpawn.X, _layout.PlayerSpawn.Y),
+        var player = new Tank(p1Input, _world, _arena, CellCentre(_layout.PlayerSpawn.X, _layout.PlayerSpawn.Y),
             TankSpeed, FireInterval, ProjectileSpeed, maxHp: 3, team: PlayerTeam, lives: StartingLives);
-        _world.Spawn(_player);
+        _player = player;
+        SpawnTank(player);
 
         var viewers = new List<ITank> { _player };
         if (twoPlayer)
@@ -172,7 +173,7 @@ public partial class ArenaScene : Node2D
             var p2Team = _mode == GameMode.TwoPlayerVersus ? EnemyTeam : PlayerTeam;
             var p2 = new Tank(new Player2InputSource(), _world, _arena, CellCentre(_layout.Player2Spawn.X, _layout.Player2Spawn.Y),
                 TankSpeed, FireInterval, ProjectileSpeed, maxHp: 3, team: p2Team, lives: StartingLives);
-            _world.Spawn(p2);
+            SpawnTank(p2);
             if (p2Team == PlayerTeam)
             {
                 viewers.Add(p2); // co-op allies share the fog reveal (versus rivals do not)
@@ -187,7 +188,7 @@ public partial class ArenaScene : Node2D
                 var enemy = new Tank(ai, _world, _arena, CellCentre(ex, ey),
                     EnemySpeed, FireInterval, ProjectileSpeed, maxHp: 3, team: EnemyTeam, lives: StartingLives);
                 ai.Bind(enemy); // resolve the input-source ↔ tank construction cycle
-                _world.Spawn(enemy);
+                SpawnTank(enemy);
             }
         }
 
@@ -211,6 +212,14 @@ public partial class ArenaScene : Node2D
         {
             SetUpFog(viewers);
         }
+    }
+
+    // Apply the active match modifier (S9: "everyone starts with effect X") to the tank, then spawn
+    // it through the world so it reaches the screen by the same event path as every other entity.
+    private void SpawnTank(Tank tank)
+    {
+        GameSetup.Modifier.ApplyTo(tank);
+        _world.Spawn(tank);
     }
 
     // Zoom that fits the whole field (plus a small margin) in the viewport, so the two-player
