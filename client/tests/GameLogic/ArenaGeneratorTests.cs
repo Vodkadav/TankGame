@@ -29,6 +29,33 @@ public class ArenaGeneratorTests
     }
 
     [Fact]
+    public void Generate_ClustersLikeCells_FormingClumps_NotSaltAndPepper()
+    {
+        // With neighbour-weighted placement, obstacles clump: somewhere there is a run of three or
+        // more identical obstacle cells in a row, which independent salt-and-pepper rarely produces.
+        var map = new ArenaGenerator().Generate(Params(seed: 11)).Map;
+        var longestRun = 0;
+
+        for (var y = 1; y < map.Height - 1; y++)
+        {
+            var run = 0;
+            var prev = CellMaterial.Floor;
+            for (var x = 1; x < map.Width - 1; x++)
+            {
+                var m = map.Materials[x, y];
+                run = (m != CellMaterial.Floor && m == prev) ? run + 1 : 1;
+                prev = m;
+                if (m != CellMaterial.Floor && run > longestRun)
+                {
+                    longestRun = run;
+                }
+            }
+        }
+
+        Assert.True(longestRun >= 3, $"clustering should produce a run of >= 3 like obstacles; longest was {longestRun}.");
+    }
+
+    [Fact]
     public void Generate_PlacesSandbags_OnlyOnFloorCells()
     {
         var arena = new ArenaGenerator().Generate(Params(seed: 3));

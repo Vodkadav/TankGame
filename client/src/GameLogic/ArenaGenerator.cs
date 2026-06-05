@@ -193,12 +193,22 @@ public sealed class ArenaGenerator
         }
     }
 
+    // The six things a non-border interior cell can be; Bush and Sandbag are passable floor variants.
+    private enum Kind { Floor, Brick, Steel, Crate, Bush, Sandbag }
+
+    // Clustering: every cell gets a bonus toward each interior neighbour's kind, so obstacles and grass
+    // form clumps rather than salt-and-pepper — but once a kind already runs RunCap cells into this one
+    // the bonus stops, so it competes at base odds (the owner's "cap at 5, then equal chance").
+    private const int RunCap = 5;
+    private const double ClusterBonus = 0.45;
+
     private static (CellMaterial[,] Materials, bool[,] Bushes, bool[,] Sandbags) Scatter(
         ArenaGenParams p, Random rng, bool[,] locked)
     {
         var materials = new CellMaterial[p.Width, p.Height];
         var bushes = new bool[p.Width, p.Height];
         var sandbags = new bool[p.Width, p.Height];
+        var kinds = new Kind[p.Width, p.Height]; // Floor by default
 
         for (var x = 0; x < p.Width; x++)
         {
@@ -207,45 +217,111 @@ public sealed class ArenaGenerator
                 if (IsBorder(p, x, y))
                 {
                     materials[x, y] = CellMaterial.Steel;
+                    kinds[x, y] = Kind.Steel;
                     continue;
                 }
 
                 if (locked[x, y])
                 {
-                    materials[x, y] = CellMaterial.Floor;
+                    materials[x, y] = CellMaterial.Floor; // kinds stays Floor
                     continue;
                 }
 
-                var roll = rng.NextDouble();
-                if (roll < p.BrickDensity)
-                {
-                    materials[x, y] = CellMaterial.Brick;
-                }
-                else if (roll < p.BrickDensity + p.SteelDensity)
-                {
-                    materials[x, y] = CellMaterial.Steel;
-                }
-                else if (roll < p.BrickDensity + p.SteelDensity + p.CrateDensity)
-                {
-                    materials[x, y] = CellMaterial.Crate;
-                }
-                else
-                {
-                    materials[x, y] = CellMaterial.Floor;
-                    // A floor cell may be a bush (cover) or sandbags (slow), never both.
-                    if (rng.NextDouble() < p.BushDensity)
-                    {
-                        bushes[x, y] = true;
-                    }
-                    else if (rng.NextDouble() < p.SandbagDensity)
-                    {
-                        sandbags[x, y] = true;
-                    }
-                }
+                var kind = PickKind(p, rng, kinds, x, y);
+                kinds[x, y] = kind;
+                Apply(kind, materials, bushes, sandbags, x, y);
             }
         }
 
         return (materials, bushes, sandbags);
+    }
+
+    // A weighted roll over the six kinds, biased toward each already-placed interior neighbour (capped).
+    private static Kind PickKind(ArenaGenParams p, Random rng, Kind[,] kinds, int x, int y)
+    {
+        var weights = BaseWeights(p);
+        BiasFromNeighbour(weights, kinds, x, y, -1, 0); // left
+        BiasFromNeighbour(weights, kinds, x, y, 0, -1); // up
+        return WeightedPick(weights, rng);
+    }
+
+    private static void BiasFromNeighbour(double[] weights, Kind[,] kinds, int x, int y, int dx, int dy)
+    {
+        var nx = x + dx;
+        var ny = y + dy;
+        // Only interior neighbours cluster — the steel border must not pull interior cells toward steel.
+        if (nx < 1 || ny < 1 || nx >= kinds.GetLength(0) - 1 || ny >= kinds.GetLength(1) - 1)
+        {
+            return;
+        }
+
+        var nk = kinds[nx, ny];
+        if (RunLength(kinds, nx, ny, dx, dy, nk) < RunCap)
+        {
+            weights[(int)nk] += ClusterBonus;
+        }
+    }
+
+    // Consecutive cells of `kind` from (x,y) heading (dx,dy) — the run leading into the cell being placed.
+    private static int RunLength(Kind[,] kinds, int x, int y, int dx, int dy, Kind kind)
+    {
+        var count = 0;
+        int cx = x, cy = y;
+        while (cx >= 0 && cy >= 0 && cx < kinds.GetLength(0) && cy < kinds.GetLength(1) && kinds[cx, cy] == kind)
+        {
+            count++;
+            cx += dx;
+            cy += dy;
+        }
+
+        return count;
+    }
+
+    private static double[] BaseWeights(ArenaGenParams p)
+    {
+        var w = new double[6];
+        w[(int)Kind.Brick] = p.BrickDensity;
+        w[(int)Kind.Steel] = p.SteelDensity;
+        w[(int)Kind.Crate] = p.CrateDensity;
+        w[(int)Kind.Bush] = p.BushDensity;
+        w[(int)Kind.Sandbag] = p.SandbagDensity;
+        w[(int)Kind.Floor] = Math.Max(0d,
+            1d - (p.BrickDensity + p.SteelDensity + p.CrateDensity + p.BushDensity + p.SandbagDensity));
+        return w;
+    }
+
+    private static Kind WeightedPick(double[] weights, Random rng)
+    {
+        var total = 0d;
+        foreach (var w in weights)
+        {
+            total += w;
+        }
+
+        var roll = rng.NextDouble() * total;
+        for (var i = 0; i < weights.Length; i++)
+        {
+            roll -= weights[i];
+            if (roll < 0)
+            {
+                return (Kind)i;
+            }
+        }
+
+        return Kind.Floor;
+    }
+
+    private static void Apply(Kind kind, CellMaterial[,] materials, bool[,] bushes, bool[,] sandbags, int x, int y)
+    {
+        switch (kind)
+        {
+            case Kind.Brick: materials[x, y] = CellMaterial.Brick; break;
+            case Kind.Steel: materials[x, y] = CellMaterial.Steel; break;
+            case Kind.Crate: materials[x, y] = CellMaterial.Crate; break;
+            case Kind.Bush: materials[x, y] = CellMaterial.Floor; bushes[x, y] = true; break;
+            case Kind.Sandbag: materials[x, y] = CellMaterial.Floor; sandbags[x, y] = true; break;
+            default: materials[x, y] = CellMaterial.Floor; break;
+        }
     }
 
     private static bool IsBorder(ArenaGenParams p, int x, int y) =>
