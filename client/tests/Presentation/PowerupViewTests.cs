@@ -42,8 +42,8 @@ public class PowerupViewTests : TestClass
 
         _view.Bind(powerup);
 
-        // World (120,64) projects to iso ((120-64)*0.5, (120+64)*0.25) = (28, 46).
-        if (Mathf.Abs(_view.Position.X - 28f) > 0.01f || Mathf.Abs(_view.Position.Y - 46f) > 0.01f)
+        // World (120,64) projects to iso ((120-64)*1, (120+64)*0.5) = (56, 92).
+        if (Mathf.Abs(_view.Position.X - 56f) > 0.01f || Mathf.Abs(_view.Position.Y - 92f) > 0.01f)
         {
             throw new Exception($"View should sit at the powerup's projected position; was {_view.Position}.");
         }

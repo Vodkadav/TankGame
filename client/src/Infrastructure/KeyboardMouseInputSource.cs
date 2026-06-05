@@ -53,7 +53,7 @@ public sealed class KeyboardMouseInputSource(Viewport viewport, bool fireOnClick
     {
         var centre = viewportSize * 0.5f;
         var screen = mouse - centre;
-        var world = new NVector2(screen.X + (2f * screen.Y), (2f * screen.Y) - screen.X);
+        var world = new NVector2((screen.X * 0.5f) + screen.Y, screen.Y - (screen.X * 0.5f));
         return MathF.Atan2(world.Y, world.X);
     }
 }

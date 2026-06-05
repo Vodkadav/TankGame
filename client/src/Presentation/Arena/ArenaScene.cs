@@ -72,6 +72,11 @@ public partial class ArenaScene : Node2D
     // Two-player frames the whole field; the zoom is computed per map so any size fits on screen.
     private const float TwoPlayerViewMargin = 1.08f;
 
+    // Mouse-wheel zoom (a playtest aid): each wheel notch scales the camera by this factor, clamped.
+    private const float MinZoom = 0.25f;
+    private const float MaxZoom = 4f;
+    private const float ZoomStepFactor = 1.1f;
+
     // Fog of war: a dark ambient the player's light cuts a hole in. Radius ≈ the AI fire range
     // so you can see roughly as far as a hidden enemy can hit you. No wall shadows yet — a soft
     // circular reveal. Off in versus (one shared screen can't fairly fog two rival views).
@@ -533,31 +538,87 @@ public partial class ArenaScene : Node2D
         return layer;
     }
 
-    // A ground rectangle covering the whole field, drawn behind the walls and tanks (negative
-    // ZIndex). World-space Polygon2D so it tracks the camera; it tiles the themed ground texture
-    // (UV in pixels + texture-repeat → one tile per TileSize) tinted by the theme's ground colour.
-    private static Polygon2D BuildGround(int widthCells, int heightCells, Color colour)
+    // The isometric ground (Phase 2): one PixVoxel diamond tile per cell laid through a real iso
+    // TileMapLayer (Godot's TileShape = Isometric), tinted to the theme, drawn behind the walls and
+    // tanks. The square flat-ground polygon is gone — this lays native 128×64 iso tiles that align
+    // with the entity projection by construction.
+    private const int GroundTileWidth = 128;          // the iso tile's diamond width
+    private const int GroundTileHeight = 64;           // the iso tile's diamond (cell) height
+    private const int GroundTileTextureHeight = 90;    // full texture height (diamond + bottom skirt)
+
+    // Godot's iso TileMapLayer puts cell (0,0)'s centre at (tile, tile/2); the entity projection puts
+    // it at (0, tile/2). The per-cell basis already matches (DiamondDown gives ex=(64,32) ey=(-64,32),
+    // exactly WorldToScreen's deltas), so a constant −tile shift in x lands the layer on the same grid
+    // as the sheared walls and the tanks. (Verified by Ground_AlignsWithTheEntityProjection.)
+    private static readonly Vector2 GroundCellOffset = new(-TileSize, 0f);
+
+    // The diamond's centre sits ~11 px below the 90-tall texture's centre; lift the art so a tank on
+    // a cell reads as standing on its diamond. A cosmetic nudge — tune by eye (mouse-wheel zoom helps).
+    private static readonly Vector2I GroundTextureOrigin = new(0, -11);
+
+    private static TileMapLayer BuildGround(int widthCells, int heightCells, Color tint)
     {
-        var w = widthCells * TileSize;
-        var h = heightCells * TileSize;
-        var corners = new[]
+        var source = new TileSetAtlasSource
         {
-            new Vector2(0f, 0f),
-            new Vector2(w, 0f),
-            new Vector2(w, h),
-            new Vector2(0f, h),
+            Texture = GD.Load<Texture2D>(AssetCatalogue.Active.GroundTile),
+            TextureRegionSize = new Vector2I(GroundTileWidth, GroundTileTextureHeight),
         };
-        return new Polygon2D
+        source.CreateTile(Vector2I.Zero);
+        source.GetTileData(Vector2I.Zero, 0).TextureOrigin = GroundTextureOrigin;
+
+        var tileSet = new TileSet
+        {
+            TileShape = TileSet.TileShapeEnum.Isometric,
+            TileLayout = TileSet.TileLayoutEnum.DiamondDown, // cell (x,y) → ((x-y)·w/2, (x+y)·h/2)
+            TileSize = new Vector2I(GroundTileWidth, GroundTileHeight),
+        };
+        var sourceId = tileSet.AddSource(source);
+
+        var layer = new TileMapLayer
         {
             Name = "Ground",
-            Color = colour,
-            ZIndex = -10,
-            Transform = IsoProjection.ScreenTransform, // shear the field rectangle into an iso diamond
-            Polygon = corners,
-            Texture = GD.Load<Texture2D>(AssetCatalogue.Active.GroundTile),
-            UV = corners, // UV in texture pixels; with repeat this tiles once per ground-tile width
-            TextureRepeat = CanvasItem.TextureRepeatEnum.Enabled,
+            TileSet = tileSet,
+            ZIndex = -10,             // behind the walls and tanks
+            Position = GroundCellOffset,
+            Modulate = tint,          // recolour the sand to the theme
+            TextureFilter = CanvasItem.TextureFilterEnum.Nearest, // keep the pixel art crisp
         };
+        for (var x = 0; x < widthCells; x++)
+        {
+            for (var y = 0; y < heightCells; y++)
+            {
+                layer.SetCell(new Vector2I(x, y), sourceId, Vector2I.Zero);
+            }
+        }
+
+        return layer;
+    }
+
+    // Mouse-wheel zooms the camera in/out so the field can be inspected while playtesting. Wheel
+    // events arrive unhandled (the input source polls state, it does not consume events).
+    public override void _UnhandledInput(InputEvent @event)
+    {
+        if (@event is not InputEventMouseButton { Pressed: true } click)
+        {
+            return;
+        }
+
+        if (click.ButtonIndex == MouseButton.WheelUp)
+        {
+            _camera.Zoom = SteppedZoom(_camera.Zoom, zoomIn: true);
+        }
+        else if (click.ButtonIndex == MouseButton.WheelDown)
+        {
+            _camera.Zoom = SteppedZoom(_camera.Zoom, zoomIn: false);
+        }
+    }
+
+    /// <summary>One wheel-notch zoom step, clamped and uniform on both axes (so the view never
+    /// skews). Public/static so a test can pin the curve without driving input events.</summary>
+    public static Vector2 SteppedZoom(Vector2 current, bool zoomIn)
+    {
+        var z = Mathf.Clamp(current.X * (zoomIn ? ZoomStepFactor : 1f / ZoomStepFactor), MinZoom, MaxZoom);
+        return new Vector2(z, z);
     }
 
     // Project a flat world position into isometric screen space for a node placed directly under the

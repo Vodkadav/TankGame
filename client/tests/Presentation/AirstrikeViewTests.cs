@@ -38,8 +38,8 @@ public class AirstrikeViewTests : TestClass
     {
         _view.Bind(new StubStrike(new NVector2(96f, 48f), radius: 100f));
 
-        // World (96,48) projects to iso ((96-48)*0.5, (96+48)*0.25) = (24, 36).
-        if (Mathf.Abs(_view.Position.X - 24f) > 0.01f || Mathf.Abs(_view.Position.Y - 36f) > 0.01f)
+        // World (96,48) projects to iso ((96-48)*1, (96+48)*0.5) = (48, 72).
+        if (Mathf.Abs(_view.Position.X - 48f) > 0.01f || Mathf.Abs(_view.Position.Y - 72f) > 0.01f)
         {
             throw new Exception($"Marker should sit at the strike's projected position; was {_view.Position}.");
         }

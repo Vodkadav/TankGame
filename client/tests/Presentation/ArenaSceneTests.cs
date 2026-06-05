@@ -186,14 +186,19 @@ public class ArenaSceneTests : TestClass
     }
 
     [Test]
-    public void Arena_PaintsTheGround_InTheThemeColour()
+    public void Arena_LaysTheIsometricGround_TintedToTheTheme()
     {
-        var ground = _arena.GetNodeOrNull<Polygon2D>("Ground")
-            ?? throw new System.Exception("Arena must paint a 'Ground' Polygon2D beneath the field.");
+        var ground = _arena.GetNodeOrNull<TileMapLayer>("Ground")
+            ?? throw new System.Exception("Arena must lay a 'Ground' iso TileMapLayer beneath the field.");
 
-        if (ground.Color != GameSetup.Theme.Ground)
+        if (ground.TileSet?.TileShape != TileSet.TileShapeEnum.Isometric)
         {
-            throw new System.Exception($"Ground colour should match the theme; was {ground.Color}.");
+            throw new System.Exception("The ground must be an isometric TileMapLayer.");
+        }
+
+        if (ground.Modulate != GameSetup.Theme.Ground)
+        {
+            throw new System.Exception($"Ground tint should match the theme; was {ground.Modulate}.");
         }
 
         if (ground.ZIndex >= 0)
@@ -201,9 +206,60 @@ public class ArenaSceneTests : TestClass
             throw new System.Exception("Ground must sit behind the walls and tanks (negative ZIndex).");
         }
 
-        if (ground.Texture is null)
+        // The corner cell must carry a ground tile (the whole field is laid).
+        if (ground.GetCellSourceId(new Vector2I(0, 0)) == -1)
         {
-            throw new System.Exception("Ground should tile the themed ground texture across the field.");
+            throw new System.Exception("The ground should lay a tile in every cell, including (0,0).");
+        }
+    }
+
+    [Test]
+    public void Ground_AlignsWithTheEntityProjection()
+    {
+        var ground = _arena.GetNodeOrNull<TileMapLayer>("Ground")
+            ?? throw new System.Exception("Arena must lay a 'Ground' iso TileMapLayer.");
+
+        // A cell's on-screen centre (tilemap local + layer offset) must equal where the entity
+        // projection puts that cell's world centre — so tanks stand on their tiles.
+        const float tile = 64f;
+        var cell = new Vector2I(3, 2);
+        var tilemapCentre = ground.MapToLocal(cell) + ground.Position;
+        var world = new System.Numerics.Vector2((cell.X + 0.5f) * tile, (cell.Y + 0.5f) * tile);
+        var projected = IsoProjection.WorldToScreen(world);
+
+        if (Mathf.Abs(tilemapCentre.X - projected.X) > 0.5f || Mathf.Abs(tilemapCentre.Y - projected.Y) > 0.5f)
+        {
+            throw new System.Exception($"Ground cell {cell} centre {tilemapCentre} must match the projection {projected}.");
+        }
+    }
+
+    [Test]
+    public void SteppedZoom_ZoomsInAndOut_WithinClamps()
+    {
+        var inOnce = ArenaScene.SteppedZoom(new Vector2(1f, 1f), zoomIn: true);
+        if (inOnce.X <= 1f || Mathf.Abs(inOnce.X - inOnce.Y) > 0.0001f)
+        {
+            throw new System.Exception($"Zooming in should raise a uniform zoom; was {inOnce}.");
+        }
+
+        var farIn = new Vector2(1f, 1f);
+        for (var i = 0; i < 50; i++)
+        {
+            farIn = ArenaScene.SteppedZoom(farIn, zoomIn: true);
+        }
+        if (farIn.X > 4f + 0.0001f)
+        {
+            throw new System.Exception($"Zoom in must clamp at the max; was {farIn.X}.");
+        }
+
+        var farOut = new Vector2(1f, 1f);
+        for (var i = 0; i < 50; i++)
+        {
+            farOut = ArenaScene.SteppedZoom(farOut, zoomIn: false);
+        }
+        if (farOut.X < 0.25f - 0.0001f)
+        {
+            throw new System.Exception($"Zoom out must clamp at the min; was {farOut.X}.");
         }
     }
 
