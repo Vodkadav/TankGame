@@ -5,9 +5,9 @@ Programmer-generated placeholder art — public domain, to be replaced by Kenney
 "Top-down Shooter" CC0 wall tiles (see docs/credits/assets.md). Deterministic (no
 randomness) so re-running reproduces the exact same PNG.
 
-Atlas layout: four 32x32 tiles in a horizontal strip (128x32), left to right:
+Atlas layout: five 32x32 tiles in a horizontal strip (160x32), left to right:
   0 brick intact  (hp 3)   1 brick cracked (hp 2)
-  2 brick rubble  (hp 1)   3 steel (indestructible)
+  2 brick rubble  (hp 1)   3 steel (indestructible)   4 crate (destructible)
 Floor is drawn as no tile, so it is absent from the atlas.
 
 Usage: python scripts/gen_wall_atlas.py
@@ -16,7 +16,7 @@ Usage: python scripts/gen_wall_atlas.py
 from PIL import Image, ImageDraw
 
 TILE = 32
-FRAMES = 4
+FRAMES = 5
 OUT = "client/src/Presentation/Arena/Walls.png"
 
 MORTAR = (60, 55, 52, 255)
@@ -27,6 +27,9 @@ STEEL = (120, 124, 132, 255)
 STEEL_LIGHT = (160, 165, 172, 255)
 STEEL_DARK = (78, 82, 90, 255)
 RIVET = (54, 57, 64, 255)
+WOOD = (168, 120, 66, 255)
+WOOD_DARK = (120, 82, 42, 255)
+WOOD_LIGHT = (198, 150, 92, 255)
 
 
 def brick_base(draw):
@@ -76,6 +79,17 @@ def draw_steel(img):
         draw.ellipse([cx - 2, cy - 2, cx + 2, cy + 2], fill=RIVET)
 
 
+def draw_crate(img):
+    """A wooden crate: plank fill, dark border, and a diagonal cross brace."""
+    draw = ImageDraw.Draw(img)
+    draw.rectangle([0, 0, TILE - 1, TILE - 1], fill=WOOD)
+    for y in range(0, TILE, 8):
+        draw.line([0, y, TILE - 1, y], fill=WOOD_DARK)  # plank seams
+    draw.rectangle([0, 0, TILE - 1, TILE - 1], outline=WOOD_DARK, width=2)  # frame
+    draw.line([2, 2, TILE - 3, TILE - 3], fill=WOOD_LIGHT, width=2)  # cross brace
+    draw.line([TILE - 3, 2, 2, TILE - 3], fill=WOOD_LIGHT, width=2)
+
+
 def main():
     atlas = Image.new("RGBA", (TILE * FRAMES, TILE), (0, 0, 0, 0))
     for state in range(3):  # intact, cracked, rubble
@@ -85,6 +99,9 @@ def main():
     steel = Image.new("RGBA", (TILE, TILE), (0, 0, 0, 0))
     draw_steel(steel)
     atlas.paste(steel, (3 * TILE, 0))
+    crate = Image.new("RGBA", (TILE, TILE), (0, 0, 0, 0))
+    draw_crate(crate)
+    atlas.paste(crate, (4 * TILE, 0))
     atlas.save(OUT)
     print(f"wrote {OUT} ({atlas.width}x{atlas.height})")
 

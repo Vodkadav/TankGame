@@ -16,8 +16,9 @@ public sealed record ArenaGenParams(
     int Seed,
     int EnemyCount,
     int PickupCount,
-    double BrickDensity = 0.12,
+    double BrickDensity = 0.08,
     double SteelDensity = 0.04,
+    double CrateDensity = 0.06,
     double BushDensity = 0.05,
     double SandbagDensity = 0.04,
     int SpawnSafeRadius = 1,
@@ -223,6 +224,10 @@ public sealed class ArenaGenerator
                 else if (roll < p.BrickDensity + p.SteelDensity)
                 {
                     materials[x, y] = CellMaterial.Steel;
+                }
+                else if (roll < p.BrickDensity + p.SteelDensity + p.CrateDensity)
+                {
+                    materials[x, y] = CellMaterial.Crate;
                 }
                 else
                 {
