@@ -114,18 +114,33 @@ public class AiInputSourceTests
     }
 
     [Fact]
-    public void Idles_WhenThereIsNoEnemy()
+    public void Idles_WhenItIsTheOnlyTank()
     {
         var world = new World();
         var self = new StubTank(Vector2.Zero, team: 1);
-        world.Spawn(self);
-        world.Spawn(new StubTank(new Vector2(100f, 0f), team: 1)); // same team, not a target
+        world.Spawn(self); // no other tanks on the field
         var ai = AiDriving(self, world);
 
         var intent = ai.Read();
 
         Assert.Equal(Vector2.Zero, intent.Move);
         Assert.False(intent.Fire);
+    }
+
+    [Fact]
+    public void Targets_AnyOtherTank_IncludingItsOwnTeam()
+    {
+        // Free-for-all: the AI attacks the nearest tank that is not itself, even a same-team one.
+        var world = new World();
+        var self = new StubTank(Vector2.Zero, team: 1);
+        world.Spawn(self);
+        world.Spawn(new StubTank(new Vector2(200f, 0f), team: 1)); // same team — now a target
+        var ai = AiDriving(self, world);
+
+        var intent = ai.Read();
+
+        Assert.Equal(0f, intent.Aim, precision: 3); // aims at the same-team tank on +X
+        Assert.True(intent.Fire);
     }
 
     [Fact]

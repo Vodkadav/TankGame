@@ -6,17 +6,27 @@ using TankGame.Domain;
 
 namespace TankGame.GameLogic;
 
-/// <summary>The combat pass: every live shot that overlaps an enemy tank (different
-/// <see cref="Tank.Team"/>) damages it and is spent. A shot passes harmlessly through its own
-/// team, so a tank never shoots itself or an ally. Pure C# — deterministic, no Godot, no
-/// networking — so it runs identically on a client and (later) on the authoritative
-/// server.</summary>
+/// <summary>The combat pass: every live shot that overlaps a tank damages it and is spent. A shot
+/// never hits its own shooter, and tanks on the <see cref="_alliedTeam"/> (the player team) do not
+/// hit each other — but every other team is free-for-all, so the AI tanks fight one another as well
+/// as the player. Pure C# — deterministic, no Godot, no networking — so it runs identically on a
+/// client and (later) on the authoritative server.</summary>
 public sealed class CombatResolver : ICombatResolver
 {
+    /// <summary>A team value no tank uses — the default "no allied team", i.e. a full free-for-all.</summary>
+    public const int NoAllies = -1;
+
     private readonly float _hitRadius;
+    private readonly int _alliedTeam;
 
     /// <param name="hitRadius">World distance within which a shot counts as hitting a tank.</param>
-    public CombatResolver(float hitRadius) => _hitRadius = hitRadius;
+    /// <param name="alliedTeam">A team whose members never hit each other (the local player team in
+    /// co-op). Every other team is free-for-all. Defaults to <see cref="NoAllies"/>.</param>
+    public CombatResolver(float hitRadius, int alliedTeam = NoAllies)
+    {
+        _hitRadius = hitRadius;
+        _alliedTeam = alliedTeam;
+    }
 
     /// <summary>Raised with the shooting tank's <see cref="Tank.Team"/> each time a shot's damage
     /// destroys a tank — once per death, since the dead are skipped thereafter. A
@@ -45,9 +55,14 @@ public sealed class CombatResolver : ICombatResolver
         {
             foreach (var tank in tanks)
             {
-                if (tank.Team == shot.Team || tank.Hp <= 0 || shot.HasHit(tank.Id))
+                if (tank.Id == shot.Owner || tank.Hp <= 0 || shot.HasHit(tank.Id))
                 {
-                    continue; // friendly fire passes through; skip the downed and the already-pierced
+                    continue; // never hit the shooter; skip the downed and the already-pierced
+                }
+
+                if (tank.Team == shot.Team && tank.Team == _alliedTeam)
+                {
+                    continue; // allies on the player team do not friendly-fire each other
                 }
 
                 if (Vector2.Distance(shot.Position, tank.Position) <= _hitRadius)

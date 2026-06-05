@@ -22,8 +22,12 @@ public sealed class ProjectileState
     /// <summary>Damage dealt to a wall or tank on impact.</summary>
     public int Damage;
 
-    /// <summary>The firing tank's team (combat spares the same team).</summary>
+    /// <summary>The firing tank's team (used for kill credit and friendly-fire protection).</summary>
     public int Team;
+
+    /// <summary>The firing tank's id — combat never lets a shot hit its own shooter, so a tank in a
+    /// free-for-all still cannot shoot itself at the muzzle.</summary>
+    public Guid Owner;
 
     /// <summary>False once the shot is spent; the world reaps it.</summary>
     public bool IsAlive = true;

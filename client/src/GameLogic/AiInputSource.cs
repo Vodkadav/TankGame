@@ -136,8 +136,9 @@ public sealed class AiInputSource : IInputSource
 
     private TankInput Hold() => new(Vector2.Zero, _self?.TurretRotation ?? 0f, Fire: false);
 
-    // The nearest enemy the AI can see: on another team, within VisionRange, and with no wall
-    // between. Enemies it cannot see are invisible to its decision-making entirely.
+    // The nearest tank the AI can see — ANY tank but itself (it attacks other AI as well as the
+    // player), within VisionRange and with no wall between. Tanks it cannot see are invisible to its
+    // decision-making entirely.
     private ITank? NearestVisibleEnemy()
     {
         ITank? nearest = null;
@@ -145,9 +146,9 @@ public sealed class AiInputSource : IInputSource
 
         foreach (var entity in _world.Entities)
         {
-            if (entity is not ITank tank || tank.Hp <= 0 || tank.Team == _self!.Team)
+            if (entity is not ITank tank || tank.Hp <= 0 || tank.Id == _self!.Id)
             {
-                continue; // skip allies and downed enemies (a respawning tank is no target)
+                continue; // skip itself and downed tanks (a respawning tank is no target)
             }
 
             var distance = Vector2.Distance(tank.Position, _self.Position);
