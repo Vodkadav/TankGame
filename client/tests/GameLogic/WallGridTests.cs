@@ -112,6 +112,26 @@ public class WallGridTests
     }
 
     [Fact]
+    public void FromMaterials_FillsACrate_WithItsHitPoints()
+    {
+        var grid = WallGrid.FromMaterials(new[,] { { CellMaterial.Crate } });
+
+        Assert.Equal(WallGrid.DefaultCrateHp, grid.GetCell(0, 0).Hp);
+    }
+
+    [Fact]
+    public void DamageCell_BreaksACrateToFloor_AfterTwoHits()
+    {
+        var grid = WallGrid.FromMaterials(new[,] { { CellMaterial.Floor, CellMaterial.Crate } });
+
+        grid.DamageCell(0, 1, 1);
+        Assert.True(grid.IsBlocked(0, 1)); // a crate survives the first hit (2 hp)
+        grid.DamageCell(0, 1, 1);
+        Assert.False(grid.IsBlocked(0, 1)); // and breaks to floor on the second
+        Assert.Equal(CellMaterial.Floor, grid.GetCell(0, 1).Material);
+    }
+
+    [Fact]
     public void DamageCell_LeavesSteelUntouched_AndRaisesNoEvent()
     {
         var grid = Grid();

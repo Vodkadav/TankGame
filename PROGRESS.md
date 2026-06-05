@@ -416,8 +416,14 @@ Catalogue and ordering: `docs/research/local-backlog.md`.
   (`SandbagDensity`) on floor cells, returned in `GeneratedArena.Sandbags`; `ArenaScene` builds the
   field, passes it to every tank, and renders a `SandbagOverlay` (khaki patches). Bushes and sandbags
   are mutually exclusive per cell. GameLogic 203 → 207, scene 70 → 71.
+- **Damageable crates** ✅ a destructible obstacle alongside brick. `CellMaterial.Crate` (Domain);
+  `WallGrid` fills crates with `DefaultCrateHp` (2) and `DamageCell` now chips crates as well as brick,
+  breaking either to floor at 0 hp — so shots and push-to-demolish both work on crates via the existing
+  `GridArena.DamageAt` path. `WallGridView` draws a crate frame (atlas extended to 5 frames via
+  `gen_wall_atlas.py`). `ArenaGenerator` scatters crates (`CrateDensity` 0.06; brick trimmed to 0.08 to
+  keep the ≥80%-open invariant). GameLogic 207 → 209, scene 71 → 73.
 
-Test counts on `main`: GameLogic 207, Domain 32, Infrastructure 12, Architecture 6, 71 GoDotTest
+Test counts on `main`: GameLogic 209, Domain 32, Infrastructure 12, Architecture 6, 73 GoDotTest
 scene tests.
 
 **Owner ask (2026-06-04): map variety + progression — both now under way.** Captured in

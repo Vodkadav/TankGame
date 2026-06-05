@@ -44,6 +44,31 @@ public class WallGridViewTests : TestClass
     }
 
     [Test]
+    public void Bind_DrawsACrate_OnItsOwnFrame()
+    {
+        var grid = WallGrid.FromMaterials(new[,] { { CellMaterial.Crate } });
+
+        _view.Bind(grid);
+
+        AssertFrame(0, 0, 4); // crate -> frame 4
+    }
+
+    [Test]
+    public void CellChanged_ClearsACrate_WhenItBreaks()
+    {
+        var grid = WallGrid.FromMaterials(new[,] { { CellMaterial.Crate } });
+        _view.Bind(grid);
+        AssertFrame(0, 0, 4);
+
+        grid.DamageCell(0, 0, WallGrid.DefaultCrateHp); // break it to floor
+
+        if (_view.GetCellSourceId(new Vector2I(0, 0)) != -1)
+        {
+            throw new System.Exception("A broken crate must render no tile.");
+        }
+    }
+
+    [Test]
     public void CellChanged_UpdatesTheFrame_AsBrickTakesDamageAndBreaks()
     {
         var grid = WallGrid.FromMaterials(new[,] { { CellMaterial.Brick } });

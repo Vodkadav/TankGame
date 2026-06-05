@@ -2,13 +2,17 @@ using System;
 
 namespace TankGame.Domain;
 
-/// <summary>What a wall cell is made of. <see cref="Floor"/> is passable empty space; a
-/// brick wall takes damage and breaks into floor; steel never breaks.</summary>
+/// <summary>What a wall cell is made of. <see cref="Floor"/> is passable empty space; a brick wall
+/// and a <see cref="Crate"/> both take damage and break into floor; steel never breaks.</summary>
 public enum CellMaterial
 {
     Floor,
     Brick,
     Steel,
+
+    /// <summary>A destructible crate — blocks movement and shots, breaks into floor after a couple of
+    /// hits (fewer than brick).</summary>
+    Crate,
 }
 
 /// <summary>One cell of the wall grid: its material and remaining hit points. A

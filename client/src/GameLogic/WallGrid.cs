@@ -13,6 +13,9 @@ public sealed class WallGrid : IWallGrid
     /// <summary>Hit points a brick cell starts with — three hits to break.</summary>
     public const int DefaultBrickHp = 3;
 
+    /// <summary>Hit points a crate starts with — two hits to break (flimsier than brick).</summary>
+    public const int DefaultCrateHp = 2;
+
     private readonly WallCell[,] _cells;
 
     public WallGrid(WallCell[,] cells)
@@ -35,7 +38,13 @@ public sealed class WallGrid : IWallGrid
             for (var y = 0; y < height; y++)
             {
                 var material = materials[x, y];
-                cells[x, y] = new WallCell(material, material == CellMaterial.Brick ? DefaultBrickHp : 0);
+                var hp = material switch
+                {
+                    CellMaterial.Brick => DefaultBrickHp,
+                    CellMaterial.Crate => DefaultCrateHp,
+                    _ => 0,
+                };
+                cells[x, y] = new WallCell(material, hp);
             }
         }
 
@@ -74,9 +83,9 @@ public sealed class WallGrid : IWallGrid
         }
 
         var cell = _cells[x, y];
-        if (cell.Material != CellMaterial.Brick)
+        if (cell.Material is not (CellMaterial.Brick or CellMaterial.Crate))
         {
-            return; // steel and floor are immune
+            return; // steel and floor are immune; brick and crates take damage
         }
 
         var hp = Math.Max(0, cell.Hp - amount);
