@@ -462,8 +462,8 @@ Catalogue and ordering: `docs/research/local-backlog.md`.
   `CellMaterial.Water` (blocks movement, NOT shots) + `Bridge` (passable to both); `CellMaterials.
   BlocksMovement`/`BlocksShots` (Domain) define per-material rules; `WallGrid.IsBlocked` is now movement,
   `BlocksShots` is new; `GridArena` raycasts shots against `BlocksShots` (so shots fly over water) and
-  treats crates as destructible-pierceable too. `WallGridView` + `gen_wall_atlas.py` add water (frame 5)
-  + bridge (frame 6) → 7-frame atlas. Not generated yet — the river generator (next slice) places them.
+  treats crates as destructible-pierceable too. `WallGridView` + `gen_wall_atlas.py` add a water frame
+  (5) and a bridge frame (6) → 7-frame atlas. Not generated yet — the river generator places them next.
   GameLogic 215 → 217, Domain 32 → 38.
 
 Test counts on `main`: GameLogic 217, Domain 38, Infrastructure 12, Architecture 6, 77 GoDotTest
