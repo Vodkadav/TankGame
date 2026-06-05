@@ -155,63 +155,72 @@ public class PowerupTests
     }
 
     [Fact]
-    public void ARespawningPowerup_StaysInTheWorld_AndReturnsAfterItsDelay()
+    public void ADropPickup_GoesDormant_OnCollection_ThenDropsWhereTheCarrierDies()
     {
         var world = new World();
-        var tank = TankAt(world, Vector2.Zero, new NoInput());
+        var carrier = TankAt(world, Vector2.Zero, new DriveRight()); // collects, then drives off +X
         var powerup = new Powerup(world, Vector2.Zero, PowerupKind.SpeedBoost,
-            new StatusEffectPickup(SpeedBoost), PickupRadius, respawnDelay: 5f);
-        world.Spawn(tank);
+            new StatusEffectPickup(SpeedBoost), PickupRadius, dropOnCarrierDeath: true);
+        world.Spawn(carrier);
         world.Spawn(powerup);
 
-        world.Step(0.016f); // collected
-        Assert.Contains(powerup, world.Entities); // not reaped — it respawns
-        Assert.False(powerup.IsAvailable);        // dormant on its cooldown
+        world.Step(0.016f); // collected → dormant, carried away (not reaped)
+        Assert.Contains(powerup, world.Entities);
+        Assert.False(powerup.IsAvailable);
 
-        world.Step(2f);
-        Assert.False(powerup.IsAvailable); // still cooling down
+        for (var i = 0; i < 20; i++)
+        {
+            world.Step(0.05f); // the carrier drives well away from the origin
+        }
 
-        world.Step(3.1f);
-        Assert.True(powerup.IsAvailable); // back on the field after the delay
+        carrier.TakeDamage(carrier.MaxHp); // the carrier falls
+        world.Step(0.016f);
+
+        Assert.True(powerup.IsAvailable);          // it returns to the field…
+        Assert.True(powerup.Position.X > 50f);     // …where the carrier died, not where it was picked up
     }
 
     [Fact]
-    public void ADormantRespawningPowerup_CannotBeCollected()
+    public void ACarriedDropPickup_CannotBeCollectedByAnotherTank_WhileItsCarrierLives()
     {
         var world = new World();
-        var collector = TankAt(world, Vector2.Zero, new NoInput(), hp: 3);
-        collector.TakeDamage(2); // Hp 1, so a repair would be observable
-        var powerup = new Powerup(world, Vector2.Zero, PowerupKind.Repair,
-            new RepairPickup(2), PickupRadius, respawnDelay: 5f);
-        world.Spawn(collector);
-        world.Spawn(powerup);
-
-        world.Step(0.016f); // first collect → Hp back to 3, now dormant
-        Assert.Equal(3, collector.Hp);
-
-        collector.TakeDamage(2); // Hp 1 again
-        world.Step(0.016f); // overlapping but dormant → no second collect
-
-        Assert.Equal(1, collector.Hp);
-    }
-
-    [Fact]
-    public void ARespawnedPowerup_CanBeCollectedAgain()
-    {
-        var world = new World();
-        var tank = TankAt(world, Vector2.Zero, new NoInput(), hp: 3);
+        var carrier = TankAt(world, Vector2.Zero, new NoInput());
         var powerup = new Powerup(world, Vector2.Zero, PowerupKind.Shield,
-            new ShieldPickup(2), PickupRadius, respawnDelay: 1f);
-        world.Spawn(tank);
+            new ShieldPickup(2), PickupRadius, dropOnCarrierDeath: true);
+        world.Spawn(carrier);
         world.Spawn(powerup);
 
-        world.Step(0.016f); // collect → +2 shield
-        Assert.Equal(2, tank.Shield);
+        world.Step(0.016f); // carrier collects → dormant
+        Assert.Equal(2, carrier.Shield);
 
-        world.Step(1.1f);   // cooldown elapses → available again (no collect on the respawn step)
+        var other = TankAt(world, Vector2.Zero, new NoInput());
+        world.Spawn(other);
+        world.Step(0.016f); // overlapping but dormant (carrier still alive) → no second collect
+
+        Assert.Equal(0, other.Shield);
+        Assert.False(powerup.IsAvailable);
+    }
+
+    [Fact]
+    public void ADroppedPickup_CanBeCollectedAgain()
+    {
+        var world = new World();
+        var carrier = TankAt(world, Vector2.Zero, new NoInput());
+        var powerup = new Powerup(world, Vector2.Zero, PowerupKind.Shield,
+            new ShieldPickup(2), PickupRadius, dropOnCarrierDeath: true);
+        world.Spawn(carrier);
+        world.Spawn(powerup);
+
+        world.Step(0.016f);     // carrier collects → dormant (and gains +2 shield)
+        carrier.TakeDamage(99); // lethal even through the shield it just picked up
+        world.Step(0.016f);     // pickup drops back, available again
         Assert.True(powerup.IsAvailable);
-        world.Step(0.016f); // now the overlapping tank collects it a second time
-        Assert.Equal(4, tank.Shield);
+
+        var taker = TankAt(world, Vector2.Zero, new NoInput());
+        world.Spawn(taker);
+        world.Step(0.016f); // the new tank collects the dropped pickup
+
+        Assert.Equal(2, taker.Shield);
     }
 
     private static float TravelWithPowerup(bool withPowerup)
