@@ -10,6 +10,9 @@ public partial class ProjectileView : Node2D
 {
     private IProjectile? _projectile;
 
+    public override void _Ready() =>
+        GetNode<Sprite2D>("Bullet").Texture = GD.Load<Texture2D>(AssetCatalogue.Active.Bullet);
+
     public void Bind(IProjectile projectile)
     {
         _projectile = projectile;

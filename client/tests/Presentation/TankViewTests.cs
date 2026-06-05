@@ -31,14 +31,15 @@ public class TankViewTests : TestClass
     public void Cleanup() => _view.QueueFree();
 
     [Test]
-    public void Scene_HasBodyAndTurretSprites()
+    public void Scene_LoadsBodyAndTurretTextures_FromTheCatalogue()
     {
         var body = _view.GetNode<Sprite2D>("Body");
         var turret = _view.GetNode<Sprite2D>("Turret");
 
-        if (body.Texture is null || turret.Texture is null)
+        if (body.Texture != GD.Load<Texture2D>(AssetCatalogue.Active.TankBody)
+            || turret.Texture != GD.Load<Texture2D>(AssetCatalogue.Active.TankTurret))
         {
-            throw new System.Exception("Body and Turret sprites must have textures loaded.");
+            throw new System.Exception("Body and Turret sprites must load their textures from the asset catalogue.");
         }
     }
 

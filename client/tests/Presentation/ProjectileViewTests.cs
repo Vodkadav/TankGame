@@ -30,6 +30,16 @@ public class ProjectileViewTests : TestClass
     }
 
     [Test]
+    public void Scene_LoadsTheBulletTexture_FromTheCatalogue()
+    {
+        var bullet = _view.GetNode<Sprite2D>("Bullet");
+        if (bullet.Texture != GD.Load<Texture2D>(AssetCatalogue.Active.Bullet))
+        {
+            throw new System.Exception("The Bullet sprite must load its texture from the asset catalogue.");
+        }
+    }
+
+    [Test]
     public void UpdateFromModel_MirrorsTheProjectilePosition()
     {
         var arena = new RectArena(new NVector2(0f, 0f), new NVector2(100f, 100f));

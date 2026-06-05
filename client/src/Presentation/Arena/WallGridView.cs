@@ -71,7 +71,7 @@ public partial class WallGridView : TileMapLayer
             return;
         }
 
-        var texture = GD.Load<Texture2D>("res://src/Presentation/Arena/Walls.png");
+        var texture = GD.Load<Texture2D>(AssetCatalogue.Active.WallAtlas);
         var source = new TileSetAtlasSource
         {
             Texture = texture,
