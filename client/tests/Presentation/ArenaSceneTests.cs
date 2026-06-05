@@ -184,4 +184,39 @@ public class ArenaSceneTests : TestClass
             throw new System.Exception("The maze's steel border should be drawn at cell (0,0).");
         }
     }
+
+    [Test]
+    public void Arena_PaintsTheGround_InTheThemeColour()
+    {
+        var ground = _arena.GetNodeOrNull<Polygon2D>("Ground")
+            ?? throw new System.Exception("Arena must paint a 'Ground' Polygon2D beneath the field.");
+
+        if (ground.Color != GameSetup.Theme.Ground)
+        {
+            throw new System.Exception($"Ground colour should match the theme; was {ground.Color}.");
+        }
+
+        if (ground.ZIndex >= 0)
+        {
+            throw new System.Exception("Ground must sit behind the walls and tanks (negative ZIndex).");
+        }
+    }
+
+    [Test]
+    public void Arena_TintsTheWalls_WithTheTheme()
+    {
+        WallGridView? walls = null;
+        foreach (var child in _arena.GetChildren())
+        {
+            if (child is WallGridView view)
+            {
+                walls = view;
+            }
+        }
+
+        if (walls!.Modulate != GameSetup.Theme.WallTint)
+        {
+            throw new System.Exception($"Walls should carry the theme tint; was {walls.Modulate}.");
+        }
+    }
 }

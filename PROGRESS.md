@@ -325,15 +325,22 @@ Catalogue and ordering: `docs/research/local-backlog.md`.
   and **`GameSetup.ArenaWidth/Height` make the size adjustable** — the scene hard-codes no cell and the
   two-player camera fits whatever size was generated. **Local only** — `NetArenaScene` keeps the shared
   `Battlefield01`. Deferred: theming, a title-screen size control, versus symmetry.
+- **S8 — arena theming (seam)** ✅ first theming slice. `ArenaTheme` (Presentation) is a swappable
+  palette = ground colour + wall tint; `GameSetup.Theme` selects it (defaults to `Sandy`, the owner's
+  reference look). `ArenaScene` paints a `Ground` Polygon2D (negative ZIndex) under the field in
+  `Theme.Ground` and applies `Theme.WallTint` to the `WallGridView.Modulate`, so a theme recolours
+  whatever wall art is loaded — **source-agnostic, not blocked on the art pass**. Ships `Sandy` +
+  `Slate` so the swap is real and tested. Deferred: a title-screen theme picker; biome/ground sprites
+  (art pass).
 
-Test counts on `main`: GameLogic 184, Domain 32, Infrastructure 12, Architecture 6, 53 GoDotTest
+Test counts on `main`: GameLogic 184, Domain 32, Infrastructure 12, Architecture 6, 58 GoDotTest
 scene tests.
 
 **Owner ask (2026-06-04): map variety + progression — both now under way.** Captured in
 `docs/research/feature-roadmap.md` as two systems. **S8 arena generation & theming** — the
-**generation** slice is done (ADR-0014, generated battlefield above); still deferred: **theming**
-(swappable background/ground, biome palettes), adjustable size as a player option, and procedural
-spawn/pickup placement. **S9 progression/meters/match-modifiers** — the **damage + K/D meters**
+**generation** slice is done (ADR-0014, generated battlefield above) and the **theming seam** is in
+(`ArenaTheme` ground/wall palette above); still deferred: biome/ground **sprites** (art pass), a
+title-screen theme + size picker. **S9 progression/meters/match-modifiers** — the **damage + K/D meters**
 slice is done (HUD above); still deferred: cosmetic-only unlocks, match modifiers ("everyone starts
 with effect X" / extra-traps / shootable NPC-animal-XP) and the XP layer (post-systems content).
 Each remaining slice gets its own ADR before build.
