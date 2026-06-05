@@ -25,7 +25,8 @@ public partial class ScoreOverlay : CanvasLayer
         _label.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.TopRight);
         _label.HorizontalAlignment = HorizontalAlignment.Right;
         _label.GrowHorizontal = Control.GrowDirection.Begin;
-        _label.Position = new Vector2(-8f, 8f);
+        _label.Position = new Vector2(-Hud.Margin, Hud.LineY(0)); // top-right row 0
+        Hud.Style(_label);
         AddChild(_label);
         Refresh();
     }

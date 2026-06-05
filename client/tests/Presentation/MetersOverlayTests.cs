@@ -36,6 +36,20 @@ public class MetersOverlayTests : TestClass
     }
 
     [Test]
+    public void Meters_SitOnTheTopLeftRow_WithAReadableOutline()
+    {
+        if (System.Math.Abs(_label.Position.Y - Hud.LineY(0)) > 0.01f)
+        {
+            throw new System.Exception($"Meters should sit on HUD row 0; Y was {_label.Position.Y}.");
+        }
+
+        if (!_label.HasThemeConstantOverride("outline_size"))
+        {
+            throw new System.Exception("HUD text needs an outline so it reads over the ground.");
+        }
+    }
+
+    [Test]
     public void Meters_English_StartsAtZeroAndCountsADamagingKill()
         => AssertCounts("en", "Damage 0 - 0   K/D 0/0 - 0/0", "Damage 0 - 3   K/D 0/1 - 1/0");
 

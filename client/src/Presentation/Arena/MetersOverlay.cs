@@ -24,7 +24,8 @@ public partial class MetersOverlay : CanvasLayer
     {
         _label = new Label { Name = "MetersReadout" };
         _label.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.TopLeft);
-        _label.Position = new Vector2(8f, 8f);
+        _label.Position = new Vector2(Hud.Margin, Hud.LineY(0)); // top-left row 0
+        Hud.Style(_label);
         AddChild(_label);
         Refresh();
     }

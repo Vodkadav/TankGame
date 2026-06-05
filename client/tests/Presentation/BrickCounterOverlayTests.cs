@@ -37,6 +37,15 @@ public class BrickCounterOverlayTests : TestClass
     }
 
     [Test]
+    public void BrickCounter_SitsBelowTheMeters_NotStackedOnThem()
+    {
+        if (_label.Position.Y <= Hud.LineY(0))
+        {
+            throw new System.Exception($"Brick counter must sit below the meters row; Y was {_label.Position.Y}.");
+        }
+    }
+
+    [Test]
     public void Counter_English_StartsAtZeroAndCountsADestroyedBrick()
         => AssertCounts("en", "Bricks destroyed: 0", "Bricks destroyed: 1");
 
