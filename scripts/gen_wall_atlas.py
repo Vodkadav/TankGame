@@ -5,9 +5,10 @@ Programmer-generated placeholder art — public domain, to be replaced by Kenney
 "Top-down Shooter" CC0 wall tiles (see docs/credits/assets.md). Deterministic (no
 randomness) so re-running reproduces the exact same PNG.
 
-Atlas layout: five 32x32 tiles in a horizontal strip (160x32), left to right:
+Atlas layout: seven 32x32 tiles in a horizontal strip (224x32), left to right:
   0 brick intact  (hp 3)   1 brick cracked (hp 2)
   2 brick rubble  (hp 1)   3 steel (indestructible)   4 crate (destructible)
+  5 water (blocks movement, not shots)   6 bridge (passable crossing)
 Floor is drawn as no tile, so it is absent from the atlas.
 
 Usage: python scripts/gen_wall_atlas.py
@@ -16,7 +17,7 @@ Usage: python scripts/gen_wall_atlas.py
 from PIL import Image, ImageDraw
 
 TILE = 32
-FRAMES = 5
+FRAMES = 7
 OUT = "client/src/Presentation/Arena/Walls.png"
 
 MORTAR = (60, 55, 52, 255)
@@ -30,6 +31,10 @@ RIVET = (54, 57, 64, 255)
 WOOD = (168, 120, 66, 255)
 WOOD_DARK = (120, 82, 42, 255)
 WOOD_LIGHT = (198, 150, 92, 255)
+WATER = (54, 110, 170, 255)
+WATER_LIGHT = (92, 150, 205, 255)
+PLANK = (150, 108, 60, 255)
+PLANK_DARK = (104, 72, 38, 255)
 
 
 def brick_base(draw):
@@ -90,18 +95,36 @@ def draw_crate(img):
     draw.line([TILE - 3, 2, 2, TILE - 3], fill=WOOD_LIGHT, width=2)
 
 
+def draw_water(img):
+    """Flat blue water with a couple of lighter wavelets."""
+    draw = ImageDraw.Draw(img)
+    draw.rectangle([0, 0, TILE - 1, TILE - 1], fill=WATER)
+    for wy in (9, 21):
+        draw.arc([4, wy - 3, 14, wy + 3], 200, 340, fill=WATER_LIGHT, width=2)
+        draw.arc([18, wy - 1, 28, wy + 5], 200, 340, fill=WATER_LIGHT, width=2)
+
+
+def draw_bridge(img):
+    """Wooden planks running across, over the water."""
+    draw = ImageDraw.Draw(img)
+    draw.rectangle([0, 0, TILE - 1, TILE - 1], fill=WATER)        # water shows at the edges
+    draw.rectangle([0, 4, TILE - 1, TILE - 5], fill=PLANK)        # the deck
+    for x in range(0, TILE, 6):
+        draw.line([x, 4, x, TILE - 5], fill=PLANK_DARK)          # plank seams
+    draw.line([0, 4, TILE - 1, 4], fill=PLANK_DARK)
+    draw.line([0, TILE - 5, TILE - 1, TILE - 5], fill=PLANK_DARK)
+
+
 def main():
     atlas = Image.new("RGBA", (TILE * FRAMES, TILE), (0, 0, 0, 0))
     for state in range(3):  # intact, cracked, rubble
         tile = Image.new("RGBA", (TILE, TILE), (0, 0, 0, 0))
         draw_brick(tile, state)
         atlas.paste(tile, (state * TILE, 0))
-    steel = Image.new("RGBA", (TILE, TILE), (0, 0, 0, 0))
-    draw_steel(steel)
-    atlas.paste(steel, (3 * TILE, 0))
-    crate = Image.new("RGBA", (TILE, TILE), (0, 0, 0, 0))
-    draw_crate(crate)
-    atlas.paste(crate, (4 * TILE, 0))
+    for index, painter in ((3, draw_steel), (4, draw_crate), (5, draw_water), (6, draw_bridge)):
+        tile = Image.new("RGBA", (TILE, TILE), (0, 0, 0, 0))
+        painter(tile)
+        atlas.paste(tile, (index * TILE, 0))
     atlas.save(OUT)
     print(f"wrote {OUT} ({atlas.width}x{atlas.height})")
 

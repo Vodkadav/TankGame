@@ -15,6 +15,8 @@ public partial class WallGridView : TileMapLayer
     private const int AtlasTile = 32;
     private const int SteelFrame = 3;
     private const int CrateFrame = 4;
+    private const int WaterFrame = 5;
+    private const int BridgeFrame = 6;
 
     private int _sourceId = -1;
     private IWallGrid? _grid;
@@ -62,6 +64,8 @@ public partial class WallGridView : TileMapLayer
     {
         CellMaterial.Steel => SteelFrame,
         CellMaterial.Crate => CrateFrame, // one frame; a crate just pops to floor when destroyed
+        CellMaterial.Water => WaterFrame,
+        CellMaterial.Bridge => BridgeFrame,
         CellMaterial.Brick => Math.Clamp(WallGrid.DefaultBrickHp - cell.Hp, 0, 2),
         _ => null,
     };
@@ -79,7 +83,7 @@ public partial class WallGridView : TileMapLayer
             Texture = texture,
             TextureRegionSize = new Vector2I(AtlasTile, AtlasTile),
         };
-        for (var frame = 0; frame <= CrateFrame; frame++)
+        for (var frame = 0; frame <= BridgeFrame; frame++)
         {
             source.CreateTile(new Vector2I(frame, 0));
         }
