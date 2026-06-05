@@ -31,16 +31,23 @@ public sealed class AiInputSource : IInputSource
     // vision range so it collects nearby crates without abandoning the fight to chase a far one.
     private const float PowerupSeekRange = 700f;
 
+    // How far an ambusher will travel to reach a patch of grass to lie in wait (≈9 tiles).
+    private const float AmbushSeekRange = 600f;
+
     private readonly IWorld _world;
     private readonly IArena _arena;
     private readonly IConcealment? _concealment;
+    private readonly bool _ambusher;
     private ITank? _self;
 
-    public AiInputSource(IWorld world, IArena arena, IConcealment? concealment = null)
+    /// <param name="ambusher">When true (and concealment exists), this tank prefers to slip into grass
+    /// and snipe from cover rather than charge — so some enemies lie in wait. Bind it after construction.</param>
+    public AiInputSource(IWorld world, IArena arena, IConcealment? concealment = null, bool ambusher = false)
     {
         _world = world;
         _arena = arena;
         _concealment = concealment;
+        _ambusher = ambusher;
     }
 
     /// <summary>Links this controller to the tank it drives (resolves the construction cycle:
@@ -52,6 +59,11 @@ public sealed class AiInputSource : IInputSource
         if (_self is null || !_self.IsAlive)
         {
             return Hold();
+        }
+
+        if (_ambusher && _concealment is not null && Ambush() is { } ambushIntent)
+        {
+            return ambushIntent;
         }
 
         var target = NearestVisibleEnemy();
@@ -96,6 +108,30 @@ public sealed class AiInputSource : IInputSource
     {
         var delta = point - _self!.Position;
         return delta == Vector2.Zero ? Vector2.Zero : Vector2.Normalize(delta);
+    }
+
+    // Ambusher mode: slip into the nearest grass and snipe from cover. While hidden it holds position
+    // and fires at any enemy in range; otherwise it moves to the grass. Returns null when no grass is
+    // within reach, so the AI falls back to fighting normally.
+    private TankInput? Ambush()
+    {
+        var enemy = NearestVisibleEnemy();
+        var aim = enemy is null ? _self!.TurretRotation : AimAt(enemy.Position);
+        var fire = enemy is not null && Vector2.Distance(enemy.Position, _self!.Position) <= FireRange;
+
+        if (_concealment!.ConcealsAt(_self!.Position))
+        {
+            return new TankInput(Vector2.Zero, aim, fire); // hidden — lie in wait and snipe
+        }
+
+        var spot = _concealment.NearestConcealment(_self.Position, AmbushSeekRange);
+        return spot is null ? null : new TankInput(DirectionTo(spot.Value), aim, fire);
+    }
+
+    private float AimAt(Vector2 point)
+    {
+        var delta = point - _self!.Position;
+        return MathF.Atan2(delta.Y, delta.X);
     }
 
     private TankInput Hold() => new(Vector2.Zero, _self?.TurretRotation ?? 0f, Fire: false);

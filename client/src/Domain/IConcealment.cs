@@ -11,4 +11,9 @@ public interface IConcealment
 {
     /// <summary>Whether <paramref name="point"/> lies on a concealing cell.</summary>
     bool ConcealsAt(Vector2 point);
+
+    /// <summary>The world-space centre of the nearest concealing cell within
+    /// <paramref name="maxRange"/> of <paramref name="from"/>, or null if none is in reach — so an
+    /// AI can head for cover to lie in wait. Pure query.</summary>
+    Vector2? NearestConcealment(Vector2 from, float maxRange);
 }

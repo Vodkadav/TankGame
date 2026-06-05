@@ -39,4 +39,31 @@ public sealed class BushField : IConcealment
 
         return _bushes[cellX, cellY];
     }
+
+    public Vector2? NearestConcealment(Vector2 from, float maxRange)
+    {
+        Vector2? nearest = null;
+        var nearestDistance = maxRange;
+
+        for (var x = 0; x < _width; x++)
+        {
+            for (var y = 0; y < _height; y++)
+            {
+                if (!_bushes[x, y])
+                {
+                    continue;
+                }
+
+                var centre = _origin + new Vector2((x + 0.5f) * _tileSize, (y + 0.5f) * _tileSize);
+                var distance = Vector2.Distance(from, centre);
+                if (distance <= nearestDistance)
+                {
+                    nearestDistance = distance;
+                    nearest = centre;
+                }
+            }
+        }
+
+        return nearest;
+    }
 }

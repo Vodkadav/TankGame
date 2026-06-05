@@ -182,13 +182,16 @@ public partial class ArenaScene : Node2D
 
         if (_mode != GameMode.TwoPlayerVersus)
         {
+            var enemyIndex = 0;
             foreach (var (ex, ey) in _layout.EnemySpawns)
             {
-                var ai = new AiInputSource(_world, _arena, _bushes);
+                var ambusher = enemyIndex % 2 == 1; // every other enemy lies in wait in the grass
+                var ai = new AiInputSource(_world, _arena, _bushes, ambusher);
                 var enemy = new Tank(ai, _world, _arena, CellCentre(ex, ey),
                     EnemySpeed, FireInterval, ProjectileSpeed, maxHp: 3, team: EnemyTeam, lives: StartingLives);
                 ai.Bind(enemy); // resolve the input-source ↔ tank construction cycle
                 SpawnTank(enemy);
+                enemyIndex++;
             }
         }
 

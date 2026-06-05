@@ -386,8 +386,13 @@ Catalogue and ordering: `docs/research/local-backlog.md`.
   further by the #103 floating name). Base SDXL could not make a clean neutral/tintable disc (its
   attempts were coloured/hazy/shadowed), so the disc is deterministic PIL — the "generated" half of the
   hybrid; SDXL per-kind icon-discs remain a possible follow-up.
+- **AI ambush from grass** ✅ some enemies now lie in wait. `IConcealment.NearestConcealment(from, range)`
+  (implemented by `BushField`) finds the closest grass; an `ambusher` `AiInputSource` slips to the
+  nearest grass and snipes from cover — holds + fires at enemies in range while hidden, only falling
+  back to charging when no grass is within reach. `ArenaScene` makes every other enemy an ambusher.
+  AiInputSource tests 15 → 18.
 
-Test counts on `main`: GameLogic 193, Domain 32, Infrastructure 12, Architecture 6, 69 GoDotTest
+Test counts on `main`: GameLogic 196, Domain 32, Infrastructure 12, Architecture 6, 69 GoDotTest
 scene tests.
 
 **Owner ask (2026-06-04): map variety + progression — both now under way.** Captured in
