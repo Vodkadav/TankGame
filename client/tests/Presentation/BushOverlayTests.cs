@@ -32,13 +32,14 @@ public class BushOverlayTests : TestClass
 
         if (_overlay.GetChildCount() != 2)
         {
-            throw new System.Exception($"Expected 2 bush patches, got {_overlay.GetChildCount()}.");
+            throw new System.Exception($"Expected 2 bush clumps, got {_overlay.GetChildCount()}.");
         }
 
-        var patch = _overlay.GetNode<Polygon2D>("Bush_1_0");
-        if (patch.Position != new Vector2(64f, 0f))
+        // Cell (1,0) centre world (96,32) projects to iso ((96-32)*1, (96+32)*0.5) = (64, 64).
+        var patch = _overlay.GetNode<Sprite2D>("Bush_1_0");
+        if (patch.Position != new Vector2(64f, 64f))
         {
-            throw new System.Exception($"Bush (1,0) should sit on its tile; was {patch.Position}.");
+            throw new System.Exception($"Bush (1,0) should sit on its projected tile; was {patch.Position}.");
         }
     }
 

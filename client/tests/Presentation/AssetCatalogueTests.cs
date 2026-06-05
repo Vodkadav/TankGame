@@ -29,6 +29,8 @@ public class AssetCatalogueTests : TestClass
             AssetCatalogue.Default.SteelTile,
             AssetCatalogue.Default.CrateTile,
             AssetCatalogue.Default.BuildingTile,
+            AssetCatalogue.Default.BushTile,
+            AssetCatalogue.Default.SandbagTile,
         })
         {
             if (GD.Load<Texture2D>(path) is null)

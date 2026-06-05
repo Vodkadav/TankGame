@@ -1,51 +1,52 @@
 using Godot;
+using NVector2 = System.Numerics.Vector2;
 
 namespace TankGame.Presentation;
 
-/// <summary>Draws a level's sandbags as opaque khaki patches — passable terrain that slows a tank
-/// crossing it (the GameLogic <c>SandbagField</c> / <c>ITerrain</c> applies the slow; this only shows
-/// where). A pure mirror built in code — one <see cref="Polygon2D"/> per sandbag cell — so no art
-/// asset is needed. Sandbags never block movement or shots.</summary>
+/// <summary>Draws a level's sandbags as low isometric bag clusters — passable terrain that slows a
+/// tank crossing it (the GameLogic <c>SandbagField</c> / <c>ITerrain</c> applies the slow; this only
+/// shows where). One <see cref="Sprite2D"/> per sandbag cell, projected onto its tile and sitting just
+/// above the ground (below every tank, so a tank drives over them). Sandbags never block movement or
+/// shots.</summary>
 public partial class SandbagOverlay : Node2D
 {
-    private static readonly Color SandbagColour = new(0.62f, 0.52f, 0.30f, 0.9f);
-    private const float Inset = 2f;
+    // Above the ground (ZIndex -10) but below every entity, so a tank reads as crossing the bags.
+    private const int SandbagZ = -3;
 
-    /// <summary>Builds a patch for every sandbag cell. <paramref name="sandbags"/> is indexed
+    // The art's ground contact sits 33 px from its bottom (shared by the iso tiles); centre the
+    // sprite and lift it so that point lands on the cell.
+    private const float BaseDiamondFromBottom = 33f;
+
+    /// <summary>Builds a cluster for every sandbag cell. <paramref name="sandbags"/> is indexed
     /// <c>[x, y]</c>; <paramref name="tileSize"/> is the world-space size of one cell.</summary>
     public void Bind(bool[,] sandbags, float tileSize)
     {
-        Transform = IsoProjection.ScreenTransform; // shear the square patches into iso diamonds
         var width = sandbags.GetLength(0);
         var height = sandbags.GetLength(1);
+        var texture = GD.Load<Texture2D>(AssetCatalogue.Active.SandbagTile);
         for (var x = 0; x < width; x++)
         {
             for (var y = 0; y < height; y++)
             {
                 if (sandbags[x, y])
                 {
-                    AddChild(BuildPatch(x, y, tileSize));
+                    AddChild(BuildCluster(x, y, tileSize, texture));
                 }
             }
         }
     }
 
-    private static Polygon2D BuildPatch(int x, int y, float tileSize)
+    private static Sprite2D BuildCluster(int x, int y, float tileSize, Texture2D texture)
     {
-        var min = Inset;
-        var max = tileSize - Inset;
-        return new Polygon2D
+        var centre = IsoProjection.WorldToScreen(new NVector2((x + 0.5f) * tileSize, (y + 0.5f) * tileSize));
+        return new Sprite2D
         {
             Name = $"Sandbag_{x}_{y}",
-            Position = new Vector2(x * tileSize, y * tileSize),
-            Color = SandbagColour,
-            Polygon = new[]
-            {
-                new Vector2(min, min),
-                new Vector2(max, min),
-                new Vector2(max, max),
-                new Vector2(min, max),
-            },
+            Texture = texture,
+            Position = new Vector2(centre.X, centre.Y),
+            Offset = new Vector2(0f, BaseDiamondFromBottom - (texture.GetHeight() / 2f)),
+            ZIndex = SandbagZ,
+            TextureFilter = CanvasItem.TextureFilterEnum.Nearest,
         };
     }
 }

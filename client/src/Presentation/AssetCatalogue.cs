@@ -10,7 +10,8 @@ public sealed record AssetCatalogue(
     string GroundTile, string PickupDisc,
     string WaterTile, string BridgeTile, string MountainTile,
     string BrickIntactTile, string BrickCrackedTile, string BrickRubbleTile,
-    string SteelTile, string CrateTile, string BuildingTile)
+    string SteelTile, string CrateTile, string BuildingTile,
+    string BushTile, string SandbagTile)
 {
     /// <summary>The active sprite set. The tank hull + turret are the imported Kenney CC0 art
     /// (neutral sand, tinted per team via <c>TankView.ApplyTeamTint</c>); the ground/terrain are native
@@ -30,7 +31,9 @@ public sealed record AssetCatalogue(
         BrickRubbleTile: "res://src/Presentation/Arena/IsoBrick2.png",
         SteelTile: "res://src/Presentation/Arena/IsoSteel.png",
         CrateTile: "res://src/Presentation/Arena/IsoCrate.png",
-        BuildingTile: "res://src/Presentation/Arena/IsoBuilding.png");
+        BuildingTile: "res://src/Presentation/Arena/IsoBuilding.png",
+        BushTile: "res://src/Presentation/Arena/IsoBush.png",
+        SandbagTile: "res://src/Presentation/Arena/IsoSandbags.png");
 
     /// <summary>The active set every view loads from. Defaults to <see cref="Default"/>.</summary>
     public static AssetCatalogue Active { get; set; } = Default;

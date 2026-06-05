@@ -32,7 +32,7 @@ public class SandbagOverlayTests : TestClass
         var patches = 0;
         foreach (var child in _overlay.GetChildren())
         {
-            if (child is Polygon2D)
+            if (child is Sprite2D)
             {
                 patches++;
             }
@@ -40,7 +40,7 @@ public class SandbagOverlayTests : TestClass
 
         if (patches != 2)
         {
-            throw new System.Exception($"Expected one patch per sandbag cell (2); saw {patches}.");
+            throw new System.Exception($"Expected one iso cluster per sandbag cell (2); saw {patches}.");
         }
     }
 }
