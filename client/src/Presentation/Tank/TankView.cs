@@ -29,6 +29,10 @@ public partial class TankView : Node2D
 
     public void Bind(ITank tank) => _tank = tank;
 
+    /// <summary>Tints the whole view to mark which side it is on (white = friendly, reddened =
+    /// enemy), so one neutral tank texture reads as either team.</summary>
+    public void ApplyTeamTint(bool isEnemy) => Modulate = TeamPalette.TintFor(isEnemy);
+
     public override void _Process(double delta) => UpdateFromModel();
 
     /// <summary>Mirrors the bound tank's state onto the node, sprites, and health bar. Public

@@ -112,6 +112,22 @@ public class TankViewTests : TestClass
     }
 
     [Test]
+    public void ApplyTeamTint_TintsEnemies_AndLeavesAlliesUntinted()
+    {
+        _view.ApplyTeamTint(isEnemy: true);
+        if (_view.Modulate != TeamPalette.TintFor(isEnemy: true))
+        {
+            throw new System.Exception($"An enemy view should carry the enemy tint; was {_view.Modulate}.");
+        }
+
+        _view.ApplyTeamTint(isEnemy: false);
+        if (_view.Modulate != Colors.White)
+        {
+            throw new System.Exception($"A friendly view should be untinted; was {_view.Modulate}.");
+        }
+    }
+
+    [Test]
     public void DownedTank_IsHidden_AndReappearsOnRespawn()
     {
         var input = new FixedInput(new TankInput(NVector2.Zero, Aim: 0f, Fire: false));

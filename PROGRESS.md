@@ -332,8 +332,13 @@ Catalogue and ordering: `docs/research/local-backlog.md`.
   whatever wall art is loaded — **source-agnostic, not blocked on the art pass**. Ships `Sandy` +
   `Slate` so the swap is real and tested. Deferred: a title-screen theme picker; biome/ground sprites
   (art pass).
+- **Art-pass prep — tank team tinting (seam)** ✅ `TeamPalette` (Presentation) is the single source of
+  the per-team `Sprite2D.Modulate` tint (friendly = white/as-authored, enemy = reddened), and
+  `TankView.ApplyTeamTint(isEnemy)` owns applying it. Both `ArenaScene` and `NetArenaScene` now call it
+  instead of each hardcoding the same red `Color`, so one neutral tank texture will read as either side
+  once the tintable art lands.
 
-Test counts on `main`: GameLogic 184, Domain 32, Infrastructure 12, Architecture 6, 58 GoDotTest
+Test counts on `main`: GameLogic 184, Domain 32, Infrastructure 12, Architecture 6, 61 GoDotTest
 scene tests.
 
 **Owner ask (2026-06-04): map variety + progression — both now under way.** Captured in

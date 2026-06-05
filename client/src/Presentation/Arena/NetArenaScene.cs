@@ -174,11 +174,7 @@ public partial class NetArenaScene : Node2D
         var view = GD.Load<PackedScene>("res://src/Presentation/Tank/TankView.tscn").Instantiate<TankView>();
         view.Name = $"TankView{slot}";
         view.Bind(tank);
-        if (slot != _localSlot)
-        {
-            view.Modulate = new Color(1f, 0.5f, 0.5f); // tint the opponent so the two read apart
-        }
-
+        view.ApplyTeamTint(slot != _localSlot); // tint the opponent so the two read apart
         AddChild(view);
         _views[slot] = view;
         return tank;
