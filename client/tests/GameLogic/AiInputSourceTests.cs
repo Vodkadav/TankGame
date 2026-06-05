@@ -195,6 +195,24 @@ public class AiInputSourceTests
     }
 
     [Fact]
+    public void IsUnawareOfAnEnemyOutsideItsVisionCircle()
+    {
+        // An enemy in the open at 800 on +X — within the old whole-map sight, but outside the ~640
+        // circle. A SEEN enemy this far would make the AI close straight in (Move == unit +X); an
+        // unseen one leaves it roaming, so it does not drive at the enemy.
+        var world = new World();
+        var self = new StubTank(Vector2.Zero, team: 1);
+        world.Spawn(self);
+        world.Spawn(new StubTank(new Vector2(800f, 0f), team: 0));
+        var ai = AiDriving(self, world);
+
+        var intent = ai.Read();
+
+        Assert.False(intent.Fire);
+        Assert.NotEqual(new Vector2(1f, 0f), intent.Move); // not closing in on the unseen enemy
+    }
+
+    [Fact]
     public void ChasesTheNearestEnemyItCanSee_NotACloserHiddenOne()
     {
         // A steel wall in cell 2 hides a close enemy in cell 0's row; a visible enemy sits

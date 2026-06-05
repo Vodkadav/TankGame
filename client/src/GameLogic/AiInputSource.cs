@@ -18,10 +18,11 @@ public sealed class AiInputSource : IInputSource
     private const float FireRange = 420f;
     private const float StandoffDistance = 160f;
 
-    // Generous sight (≈18 tiles) so enemies engage across the open battlefield's clear
-    // sightlines and the game stays lively — while line-of-sight gating means walls and bushes
-    // still break the AI's view and enable ambush. A tunable balance knob.
-    private const float VisionRange = 1200f;
+    // The AI's circle of vision (≈10 tiles): it is unaware of tanks outside this radius — it does not
+    // see across the whole map. Line-of-sight gating means walls and bushes break the view within it,
+    // too. Roughly matches the player's lit vision circle so both sides see about as far. A firing tank
+    // can still draw the AI from beyond this (handled separately). A tunable balance knob.
+    private const float VisionRange = 640f;
 
     // A tank hiding in a bush is only spotted from within about a tile and a half — close
     // enough to brush the foliage. Beyond that the AI cannot pick it out of the cover.

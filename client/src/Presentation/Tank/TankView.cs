@@ -36,9 +36,26 @@ public partial class TankView : Node2D
     /// so a tank in cover is genuinely hard to see). Set each frame by the scene.</summary>
     public bool Concealed { get; set; }
 
+    private Color _teamTint = Colors.White;
+    private bool _stealthed;
+
     /// <summary>Tints the whole view to mark which side it is on (white = friendly, reddened =
     /// enemy), so one neutral tank texture reads as either team.</summary>
-    public void ApplyTeamTint(bool isEnemy) => Modulate = TeamPalette.TintFor(isEnemy);
+    public void ApplyTeamTint(bool isEnemy)
+    {
+        _teamTint = TeamPalette.TintFor(isEnemy);
+        ApplyTint();
+    }
+
+    /// <summary>When true the tank is hiding in a bush — darken it to signal it is in stealth cover.
+    /// Keeps the team tint underneath. Set each frame by the scene for the player's own tank.</summary>
+    public bool Stealthed
+    {
+        get => _stealthed;
+        set { _stealthed = value; ApplyTint(); }
+    }
+
+    private void ApplyTint() => Modulate = _stealthed ? _teamTint.Darkened(0.55f) : _teamTint;
 
     public override void _Process(double delta) => UpdateFromModel();
 
