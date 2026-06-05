@@ -89,6 +89,7 @@ public partial class ArenaScene : Node2D
     private BushField _bushes = null!;
     private SandbagField _sandbags = null!;
     private Camera2D _camera = null!;
+    private CanvasLayer _fireArrows = null!;
     private ITank _player = null!;
     private GeneratedArena _layout = null!;
     private GameMode _mode;
@@ -146,6 +147,9 @@ public partial class ArenaScene : Node2D
 
         _camera = new Camera2D { Name = "GameCamera", ProcessCallback = Camera2D.Camera2DProcessCallback.Physics };
         AddChild(_camera);
+
+        _fireArrows = new CanvasLayer { Name = "FireArrows" }; // screen-space edge arrows for incoming fire
+        AddChild(_fireArrows);
 
         SpawnPowerups(); // before the tanks so pickup diamonds render beneath them
         SpawnTanks();
@@ -385,6 +389,31 @@ public partial class ArenaScene : Node2D
         {
             pickup.Collected += kind => ShowPickupFloater(pickup.Position, kind);
         }
+
+        // A new enemy shot — flash a screen-edge arrow toward the tank that fired it.
+        if (entity is IProjectile shot && shot.Team != PlayerTeam)
+        {
+            ShowFireArrow(shot.Position);
+        }
+    }
+
+    // Place a blinking arrow near the screen edge pointing toward where the shot came from. The
+    // direction from the screen centre to the shooter is the same in world and screen space (the
+    // camera is not rotated), so a normalised world delta gives the on-screen heading.
+    private void ShowFireArrow(NVector2 shooterWorld)
+    {
+        var viewportCentre = GetViewportRect().Size * 0.5f;
+        var toShooter = new Vector2(shooterWorld.X, shooterWorld.Y) - _camera.GetScreenCenterPosition();
+        if (toShooter.LengthSquared() < 1f)
+        {
+            return;
+        }
+
+        var dir = toShooter.Normalized();
+        var radius = Mathf.Min(viewportCentre.X, viewportCentre.Y) * 0.86f; // just inside the edge
+        var arrow = new FireArrow();
+        _fireArrows.AddChild(arrow);
+        arrow.Show(viewportCentre + (dir * radius), dir.Angle());
     }
 
     private void ShowPickupFloater(NVector2 position, PowerupKind kind)
