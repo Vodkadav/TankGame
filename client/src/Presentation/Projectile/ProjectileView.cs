@@ -31,5 +31,7 @@ public partial class ProjectileView : Node2D
         }
 
         Position = new Vector2(_projectile.Position.X, _projectile.Position.Y);
+        // The bullet art faces east at rotation 0; point it the way the shot is travelling.
+        Rotation = Mathf.Atan2(_projectile.Direction.Y, _projectile.Direction.X);
     }
 }

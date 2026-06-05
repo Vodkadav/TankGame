@@ -40,6 +40,22 @@ public class ProjectileViewTests : TestClass
     }
 
     [Test]
+    public void UpdateFromModel_RotatesTheBullet_ToFaceTravelDirection()
+    {
+        var arena = new RectArena(new NVector2(0f, 0f), new NVector2(1000f, 1000f));
+        var projectile = new Projectile(arena, new NVector2(50f, 50f), new NVector2(0f, 1f), speed: 200f);
+        _view.Bind(projectile);
+
+        _view.UpdateFromModel();
+
+        // The bullet art faces east at rotation 0; a shot heading +Y must point the sprite down.
+        if (Mathf.Abs(_view.Rotation - (Mathf.Pi / 2f)) > 0.01f)
+        {
+            throw new System.Exception($"View should face the travel direction (π/2); was {_view.Rotation}.");
+        }
+    }
+
+    [Test]
     public void UpdateFromModel_MirrorsTheProjectilePosition()
     {
         var arena = new RectArena(new NVector2(0f, 0f), new NVector2(100f, 100f));

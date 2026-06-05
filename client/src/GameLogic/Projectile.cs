@@ -45,6 +45,7 @@ public sealed class Projectile : IProjectile
     public int Team => _state.Team;
     public Guid Id { get; }
     public Vector2 Position => _state.Position;
+    public Vector2 Direction => _state.Direction;
     public bool IsAlive => _state.IsAlive;
 
     /// <summary>Damage this shot deals to a tank on impact.</summary>
