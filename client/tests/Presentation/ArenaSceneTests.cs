@@ -162,26 +162,26 @@ public class ArenaSceneTests : TestClass
     }
 
     [Test]
-    public void Arena_RendersTheMazeWallGrid()
+    public void Arena_RendersTheWalls_AsIsoTiles()
     {
-        WallGridView? walls = null;
+        IsoTerrainView? terrain = null;
         foreach (var child in _arena.GetChildren())
         {
-            if (child is WallGridView view)
+            if (child is IsoTerrainView view)
             {
-                walls = view;
+                terrain = view;
             }
         }
 
-        if (walls is null)
+        if (terrain is null)
         {
-            throw new System.Exception("Arena must render the maze via a WallGridView.");
+            throw new System.Exception("Arena must render the walls/terrain via an IsoTerrainView.");
         }
 
-        // The hand-authored maze has a steel border, so the corner cell must carry a tile.
-        if (walls.GetCellSourceId(new Vector2I(0, 0)) == -1)
+        // The generated arena has a steel border, so the corner cell must carry an iso wall tile.
+        if (terrain.GetNodeOrNull<Sprite2D>("Terrain_0_0") is null)
         {
-            throw new System.Exception("The maze's steel border should be drawn at cell (0,0).");
+            throw new System.Exception("The steel border should be drawn as an iso tile at cell (0,0).");
         }
     }
 
@@ -263,21 +263,4 @@ public class ArenaSceneTests : TestClass
         }
     }
 
-    [Test]
-    public void Arena_TintsTheWalls_WithTheTheme()
-    {
-        WallGridView? walls = null;
-        foreach (var child in _arena.GetChildren())
-        {
-            if (child is WallGridView view)
-            {
-                walls = view;
-            }
-        }
-
-        if (walls!.Modulate != GameSetup.Theme.WallTint)
-        {
-            throw new System.Exception($"Walls should carry the theme tint; was {walls.Modulate}.");
-        }
-    }
 }

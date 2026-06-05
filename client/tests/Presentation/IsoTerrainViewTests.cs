@@ -23,30 +23,51 @@ public class IsoTerrainViewTests : TestClass
     public void Cleanup() => _view.QueueFree();
 
     [Test]
-    public void Bind_DrawsWaterBridgeAndMountain_ButNotWallsOrFloor()
+    public void Bind_DrawsEveryNonFloorCell_ButNotFloor()
     {
-        // [x, y]: (0,0) water, (1,0) bridge, (2,0) mountain, (3,0) brick, (4,0) floor.
+        // [x, y]: (0,0) water, (1,0) mountain, (2,0) brick, (3,0) steel, (4,0) floor.
         var grid = WallGrid.FromMaterials(new[,]
         {
             { CellMaterial.Water },
-            { CellMaterial.Bridge },
             { CellMaterial.Mountain },
             { CellMaterial.Brick },
+            { CellMaterial.Steel },
             { CellMaterial.Floor },
         });
 
         _view.Bind(grid, tileSize: 64f);
 
-        // Three natural-terrain tiles; the brick and floor are not this view's job.
-        if (_view.GetChildCount() != 3)
+        // Four non-floor tiles; the floor is not drawn.
+        if (_view.GetChildCount() != 4)
         {
-            throw new System.Exception($"Expected 3 terrain tiles (water/bridge/mountain), got {_view.GetChildCount()}.");
+            throw new System.Exception($"Expected 4 non-floor tiles, got {_view.GetChildCount()}.");
         }
 
-        if (_view.GetNodeOrNull<Sprite2D>("Terrain_3_0") is not null
-            || _view.GetNodeOrNull<Sprite2D>("Terrain_4_0") is not null)
+        if (_view.GetNodeOrNull<Sprite2D>("Terrain_4_0") is not null)
         {
-            throw new System.Exception("IsoTerrainView must not draw walls or floor.");
+            throw new System.Exception("IsoTerrainView must not draw floor cells.");
+        }
+    }
+
+    [Test]
+    public void Brick_RetilesThroughDamageFrames_AndVanishesWhenBroken()
+    {
+        var grid = WallGrid.FromMaterials(new[,] { { CellMaterial.Brick } });
+        _view.Bind(grid, tileSize: 64f);
+
+        var intact = _view.GetNode<Sprite2D>("Terrain_0_0").Texture;
+
+        grid.DamageCell(0, 0, 1); // hp 2 -> cracked
+        var cracked = _view.GetNode<Sprite2D>("Terrain_0_0").Texture;
+        if (cracked == intact)
+        {
+            throw new System.Exception("A cracked brick should re-tile to a different frame.");
+        }
+
+        grid.DamageCell(0, 0, 2); // breaks to floor
+        if (_view.GetNodeOrNull<Sprite2D>("Terrain_0_0") is not null)
+        {
+            throw new System.Exception("A broken brick must leave no tile.");
         }
     }
 
