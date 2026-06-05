@@ -19,6 +19,7 @@ public sealed record ArenaGenParams(
     double BrickDensity = 0.12,
     double SteelDensity = 0.04,
     double BushDensity = 0.05,
+    double SandbagDensity = 0.04,
     int SpawnSafeRadius = 1,
     double MinOpenFloorFraction = 0.8,
     int MinAnchorSeparation = 4);
@@ -30,7 +31,8 @@ public sealed record GeneratedArena(
     (int X, int Y) PlayerSpawn,
     (int X, int Y) Player2Spawn,
     IReadOnlyList<(int X, int Y)> EnemySpawns,
-    IReadOnlyList<(int X, int Y)> PickupCells);
+    IReadOnlyList<(int X, int Y)> PickupCells,
+    bool[,] Sandbags);
 
 /// <summary>Generates an open battlefield in the spirit of the hand-authored one (a steel border
 /// around a mostly-open interior of scattered brick, a little steel, and bush hide-spots) — but
@@ -83,7 +85,7 @@ public sealed class ArenaGenerator
         }
 
         var locked = LockedMask(p, chosen, playerSpawn);
-        var (materials, bushes) = Scatter(p, rng, locked);
+        var (materials, bushes, sandbags) = Scatter(p, rng, locked);
 
         // Wall off any floor the spawn can't reach; a locked anchor that ends up enclosed instead
         // rejects this attempt (every anchor must stay reachable open floor).
@@ -104,6 +106,7 @@ public sealed class ArenaGenerator
 
                 materials[x, y] = CellMaterial.Steel;
                 bushes[x, y] = false;
+                sandbags[x, y] = false;
             }
         }
 
@@ -113,7 +116,7 @@ public sealed class ArenaGenerator
         }
 
         var map = LevelMap.FromCells(materials, bushes, playerSpawn.X, playerSpawn.Y);
-        return new GeneratedArena(map, playerSpawn, player2Spawn, enemySpawns, pickupCells);
+        return new GeneratedArena(map, playerSpawn, player2Spawn, enemySpawns, pickupCells, sandbags);
     }
 
     // Picks a cell within the region, preferring one at least MinAnchorSeparation (Chebyshev) from
@@ -189,10 +192,12 @@ public sealed class ArenaGenerator
         }
     }
 
-    private static (CellMaterial[,] Materials, bool[,] Bushes) Scatter(ArenaGenParams p, Random rng, bool[,] locked)
+    private static (CellMaterial[,] Materials, bool[,] Bushes, bool[,] Sandbags) Scatter(
+        ArenaGenParams p, Random rng, bool[,] locked)
     {
         var materials = new CellMaterial[p.Width, p.Height];
         var bushes = new bool[p.Width, p.Height];
+        var sandbags = new bool[p.Width, p.Height];
 
         for (var x = 0; x < p.Width; x++)
         {
@@ -222,15 +227,20 @@ public sealed class ArenaGenerator
                 else
                 {
                     materials[x, y] = CellMaterial.Floor;
+                    // A floor cell may be a bush (cover) or sandbags (slow), never both.
                     if (rng.NextDouble() < p.BushDensity)
                     {
                         bushes[x, y] = true;
+                    }
+                    else if (rng.NextDouble() < p.SandbagDensity)
+                    {
+                        sandbags[x, y] = true;
                     }
                 }
             }
         }
 
-        return (materials, bushes);
+        return (materials, bushes, sandbags);
     }
 
     private static bool IsBorder(ArenaGenParams p, int x, int y) =>
@@ -310,7 +320,8 @@ public sealed class ArenaGenerator
         var pickupCells = SpreadCells(p, p.PickupCount, offset: 1);
 
         var map = LevelMap.FromCells(materials, new bool[p.Width, p.Height], playerSpawn.X, playerSpawn.Y);
-        return new GeneratedArena(map, playerSpawn, player2Spawn, enemySpawns, pickupCells);
+        return new GeneratedArena(map, playerSpawn, player2Spawn, enemySpawns, pickupCells,
+            new bool[p.Width, p.Height]);
     }
 
     private static List<(int X, int Y)> SpreadCells(ArenaGenParams p, int count, int offset)

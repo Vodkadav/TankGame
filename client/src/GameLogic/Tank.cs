@@ -15,6 +15,7 @@ public sealed class Tank : ITank
     private readonly IInputSource _input;
     private readonly IWorld _world;
     private readonly IArena _arena;
+    private readonly ITerrain? _terrain;
     private readonly Vector2 _spawnPosition;
     private readonly Stats _stats;
     private readonly float _projectileSpeed;
@@ -46,7 +47,8 @@ public sealed class Tank : ITank
         float projectileSpeed,
         int maxHp = 3,
         int team = 0,
-        int lives = 1)
+        int lives = 1,
+        ITerrain? terrain = null)
     {
         Id = Guid.NewGuid();
         MaxHp = maxHp;
@@ -56,6 +58,7 @@ public sealed class Tank : ITank
         _input = input;
         _world = world;
         _arena = arena;
+        _terrain = terrain;
         Position = startPosition;
         _spawnPosition = startPosition;
         _stats = new Stats(new Dictionary<StatKind, float>
@@ -193,7 +196,9 @@ public sealed class Tank : ITank
             move = Vector2.Normalize(move); // a (1,1) keyboard diagonal must not be faster
         }
 
-        var desired = Position + (move * _stats.Current(StatKind.Speed) * deltaSeconds);
+        // Terrain underfoot scales the speed — sandbags slow a tank crossing them.
+        var speed = _stats.Current(StatKind.Speed) * (_terrain?.SpeedFactorAt(Position) ?? 1f);
+        var desired = Position + (move * speed * deltaSeconds);
 
         // Resolve each axis independently so the tank slides along a wall instead of sticking.
         // A move is allowed only if the leading edge (centre + radius) clears walls and the new
