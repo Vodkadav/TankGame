@@ -447,8 +447,12 @@ Catalogue and ordering: `docs/research/local-backlog.md`.
   but the bias stops once a kind already runs `RunCap` (5) cells into the current one (owner's "cap at
   5, then equal chance"). Floor is the majority so clustering keeps the ≥80%-open invariant. GameLogic
   208 → 209.
+- **Missile pickup** ✅ a single shot that plows through a whole line of tanks and destructible walls,
+  stopping only at steel. `PowerupKind.Missile` (Domain) + `MissileAmmo` (a single-lance piercing
+  modifier with a huge `Pierce` budget, reusing `PiercingBehaviour`). `ArenaScene` lays a one-shot
+  missile crate (hot-orange disc, `pickup.missile` EN/ES/DK). Field pickups 7 → 8. GameLogic 209 → 210.
 
-Test counts on `main`: GameLogic 209, Domain 32, Infrastructure 12, Architecture 6, 76 GoDotTest
+Test counts on `main`: GameLogic 210, Domain 32, Infrastructure 12, Architecture 6, 76 GoDotTest
 scene tests.
 
 **Owner ask (2026-06-04): map variety + progression — both now under way.** Captured in

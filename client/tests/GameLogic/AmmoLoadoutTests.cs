@@ -94,6 +94,18 @@ public class AmmoLoadoutTests
     }
 
     [Fact]
+    public void MissileAmmo_IsASinglePiercingLance_WithAHugePierceBudget()
+    {
+        var loadout = new AmmoLoadout();
+        new SpreadAmmo(count: 3, radians: 0.2f).ApplyTo(loadout); // even with spread loaded…
+        new MissileAmmo(tileSize: 64f).ApplyTo(loadout);          // …the missile fires a single lance
+
+        Assert.Equal(1, loadout.SpreadCount);
+        Assert.Equal(MissileAmmo.Pierce, loadout.Pierce);
+        Assert.IsType<PiercingBehaviour>(loadout.BehaviourFactory());
+    }
+
+    [Fact]
     public void Behaviour_IsOneAxis_PiercingReplacesBouncing()
     {
         var loadout = new AmmoLoadout();
