@@ -391,8 +391,17 @@ Catalogue and ordering: `docs/research/local-backlog.md`.
   nearest grass and snipes from cover — holds + fires at enemies in range while hidden, only falling
   back to charging when no grass is within reach. `ArenaScene` makes every other enemy an ambusher.
   AiInputSource tests 15 → 18.
+- **Composable / stacking ammo** ✅ (`docs/adr/0016-composable-ammo.md`, supersedes the firing-strategy
+  half of 0013) ammo pickups now STACK. A tank holds one mutable `AmmoLoadout` with two independent
+  axes — spread pattern (`SpreadCount`/`SpreadRadians`) × per-pellet behaviour
+  (`BehaviourFactory`/`Pierce`); its default state is the single straight shot. Pickups are
+  `AmmoModifier`s (`SpreadAmmo` / `BouncingAmmo` / `PiercingAmmo`) that set only their own axis, so
+  bouncing + spread fires a fan of bouncing pellets (bouncing/piercing share the behaviour axis →
+  last wins). `Tank.LoadAmmo(modifier, shots)` applies + refreshes shots, `Reset`s on depletion.
+  `IWeapon`/`BehaviourWeapon`/`SpreadWeapon`/`PiercingWeapon` removed; `IProjectileBehaviour` classes
+  unchanged. GameLogic 196 → 200 (new `AmmoLoadoutTests`).
 
-Test counts on `main`: GameLogic 196, Domain 32, Infrastructure 12, Architecture 6, 69 GoDotTest
+Test counts on `main`: GameLogic 200, Domain 32, Infrastructure 12, Architecture 6, 69 GoDotTest
 scene tests.
 
 **Owner ask (2026-06-04): map variety + progression — both now under way.** Captured in

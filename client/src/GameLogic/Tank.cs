@@ -22,8 +22,7 @@ public sealed class Tank : ITank
     private float _pushTimer;
     private int _livesRemaining;
     private float _respawnTimer;
-    private readonly IWeapon _defaultWeapon = new BehaviourWeapon(() => StraightBehaviour.Instance);
-    private IWeapon? _specialWeapon;
+    private readonly AmmoLoadout _ammo = new();
     private int _specialShots;
 
     /// <param name="input">Per-frame intent source.</param>
@@ -72,12 +71,13 @@ public sealed class Tank : ITank
     /// <c>docs/adr/0012-stats-and-status-effects.md</c>.</summary>
     public void ApplyEffect(StatusEffect effect) => _stats.Apply(effect);
 
-    /// <summary>Loads a special weapon for the next <paramref name="shots"/> shots (an ammo
-    /// crate); once spent, the tank reverts to its default straight shot. See
-    /// <c>docs/adr/0013-weapon-behaviour-strategy.md</c>.</summary>
-    public void LoadAmmo(IWeapon weapon, int shots)
+    /// <summary>Applies an ammo crate: the modifier sets its axis of the loadout (spread or
+    /// behaviour) — leaving the others, so pickups stack — and refreshes the special-shot count.
+    /// Once spent, the loadout resets to the default straight shot. See
+    /// <c>docs/adr/0016-composable-ammo.md</c>.</summary>
+    public void LoadAmmo(AmmoModifier modifier, int shots)
     {
-        _specialWeapon = weapon;
+        modifier.ApplyTo(_ammo);
         _specialShots = shots;
     }
 
@@ -246,12 +246,12 @@ public sealed class Tank : ITank
             _fireCooldown = _stats.Current(StatKind.FireInterval);
             var direction = new Vector2(MathF.Cos(TurretRotation), MathF.Sin(TurretRotation));
 
-            // Fire the loaded special weapon while ammo lasts, then fall back to the default shot.
-            var weapon = _specialShots > 0 ? _specialWeapon! : _defaultWeapon;
-            weapon.Fire(_world, _arena, Position, direction, _projectileSpeed, Team);
+            // The loadout fires its current shot (special ammo while it lasts, else the default
+            // straight shot — the loadout is in its default state whenever no special ammo is loaded).
+            _ammo.Fire(_world, _arena, Position, direction, _projectileSpeed, Team);
             if (_specialShots > 0 && --_specialShots == 0)
             {
-                _specialWeapon = null;
+                _ammo.Reset();
             }
         }
     }

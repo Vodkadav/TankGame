@@ -143,7 +143,7 @@ public class PowerupTests
         var world = new World();
         var tank = TankAt(world, Vector2.Zero, new HoldFire());
         var crate = new Powerup(world, Vector2.Zero, PowerupKind.SpreadAmmo,
-            new AmmoPickup(new SpreadWeapon(count: 3, spreadRadians: 0.2f), shots: 1), PickupRadius);
+            new AmmoPickup(new SpreadAmmo(count: 3, radians: 0.2f), shots: 1), PickupRadius);
         world.Spawn(tank);
         world.Spawn(crate);
 
