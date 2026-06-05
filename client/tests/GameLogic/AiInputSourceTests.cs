@@ -114,7 +114,7 @@ public class AiInputSourceTests
     }
 
     [Fact]
-    public void Idles_WhenItIsTheOnlyTank()
+    public void Roams_WhenItHasNoTarget_InsteadOfStandingStill()
     {
         var world = new World();
         var self = new StubTank(Vector2.Zero, team: 1);
@@ -123,8 +123,8 @@ public class AiInputSourceTests
 
         var intent = ai.Read();
 
-        Assert.Equal(Vector2.Zero, intent.Move);
-        Assert.False(intent.Fire);
+        Assert.NotEqual(Vector2.Zero, intent.Move); // wanders to find a fight
+        Assert.False(intent.Fire);                  // but does not fire at nothing
     }
 
     [Fact]
@@ -181,28 +181,6 @@ public class AiInputSourceTests
     }
 
     [Fact]
-    public void DoesNotChaseAnEnemyItCannotSee_BehindAWall()
-    {
-        var materials = new CellMaterial[5, 1];
-        for (var x = 0; x < 5; x++)
-        {
-            materials[x, 0] = x == 2 ? CellMaterial.Steel : CellMaterial.Floor;
-        }
-
-        var arena = new GridArena(WallGrid.FromMaterials(materials), tileSize: 64f, origin: Vector2.Zero);
-        var world = new World();
-        var self = new StubTank(new Vector2(32f, 32f), team: 1);
-        world.Spawn(self);
-        world.Spawn(new StubTank(new Vector2(288f, 32f), team: 0)); // behind the wall
-        var ai = AiDriving(self, world, arena);
-
-        var intent = ai.Read();
-
-        Assert.Equal(Vector2.Zero, intent.Move); // an unseen enemy is not hunted
-        Assert.False(intent.Fire);
-    }
-
-    [Fact]
     public void IgnoresAnEnemyBeyondVisionRange()
     {
         var world = new World();
@@ -213,8 +191,7 @@ public class AiInputSourceTests
 
         var intent = ai.Read();
 
-        Assert.Equal(Vector2.Zero, intent.Move); // too far to see — no target acquired
-        Assert.False(intent.Fire);
+        Assert.False(intent.Fire); // too far to see — not engaged (it roams instead of hunting it)
     }
 
     [Fact]
@@ -257,8 +234,7 @@ public class AiInputSourceTests
 
         var intent = ai.Read();
 
-        Assert.Equal(Vector2.Zero, intent.Move); // can't pick it out of the foliage from afar
-        Assert.False(intent.Fire);
+        Assert.False(intent.Fire); // can't pick it out of the foliage from afar — not engaged
     }
 
     [Fact]
@@ -326,31 +302,34 @@ public class AiInputSourceTests
     }
 
     [Fact]
-    public void IgnoresAnUnavailablePowerup()
+    public void IgnoresAnUnavailablePowerup_AndDoesNotDetourToIt()
     {
         var world = new World();
         var self = new StubTank(Vector2.Zero, team: 1);
         world.Spawn(self);
-        world.Spawn(new StubPowerup(new Vector2(300f, 0f), available: false)); // dormant, respawning
+        world.Spawn(new StubTank(new Vector2(600f, 0f), team: 0));               // enemy out of fire range on +X
+        world.Spawn(new StubPowerup(new Vector2(0f, 300f), available: false));   // dormant pickup on +Y
         var ai = AiDriving(self, world);
 
         var intent = ai.Read();
 
-        Assert.Equal(Vector2.Zero, intent.Move); // nothing to chase
+        Assert.True(intent.Move.X > 0f);            // advances on the enemy, not toward the dormant pickup
+        Assert.True(MathF.Abs(intent.Move.Y) < 0.01f);
     }
 
     [Fact]
-    public void Ambusher_SlipsTowardNearbyGrass_WhenNotYetHidden()
+    public void Ambusher_SlipsTowardNearbyGrass_WhenItHasPreyInSight()
     {
         var world = new World();
         var self = new StubTank(Vector2.Zero, team: 1);
         world.Spawn(self);
+        world.Spawn(new StubTank(new Vector2(0f, 600f), team: 0)); // an enemy to ambush, out of range on +Y
         var ai = new AiInputSource(world, new OpenArena(), new GrassAt(new Vector2(200f, 0f)), ambusher: true);
         ai.Bind(self);
 
         var intent = ai.Read();
 
-        Assert.True(intent.Move.X > 0f); // heads for the grass patch on +X
+        Assert.True(intent.Move.X > 0f); // heads for the grass patch on +X to lie in wait
     }
 
     [Fact]
@@ -386,16 +365,18 @@ public class AiInputSourceTests
     }
 
     [Fact]
-    public void IgnoresAPowerupBeyondSeekRange()
+    public void IgnoresAPowerupBeyondSeekRange_AndDoesNotDetourToIt()
     {
         var world = new World();
         var self = new StubTank(Vector2.Zero, team: 1);
         world.Spawn(self);
-        world.Spawn(new StubPowerup(new Vector2(5000f, 0f))); // way across the map
+        world.Spawn(new StubTank(new Vector2(600f, 0f), team: 0));   // enemy out of fire range on +X
+        world.Spawn(new StubPowerup(new Vector2(0f, 5000f)));        // pickup way across the map on +Y
         var ai = AiDriving(self, world);
 
         var intent = ai.Read();
 
-        Assert.Equal(Vector2.Zero, intent.Move);
+        Assert.True(intent.Move.X > 0f);            // advances on the enemy; the far pickup is out of reach
+        Assert.True(MathF.Abs(intent.Move.Y) < 0.01f);
     }
 }
