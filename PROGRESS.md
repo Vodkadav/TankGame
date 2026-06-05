@@ -404,8 +404,14 @@ Catalogue and ordering: `docs/research/local-backlog.md`.
   on a bounce) lets `ProjectileView` rotate the bullet to face travel. `scripts/prep_kenney_bullet.py`
   turns `bulletSand2` → `KenneyBullet.png` (east-facing); `AssetCatalogue.Bullet` repointed at it. CC0
   credited. Scene 69 → 70.
+- **AI free-for-all (attacks any tank) + co-op-safe friendly fire** ✅ `Projectile` carries an `Owner`
+  id; `CombatResolver` never hits the shooter, and spares friendly fire only within an `alliedTeam`
+  (the player team) — every other team is free-for-all, so the AI tanks fight each other as well as the
+  player. `AiInputSource` now targets the nearest visible tank that is not itself (any team).
+  `ArenaScene` builds the resolver with `alliedTeam: PlayerTeam`, so co-op players never hurt each other.
+  GameLogic 200 → 203.
 
-Test counts on `main`: GameLogic 200, Domain 32, Infrastructure 12, Architecture 6, 70 GoDotTest
+Test counts on `main`: GameLogic 203, Domain 32, Infrastructure 12, Architecture 6, 70 GoDotTest
 scene tests.
 
 **Owner ask (2026-06-04): map variety + progression — both now under way.** Captured in

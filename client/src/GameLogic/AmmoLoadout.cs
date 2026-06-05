@@ -38,7 +38,8 @@ public sealed class AmmoLoadout
 
     /// <summary>Spawns this shot — <see cref="SpreadCount"/> pellets fanned symmetrically about the
     /// aim, each its own behaviour and pierce budget.</summary>
-    public void Fire(IWorld world, IArena arena, Vector2 muzzle, Vector2 direction, float speed, int team)
+    public void Fire(IWorld world, IArena arena, Vector2 muzzle, Vector2 direction, float speed, int team,
+        Guid owner = default)
     {
         var baseAngle = MathF.Atan2(direction.Y, direction.X);
         var firstOffset = -SpreadRadians * (SpreadCount - 1) / 2f; // centre the fan on the aim
@@ -48,7 +49,7 @@ public sealed class AmmoLoadout
             var angle = baseAngle + firstOffset + (SpreadRadians * i);
             var pelletDir = new Vector2(MathF.Cos(angle), MathF.Sin(angle));
             world.Spawn(new Projectile(arena, muzzle, pelletDir, speed, team: team,
-                behaviour: BehaviourFactory(), pierce: Pierce));
+                behaviour: BehaviourFactory(), pierce: Pierce, owner: owner));
         }
     }
 }

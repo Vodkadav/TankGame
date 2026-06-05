@@ -248,7 +248,7 @@ public sealed class Tank : ITank
 
             // The loadout fires its current shot (special ammo while it lasts, else the default
             // straight shot — the loadout is in its default state whenever no special ammo is loaded).
-            _ammo.Fire(_world, _arena, Position, direction, _projectileSpeed, Team);
+            _ammo.Fire(_world, _arena, Position, direction, _projectileSpeed, Team, Id);
             if (_specialShots > 0 && --_specialShots == 0)
             {
                 _ammo.Reset();

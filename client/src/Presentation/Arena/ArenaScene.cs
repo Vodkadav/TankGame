@@ -95,7 +95,9 @@ public partial class ArenaScene : Node2D
         _arena = new GridArena(grid, TileSize, GridOrigin);
         _bushes = new BushField(level.Bushes, TileSize, GridOrigin);
 
-        var combat = new CombatResolver(CombatHitRadius);
+        // The player team never friendly-fires (co-op stays friendly); the AI tanks are free-for-all,
+        // so they fight each other as well as the player.
+        var combat = new CombatResolver(CombatHitRadius, alliedTeam: PlayerTeam);
         combat.TankKilled += _scoreBoard.RecordKill; // credit each kill to the shooter's team
         combat.Hit += hit => _meterBoard.Record(hit.ShooterTeam, hit.VictimTeam, hit.Amount, hit.Killed);
         _world = new World(combat);
