@@ -28,3 +28,7 @@ dist/
 
 # Orchestration plans (ephemeral — never committed)
 .claude/plans/
+
+# Art working area + extracted source asset packs (only processed outputs are committed)
+art-wip/
+kenney_*

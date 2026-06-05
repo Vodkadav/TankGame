@@ -354,6 +354,14 @@ Catalogue and ordering: `docs/research/local-backlog.md`.
   whole set is one assignment — ready to repoint at the imported **Kenney CC0** pack (owner picked the
   hybrid: Kenney base sprites + generated glowing pickup discs). Behaviour-preserving (still the
   placeholder art).
+- **Art pass — Kenney tank sprites (first drop)** ✅ owner imported *Top-down Tanks Remastered* (CC0).
+  `scripts/prep_kenney_tank.py` turns the sand body + barrel into `KenneyTankBody.png` /
+  `KenneyTankTurret.png` (scaled to ~one tile, rotated north→east to match the rotation-0 convention,
+  barrel mount centred for the turret pivot); `AssetCatalogue.Default` repoints the tank hull + turret
+  at them (one-line swap, the #100 seam working). Neutral sand tinted per team via `ApplyTeamTint`.
+  Credited CC0 in `docs/credits/assets.md`; extracted packs + `art-wip/` gitignored. Still placeholders:
+  the bullet and the wall atlas (the latter needs a 4-frame damage layout — a follow-up), and the
+  ground (flat theme colour, could tile `tileSand`). Needs an in-game eyeball pass for scale/pivot feel.
 
 Test counts on `main`: GameLogic 187, Domain 32, Infrastructure 12, Architecture 6, 65 GoDotTest
 scene tests.
