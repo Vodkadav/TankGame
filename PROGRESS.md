@@ -465,8 +465,14 @@ Catalogue and ordering: `docs/research/local-backlog.md`.
   treats crates as destructible-pierceable too. `WallGridView` + `gen_wall_atlas.py` add a water frame
   (5) and a bridge frame (6) → 7-frame atlas. Not generated yet — the river generator places them next.
   GameLogic 215 → 217, Domain 32 → 38.
+- **River generation + cell-claiming** ✅ `ArenaGenerator` now carves one river (vertical → 2 bridges,
+  horizontal → 3) and **claims** its cells, so anchors / walls / terrain never land on the water or
+  bridges (the "claim a cell" rule). Bridge approach cells are forced floor so each crossing works;
+  `Scatter` skips claimed cells; the flood-fill traverses bridges (passability = `!BlocksMovement`) and
+  the open-floor invariant excludes the river. Validity (every anchor reachable across the river) holds
+  over 25 seeds. GameLogic 217 → 218. Deferred: a river fork, river width >1.
 
-Test counts on `main`: GameLogic 217, Domain 38, Infrastructure 12, Architecture 6, 77 GoDotTest
+Test counts on `main`: GameLogic 218, Domain 38, Infrastructure 12, Architecture 6, 77 GoDotTest
 scene tests.
 
 **Owner ask (2026-06-04): map variety + progression — both now under way.** Captured in

@@ -165,6 +165,12 @@ public class ArenaGeneratorTests
             {
                 for (var y = 1; y < map.Height - 1; y++)
                 {
+                    // The river (water + bridges) is deliberate terrain — measure clutter on the land.
+                    if (map.Materials[x, y] is CellMaterial.Water or CellMaterial.Bridge)
+                    {
+                        continue;
+                    }
+
                     interior++;
                     if (map.Materials[x, y] == CellMaterial.Floor)
                     {
@@ -191,6 +197,35 @@ public class ArenaGeneratorTests
         foreach (var (x, y) in AllAnchors(arena))
         {
             Assert.True(reached[x, y], $"{width}x{height}: anchor ({x},{y}) unreachable");
+        }
+    }
+
+    [Fact]
+    public void Generate_CarvesARiver_WithBridges_AndKeepsEveryAnchorReachable()
+    {
+        for (var seed = 0; seed < 25; seed++)
+        {
+            var arena = new ArenaGenerator().Generate(Params(seed));
+            var water = 0;
+            var bridges = 0;
+            for (var x = 0; x < arena.Map.Width; x++)
+            {
+                for (var y = 0; y < arena.Map.Height; y++)
+                {
+                    if (arena.Map.Materials[x, y] == CellMaterial.Water) { water++; }
+                    if (arena.Map.Materials[x, y] == CellMaterial.Bridge) { bridges++; }
+                }
+            }
+
+            Assert.True(water > 0, $"seed {seed}: expected a river of water");
+            Assert.True(bridges >= 2, $"seed {seed}: a river needs at least two bridges; had {bridges}");
+
+            // Anchors on both sides of the river must still be reachable (across the bridges).
+            var reached = ReachableSet(arena.Map);
+            foreach (var (x, y) in AllAnchors(arena))
+            {
+                Assert.True(reached[x, y], $"seed {seed}: anchor ({x},{y}) cut off by the river");
+            }
         }
     }
 
@@ -253,9 +288,9 @@ public class ArenaGeneratorTests
                 var nx = x + dx;
                 var ny = y + dy;
                 if (nx >= 0 && ny >= 0 && nx < map.Width && ny < map.Height &&
-                    !seen[nx, ny] && map.Materials[nx, ny] == CellMaterial.Floor)
+                    !seen[nx, ny] && !CellMaterials.BlocksMovement(map.Materials[nx, ny]))
                 {
-                    seen[nx, ny] = true;
+                    seen[nx, ny] = true; // floor and bridges are passable; water and walls are not
                     queue.Enqueue((nx, ny));
                 }
             }
