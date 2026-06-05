@@ -27,6 +27,10 @@ public enum PowerupKind
 
     /// <summary>Grants over-shield points that absorb damage before hit points.</summary>
     Shield,
+
+    /// <summary>A missile: one shot that plows through a whole line of tanks and destructible walls,
+    /// only stopping at steel.</summary>
+    Missile,
 }
 
 /// <summary>A collectible sitting on the field — a world <see cref="IEntity"/>. The

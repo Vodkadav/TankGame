@@ -60,6 +60,7 @@ public partial class ArenaScene : Node2D
         (PowerupKind.Repair, new RepairPickup(RepairAmount)),
         (PowerupKind.Shield, new ShieldPickup(ShieldAmount)),
         (PowerupKind.PiercingAmmo, new AmmoPickup(new PiercingAmmo(pierces: 1, TileSize), AmmoShots)),
+        (PowerupKind.Missile, new AmmoPickup(new MissileAmmo(TileSize), shots: 1)),
     };
 
     // Two-player frames the whole field; the zoom is computed per map so any size fits on screen.

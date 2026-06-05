@@ -62,3 +62,25 @@ public sealed class PiercingAmmo : AmmoModifier
         loadout.Pierce = _pierces;
     }
 }
+
+/// <summary>A missile: a single shot with a huge pierce budget, so it plows through a whole line of
+/// tanks and destructible walls — damaging everything in its wake — and only stops at steel (or the
+/// map's steel border). Reuses the piercing behaviour with a big budget.</summary>
+public sealed class MissileAmmo : AmmoModifier
+{
+    /// <summary>How many tanks/destructible cells the missile can punch through — effectively a whole
+    /// line across the field.</summary>
+    public const int Pierce = 50;
+
+    private readonly float _tileSize;
+
+    public MissileAmmo(float tileSize) => _tileSize = tileSize;
+
+    public override void ApplyTo(AmmoLoadout loadout)
+    {
+        loadout.SpreadCount = 1; // a single lance, never fanned
+        loadout.SpreadRadians = 0f;
+        loadout.BehaviourFactory = () => new PiercingBehaviour(_tileSize);
+        loadout.Pierce = Pierce;
+    }
+}
