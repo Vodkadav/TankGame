@@ -319,6 +319,19 @@ public partial class ArenaScene : Node2D
 
         AddChild(view);
         _views[entity.Id] = view;
+
+        // Pop a floating name where a pickup is collected, so the player learns what each one does.
+        if (entity is IPowerup pickup)
+        {
+            pickup.Collected += kind => ShowPickupFloater(pickup.Position, kind);
+        }
+    }
+
+    private void ShowPickupFloater(NVector2 position, PowerupKind kind)
+    {
+        var floater = new PickupFloater { Name = "PickupFloater" };
+        AddChild(floater);
+        floater.Show(new Vector2(position.X, position.Y), PickupFloater.LabelKeyFor(kind));
     }
 
     private void OnEntityDespawned(IEntity entity)

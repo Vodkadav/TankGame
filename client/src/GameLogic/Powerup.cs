@@ -47,6 +47,8 @@ public sealed class Powerup : IPowerup
     public bool IsAlive { get; private set; }
     public bool IsAvailable { get; private set; }
 
+    public event Action<PowerupKind>? Collected;
+
     public void Step(float deltaSeconds)
     {
         if (!IsAlive)
@@ -76,6 +78,7 @@ public sealed class Powerup : IPowerup
             if (Vector2.DistanceSquared(Position, tank.Position) <= _pickupRadius * _pickupRadius)
             {
                 _effect.ApplyTo(tank);
+                Collected?.Invoke(Kind);
                 if (_respawnDelay > 0f)
                 {
                     IsAvailable = false; // dormant until it respawns at the same spot

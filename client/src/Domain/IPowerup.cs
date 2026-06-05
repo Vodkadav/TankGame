@@ -1,3 +1,5 @@
+using System;
+
 namespace TankGame.Domain;
 
 /// <summary>What a <see cref="IPowerup"/> grants — drives both its colour on screen and the
@@ -40,4 +42,8 @@ public interface IPowerup : IEntity
     /// goes unavailable (dormant) for its respawn delay after being collected, then returns; a
     /// one-shot pickup is simply reaped. The view shows the shape only while available.</summary>
     bool IsAvailable { get; }
+
+    /// <summary>Raised when a tank collects this pickup — each time, for a respawning one. Carries
+    /// the kind so Presentation can pop a floating label of what was grabbed.</summary>
+    event Action<PowerupKind>? Collected;
 }
