@@ -27,6 +27,10 @@ public static class GameSetup
 
     public static GameMode Mode { get; set; } = GameMode.OnePlayer;
 
+    /// <summary>The arena's visual palette (S8 theming): ground colour + wall tint. A title control
+    /// can later set it; defaults to the sandy reference look.</summary>
+    public static ArenaTheme Theme { get; set; } = ArenaTheme.Default;
+
     /// <summary>The running best-of-N series; survives per-round scene reloads.</summary>
     public static SeriesTracker Series { get; private set; } = new(RoundsToWin);
 

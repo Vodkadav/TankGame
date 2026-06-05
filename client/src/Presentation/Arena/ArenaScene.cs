@@ -102,7 +102,11 @@ public partial class ArenaScene : Node2D
         _world.EntitySpawned += OnEntitySpawned;
         _world.EntityDespawned += OnEntityDespawned;
 
+        var theme = GameSetup.Theme;
+        AddChild(BuildGround(level.Width, level.Height, theme.Ground)); // behind everything
+
         var wallView = new WallGridView { Name = "WallGridView", RenderTileSize = (int)TileSize };
+        wallView.Modulate = theme.WallTint; // recolour the wall sprites to the theme
         AddChild(wallView);     // runs _Ready (builds the atlas TileSet)
         wallView.Bind(grid);    // then draw the walls and track damage
 
@@ -410,6 +414,28 @@ public partial class ArenaScene : Node2D
         label.GrowHorizontal = Control.GrowDirection.Both;
         layer.AddChild(label);
         return layer;
+    }
+
+    // A flat-coloured ground rectangle covering the whole field, drawn behind the walls and tanks
+    // (negative ZIndex). World-space Polygon2D so it tracks the camera; the theme picks its colour.
+    private static Polygon2D BuildGround(int widthCells, int heightCells, Color colour)
+    {
+        var w = widthCells * TileSize;
+        var h = heightCells * TileSize;
+        return new Polygon2D
+        {
+            Name = "Ground",
+            Color = colour,
+            ZIndex = -10,
+            Position = new Vector2(GridOrigin.X, GridOrigin.Y),
+            Polygon = new[]
+            {
+                new Vector2(0f, 0f),
+                new Vector2(w, 0f),
+                new Vector2(w, h),
+                new Vector2(0f, h),
+            },
+        };
     }
 
     // World-space centre of cell (x, y) — where the tank starts and where shots land.
