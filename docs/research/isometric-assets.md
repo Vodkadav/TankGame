@@ -60,3 +60,30 @@ One cohesive isometric wargame pack that covers most needs:
 
 The asset catalogue (`AssetCatalogue`) and the per-cell tile mapping (`WallGridView.FrameFor`) are the
 seams these phases plug into; the move/shot blocking, generation, and combat are unchanged.
+
+## Phase 1 starting checklist (fresh session)
+
+Goal: render the *existing* world isometrically with **no GameLogic change** and no new art yet — prove
+the projection + depth sort, then later phases swap in iso tiles/sprites.
+
+1. **`IsoProjection` helper** (Presentation, pure): `WorldToScreen(Vector2 world)` →
+   `new Vector2((world.X - world.Y) * 0.5f, (world.X + world.Y) * 0.25f)` (2:1 dimetric; tune the Y
+   factor). Add `ScreenToWorld` (inverse) for mouse-aim. Unit-test the round-trip.
+2. **Apply it in every view that mirrors a world position** — `TankView`, `ProjectileView`,
+   `PowerupView`, `BushOverlay`, `SandbagOverlay`, `AirstrikeView`, the `Ground` polygon, the fog
+   `PointLight2D`s, and the camera target in `ArenaScene` (the camera centres on
+   `WorldToScreen(player.Position)`). The `FireArrow`/HUD are screen-space — leave them.
+3. **Depth sort** — set each entity view's `ZIndex` (or use a `Node2D` with `YSortEnabled`) from
+   `world.X + world.Y` so nearer (greater x+y) draws over farther. Tanks/projectiles update it each frame.
+4. **Walls** — for Phase 1 keep the square `WallGridView` but project its tile positions; the proper iso
+   `TileMapLayer` (Godot supports `TileSet.TileShape = Isometric`) comes in Phase 2 with the PixVoxel
+   terrain tiles. Simplest Phase-1: draw each non-floor cell as a projected coloured diamond so the
+   layout reads correctly in iso.
+5. **Input** — `KeyboardMouseInputSource` aim must invert the projection (`ScreenToWorld`) so the mouse
+   still aims at the world point under the cursor.
+6. **Tests** — `IsoProjection` round-trip; a `TankView`/scene test that a known world position maps to the
+   expected screen position. Existing GameLogic/Domain tests are untouched (logic unchanged).
+
+Files most affected: `client/src/Presentation/**` (views, `ArenaScene`, new `IsoProjection.cs`) and
+`client/src/Infrastructure/KeyboardMouseInputSource.cs` (aim inversion). `NetArenaScene` mirrors the
+same projection. Keep each phase a squash-PR (branch → PR → CI green → squash-merge).
