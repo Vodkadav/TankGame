@@ -15,10 +15,7 @@ public partial class WallGridView : TileMapLayer
     private const int AtlasTile = 32;
     private const int SteelFrame = 3;
     private const int CrateFrame = 4;
-    private const int WaterFrame = 5;
-    private const int BridgeFrame = 6;
-    private const int MountainFrame = 7;
-    private const int BuildingFrame = 8;
+    private const int BuildingFrame = 8; // frames 5–7 (water/bridge/mountain) moved to IsoTerrainView
 
     private int _sourceId = -1;
     private IWallGrid? _grid;
@@ -64,18 +61,16 @@ public partial class WallGridView : TileMapLayer
         }
     }
 
-    // Brick damage maps onto the first three frames (intact -> rubble); steel is the last
-    // frame; floor has no frame.
+    // Brick damage maps onto the first three frames (intact -> rubble); steel is the last frame;
+    // floor has no frame. Water/bridge/mountain moved to the iso IsoTerrainView (Phase 2), so they
+    // draw nothing here.
     private static int? FrameFor(WallCell cell) => cell.Material switch
     {
         CellMaterial.Steel => SteelFrame,
         CellMaterial.Crate => CrateFrame, // one frame; a crate just pops to floor when destroyed
-        CellMaterial.Water => WaterFrame,
-        CellMaterial.Bridge => BridgeFrame,
-        CellMaterial.Mountain => MountainFrame,
         CellMaterial.Building => BuildingFrame,
         CellMaterial.Brick => Math.Clamp(WallGrid.DefaultBrickHp - cell.Hp, 0, 2),
-        _ => null,
+        _ => null, // floor, and the iso-rendered water/bridge/mountain
     };
 
     private void EnsureTileSet()

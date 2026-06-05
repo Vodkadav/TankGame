@@ -21,6 +21,9 @@ public class AssetCatalogueTests : TestClass
             AssetCatalogue.Default.WallAtlas,
             AssetCatalogue.Default.GroundTile,
             AssetCatalogue.Default.PickupDisc,
+            AssetCatalogue.Default.WaterTile,
+            AssetCatalogue.Default.BridgeTile,
+            AssetCatalogue.Default.MountainTile,
         })
         {
             if (GD.Load<Texture2D>(path) is null)

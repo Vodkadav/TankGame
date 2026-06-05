@@ -6,7 +6,7 @@ namespace TankGame.Presentation;
 /// with <c>AssetCatalogue.Active = AssetCatalogue.Default with { TankBody = "res://…" }</c>, or a whole
 /// set by pointing <see cref="Active"/> at another catalogue (e.g. the imported Kenney CC0 pack).</summary>
 public sealed record AssetCatalogue(string TankBody, string TankTurret, string Bullet, string WallAtlas,
-    string GroundTile, string PickupDisc)
+    string GroundTile, string PickupDisc, string WaterTile, string BridgeTile, string MountainTile)
 {
     /// <summary>The active sprite set. The tank hull + turret are the imported Kenney CC0 art
     /// (neutral sand, tinted per team via <c>TankView.ApplyTeamTint</c>); the bullet and wall atlas
@@ -18,7 +18,10 @@ public sealed record AssetCatalogue(string TankBody, string TankTurret, string B
         Bullet: "res://src/Presentation/Projectile/KenneyBullet.png",
         WallAtlas: "res://src/Presentation/Arena/Walls.png",
         GroundTile: "res://src/Presentation/Arena/IsoGroundDesert.png",
-        PickupDisc: "res://src/Presentation/Arena/PickupDisc.png");
+        PickupDisc: "res://src/Presentation/Arena/PickupDisc.png",
+        WaterTile: "res://src/Presentation/Arena/IsoWater.png",
+        BridgeTile: "res://src/Presentation/Arena/IsoBridge.png",
+        MountainTile: "res://src/Presentation/Arena/IsoMountain.png");
 
     /// <summary>The active set every view loads from. Defaults to <see cref="Default"/>.</summary>
     public static AssetCatalogue Active { get; set; } = Default;
