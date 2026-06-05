@@ -24,7 +24,7 @@ public sealed record AssetCatalogue(
         PickupDisc: "res://src/Presentation/Arena/PickupDisc.png",
         WaterTile: "res://src/Presentation/Arena/IsoWater.png",
         BridgeTile: "res://src/Presentation/Arena/IsoBridge.png",
-        MountainTile: "res://src/Presentation/Arena/IsoMountain.png",
+        MountainTile: "res://src/Presentation/Arena/IsoMountainStacked.png",
         BrickIntactTile: "res://src/Presentation/Arena/IsoBrick0.png",
         BrickCrackedTile: "res://src/Presentation/Arena/IsoBrick1.png",
         BrickRubbleTile: "res://src/Presentation/Arena/IsoBrick2.png",

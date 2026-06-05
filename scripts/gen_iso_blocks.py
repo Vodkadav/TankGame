@@ -83,12 +83,6 @@ def cracks(d):
     d.line([(80, 36), (72, 58), (84, 78)], fill=c)
 
 
-def steel_top(d, base):
-    rivet = shade(base, 0.40)
-    for px, py in [(64, 33), (32, 49), (96, 49), (64, 65)]:
-        d.ellipse([px - 3, py - 2, px + 3, py + 2], fill=rivet)
-
-
 def crate_front(d, base, h):
     brace = shade(base, 1.15)
     d.line([(4, DIAMOND_MID + h - 6), (60, DIAMOND_BOT + h - 4)], fill=brace, width=2)
@@ -111,7 +105,7 @@ def main():
         ("IsoBrick0.png", block(BRICK, 38, brick_top, brick_front)),
         ("IsoBrick1.png", _with(block(shade(BRICK, 0.85), 38, brick_top, brick_front), cracks)),
         ("IsoBrick2.png", _with(block(shade(BRICK, 0.7), 14, None, brick_front), cracks)),
-        ("IsoSteel.png", block((120, 124, 132, 255), 42, steel_top)),
+        ("IsoSteel.png", block((120, 124, 132, 255), 42)),  # plain plate — no rivets
         ("IsoCrate.png", block((168, 120, 66, 255), 32, None, crate_front)),
         ("IsoBuilding.png", block((158, 150, 138, 255), 56, None, building_front)),
     ]
