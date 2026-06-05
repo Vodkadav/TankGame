@@ -29,6 +29,10 @@ public partial class ArenaScene : Node2D
     private const int PlayerTeam = 0;
     private const int EnemyTeam = 1;
 
+    // An adversary lurking in grass is hidden from the player until a player tank is within about a
+    // tile and a half — the same reveal range the AI uses to spot a bushed target.
+    private const float BushRevealRange = 96f;
+
     // Total lives per tank: a fallen tank revives at its spawn after Tank.RespawnDelay until its
     // lives run out, then it stays dead. Tunable balance knob; uniform across modes for now.
     private const int StartingLives = 3;
@@ -309,6 +313,8 @@ public partial class ArenaScene : Node2D
             }
         }
 
+        UpdateConcealment();
+
         var result = _matchTracker.Evaluate(_world.Entities);
         if (result.Decided)
         {
@@ -316,6 +322,44 @@ public partial class ArenaScene : Node2D
             GameSetup.Series.RecordRound(result.WinningTeam); // tally this round toward best-of-N
             ShowRoundOver(result);
         }
+    }
+
+    // Hide each adversary tank that is lurking in grass, unless a player-team tank is close enough to
+    // spot it (mirrors the AI's BushRevealRange), so cover actually conceals enemies from the player.
+    // Versus has no AI enemies and shares one screen, so it is left alone.
+    private void UpdateConcealment()
+    {
+        if (_mode == GameMode.TwoPlayerVersus)
+        {
+            return;
+        }
+
+        foreach (var entity in _world.Entities)
+        {
+            if (entity is not ITank tank || tank.Team == PlayerTeam || !_views.TryGetValue(tank.Id, out var node)
+                || node is not TankView view)
+            {
+                continue;
+            }
+
+            view.Concealed = tank.Hp > 0
+                && _bushes.ConcealsAt(tank.Position)
+                && !AnyPlayerWithin(tank.Position, BushRevealRange);
+        }
+    }
+
+    private bool AnyPlayerWithin(NVector2 point, float range)
+    {
+        foreach (var entity in _world.Entities)
+        {
+            if (entity is ITank tank && tank.Team == PlayerTeam && tank.Hp > 0
+                && NVector2.Distance(tank.Position, point) <= range)
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private void OnEntitySpawned(IEntity entity)

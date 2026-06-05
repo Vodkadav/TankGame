@@ -129,6 +129,30 @@ public class TankViewTests : TestClass
     }
 
     [Test]
+    public void ConcealedTank_IsHiddenFromView_UntilRevealed()
+    {
+        var input = new FixedInput(new TankInput(NVector2.Zero, Aim: 0f, Fire: false));
+        var arena = new RectArena(new NVector2(-500f, -500f), new NVector2(500f, 500f));
+        var tank = new Tank(input, new World(), arena, NVector2.Zero, speed: 100f, fireInterval: 0.3f,
+            projectileSpeed: 600f, maxHp: 3);
+        _view.Bind(tank);
+
+        _view.Concealed = true; // lurking in grass, no enemy near
+        _view.UpdateFromModel();
+        if (_view.Visible)
+        {
+            throw new System.Exception("A concealed tank should be hidden from view.");
+        }
+
+        _view.Concealed = false; // spotted / left cover
+        _view.UpdateFromModel();
+        if (!_view.Visible)
+        {
+            throw new System.Exception("A revealed tank should be visible again.");
+        }
+    }
+
+    [Test]
     public void DownedTank_IsHidden_AndReappearsOnRespawn()
     {
         var input = new FixedInput(new TankInput(NVector2.Zero, Aim: 0f, Fire: false));

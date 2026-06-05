@@ -31,6 +31,11 @@ public partial class TankView : Node2D
 
     public void Bind(ITank tank) => _tank = tank;
 
+    /// <summary>When true the tank is hidden from view — it is lurking in grass and no enemy is close
+    /// enough to spot it (the scene sets this for concealed adversaries, mirroring the AI's blindness
+    /// so a tank in cover is genuinely hard to see). Set each frame by the scene.</summary>
+    public bool Concealed { get; set; }
+
     /// <summary>Tints the whole view to mark which side it is on (white = friendly, reddened =
     /// enemy), so one neutral tank texture reads as either team.</summary>
     public void ApplyTeamTint(bool isEnemy) => Modulate = TeamPalette.TintFor(isEnemy);
@@ -46,8 +51,9 @@ public partial class TankView : Node2D
             return;
         }
 
-        // A downed tank (0 hp) is awaiting respawn — hide it until it revives at full health.
-        Visible = _tank.Hp > 0;
+        // A downed tank (0 hp) is awaiting respawn — hide it until it revives. A concealed tank
+        // (lurking in grass, unseen) is hidden too, so cover actually hides it from view.
+        Visible = _tank.Hp > 0 && !Concealed;
         if (!Visible)
         {
             return;
