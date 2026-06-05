@@ -20,6 +20,7 @@ public class AssetCatalogueTests : TestClass
             AssetCatalogue.Default.Bullet,
             AssetCatalogue.Default.WallAtlas,
             AssetCatalogue.Default.GroundTile,
+            AssetCatalogue.Default.PickupDisc,
         })
         {
             if (GD.Load<Texture2D>(path) is null)

@@ -3,22 +3,24 @@ using TankGame.Domain;
 
 namespace TankGame.Presentation;
 
-/// <summary>Renders an <see cref="IPowerup"/> as a code-built coloured diamond (no art asset),
-/// its colour chosen from the powerup's <see cref="PowerupKind"/>. A pure mirror: the world owns
-/// the entity (a tank collecting it expires it); the scene frees this view on the despawn
-/// event. Powerups do not move, so the node's position is set once on <see cref="Bind"/>.</summary>
+/// <summary>Renders an <see cref="IPowerup"/> as a glowing disc — the neutral
+/// <c>AssetCatalogue.PickupDisc</c> texture tinted per <see cref="PowerupKind"/> via Modulate, so one
+/// disc reads as every pickup by colour. A pure mirror: the world owns the entity (a tank collecting it
+/// expires it); the scene frees this view on the despawn event. Powerups do not move, so the node's
+/// position is set once on <see cref="Bind"/>.</summary>
 public partial class PowerupView : Node2D
 {
-    private const float HalfSize = 14f;
+    // The disc texture is 128 px; this renders it at roughly one-and-a-bit tile-thirds across.
+    private const float DiscScale = 0.42f;
 
     private IPowerup? _powerup;
 
-    /// <summary>Builds the coloured shape and places the node at the powerup's position.</summary>
+    /// <summary>Builds the tinted disc and places the node at the powerup's position.</summary>
     public void Bind(IPowerup powerup)
     {
         _powerup = powerup;
         Position = new Vector2(powerup.Position.X, powerup.Position.Y);
-        AddChild(BuildShape(powerup.Kind));
+        AddChild(BuildDisc(powerup.Kind));
         UpdateFromModel();
     }
 
@@ -34,17 +36,12 @@ public partial class PowerupView : Node2D
         }
     }
 
-    private static Polygon2D BuildShape(PowerupKind kind) => new()
+    private static Sprite2D BuildDisc(PowerupKind kind) => new()
     {
-        Name = "Shape",
-        Color = ColourFor(kind),
-        Polygon = new[]
-        {
-            new Vector2(0f, -HalfSize),
-            new Vector2(HalfSize, 0f),
-            new Vector2(0f, HalfSize),
-            new Vector2(-HalfSize, 0f),
-        },
+        Name = "Disc",
+        Texture = GD.Load<Texture2D>(AssetCatalogue.Active.PickupDisc),
+        Modulate = ColourFor(kind), // white core → the kind's colour; dark coin edge stays dark
+        Scale = new Vector2(DiscScale, DiscScale),
     };
 
     /// <summary>The on-screen colour for each kind — public so a test can assert the mapping.</summary>
