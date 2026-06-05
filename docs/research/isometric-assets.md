@@ -50,8 +50,13 @@ One cohesive isometric wargame pack that covers most needs:
    `ZIndex` from `x+y`; the static layers (ground, wall tilemap, bush/sandbag overlays) shear via the
    affine `ScreenTransform`; mouse aim inverts the projection. GameLogic untouched. Proper iso
    `TileMapLayer` + tiles come in Phase 2.
-2. **Iso ground + terrain** — PixVoxel terrain tiles for floor/water/bridge/mountain via the iso tilemap
-   (replaces the flat ground polygon + the square `Walls.png` atlas).
+2. **Iso ground + terrain** — 🚧 **IN PROGRESS.** Ground slice ✅ **DONE (#127):** the flat ground
+   polygon is replaced by a real isometric `TileMapLayer` (`TileShape=Isometric`, `DiamondDown`) laying
+   one native PixVoxel `Desert` diamond per cell, themed; the projection was scaled up 2× (AxisX=1,
+   AxisY=0.5) so the 128×64 tiles render crisp, and mouse-wheel camera zoom was added as a playtest aid.
+   **Remaining:** the terrain materials — water/bridge/mountain (and the brick/steel/crate/building
+   walls) still render via the Phase-1 sheared square `WallGridView`; swap those to PixVoxel terrain
+   tiles on an iso tilemap (or per-cell iso sprites for the raised ones that must depth-sort vs tanks).
 3. **Iso tanks** — directional `Tank_Large_face{0..3}` sprites; map `Tank.Rotation` → nearest facing,
    team → `colorN`; turret handled by a separate facing sprite or an overlaid barrel. Replaces `TankView`.
 4. **Buildings / crates** — solid building + crate iso sprites placed per cell.
