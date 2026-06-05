@@ -13,7 +13,8 @@ base-diamond centre therefore always sits 33 px from the image bottom, which is 
 IsoTerrainView's vertical anchor (33 - height/2) relies on.
 
 Outputs (client/src/Presentation/Arena/):
-  IsoBrick0/1/2.png (intact/cracked/rubble)  IsoSteel.png  IsoCrate.png  IsoBuilding.png
+  IsoBrick0/1/2.png (intact/cracked/rubble)  IsoSteel.png  IsoCrate.png
+(Building uses the PixVoxel City sprite via scripts/prep_iso_building.py.)
 
 Usage: python scripts/gen_iso_blocks.py
 """
@@ -89,16 +90,6 @@ def crate_front(d, base, h):
     d.line([(64, DIAMOND_BOT + h - 4), (W - 5, DIAMOND_MID + h - 6)], fill=brace, width=2)
 
 
-def building_front(d, base, h):
-    win = (96, 140, 170, 255)
-    frame = shade(base, 0.4)
-    for row in range(DIAMOND_MID + 14, DIAMOND_MID + h - 6, 16):
-        for cx in (22, 42):
-            d.rectangle([cx, row, cx + 9, row + 9], fill=win, outline=frame)        # left face
-        for cx in (78, 98):
-            d.rectangle([cx, row - 8, cx + 9, row + 1], fill=win, outline=frame)    # right face
-
-
 def main():
     BRICK = (150, 70, 52, 255)
     jobs = [
@@ -107,7 +98,7 @@ def main():
         ("IsoBrick2.png", _with(block(shade(BRICK, 0.7), 14, None, brick_front), cracks)),
         ("IsoSteel.png", block((120, 124, 132, 255), 42)),  # plain plate — no rivets
         ("IsoCrate.png", block((168, 120, 66, 255), 32, None, crate_front)),
-        ("IsoBuilding.png", block((158, 150, 138, 255), 56, None, building_front)),
+        # Building uses the PixVoxel City sprite — see scripts/prep_iso_building.py.
     ]
     for name, img in jobs:
         path = f"{OUT}/{name}"
