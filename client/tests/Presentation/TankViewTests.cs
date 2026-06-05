@@ -130,6 +130,26 @@ public class TankViewTests : TestClass
     }
 
     [Test]
+    public void Stealthed_DarkensTheTank_OverItsTeamTint()
+    {
+        _view.ApplyTeamTint(isEnemy: false);
+        var lit = _view.Modulate;
+
+        _view.Stealthed = true; // sitting in a bush
+        var stealthed = _view.Modulate;
+        if (stealthed.V >= lit.V)
+        {
+            throw new System.Exception($"A stealthed tank should be darker; was {stealthed} vs {lit}.");
+        }
+
+        _view.Stealthed = false; // left the bush
+        if (_view.Modulate != lit)
+        {
+            throw new System.Exception($"Leaving cover should restore the team tint; was {_view.Modulate}.");
+        }
+    }
+
+    [Test]
     public void ConcealedTank_IsHiddenFromView_UntilRevealed()
     {
         var input = new FixedInput(new TankInput(NVector2.Zero, Aim: 0f, Fire: false));

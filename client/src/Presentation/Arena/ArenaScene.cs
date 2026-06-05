@@ -33,6 +33,11 @@ public partial class ArenaScene : Node2D
     // tile and a half — the same reveal range the AI uses to spot a bushed target.
     private const float BushRevealRange = 96f;
 
+    // The player team's circle of vision: an enemy farther than this from every living player tank is
+    // invisible (not just dimmed). Matches the AI's VisionRange and the lit fog circle so both sides
+    // see about as far. A tunable balance knob.
+    private const float PlayerVisionRadius = 640f;
+
     // Total lives per tank: a fallen tank revives at its spawn after Tank.RespawnDelay until its
     // lives run out, then it stays dead. Tunable balance knob; uniform across modes for now.
     private const int StartingLives = 3;
@@ -77,11 +82,12 @@ public partial class ArenaScene : Node2D
     private const float MaxZoom = 4f;
     private const float ZoomStepFactor = 1.1f;
 
-    // Fog of war: a dark ambient the player's light cuts a hole in. Radius ≈ the AI fire range
-    // so you can see roughly as far as a hidden enemy can hit you. No wall shadows yet — a soft
-    // circular reveal. Off in versus (one shared screen can't fairly fog two rival views).
+    // Fog of war: a dark ambient the player's light cuts a hole in. The lit circle matches the player's
+    // vision radius so "lit" == "visible". The light is squashed to a 2:1 ellipse (Scale Y 0.5) so the
+    // circular texture lands as the iso projection of a world circle. Off in versus (one shared screen
+    // can't fairly fog two rival views).
     private static readonly Color FogAmbient = new(0.16f, 0.16f, 0.22f);
-    private const float FogLightRadius = 420f;
+    private const float FogLightRadius = PlayerVisionRadius;
     private const int LightTextureSize = 256;
 
     private readonly Dictionary<Guid, Node2D> _views = new();
@@ -278,6 +284,7 @@ public partial class ArenaScene : Node2D
                 Name = "FogLight",
                 Texture = texture,
                 TextureScale = FogLightRadius / (LightTextureSize / 2f),
+                Scale = new Vector2(1f, 0.5f), // squash to the iso 2:1 ellipse of a world vision circle
                 Position = Screen(viewer.Position),
             };
             AddChild(light);
@@ -341,9 +348,10 @@ public partial class ArenaScene : Node2D
         }
     }
 
-    // Hide each adversary tank that is lurking in grass, unless a player-team tank is close enough to
-    // spot it (mirrors the AI's BushRevealRange), so cover actually conceals enemies from the player.
-    // Versus has no AI enemies and shares one screen, so it is left alone.
+    // An enemy tank is visible to the player only inside the player team's circle of vision (and not
+    // lurking unspotted in grass); beyond that circle it is invisible, not merely dimmed. The player's
+    // own tank darkens while it sits in a bush, to signal it is in stealth cover. Versus has no AI
+    // enemies and shares one screen, so it is left alone.
     private void UpdateConcealment()
     {
         if (_mode == GameMode.TwoPlayerVersus)
@@ -353,15 +361,20 @@ public partial class ArenaScene : Node2D
 
         foreach (var entity in _world.Entities)
         {
-            if (entity is not ITank tank || tank.Team == PlayerTeam || !_views.TryGetValue(tank.Id, out var node)
-                || node is not TankView view)
+            if (entity is not ITank tank || !_views.TryGetValue(tank.Id, out var node) || node is not TankView view)
             {
                 continue;
             }
 
-            view.Concealed = tank.Hp > 0
-                && _bushes.ConcealsAt(tank.Position)
-                && !AnyPlayerWithin(tank.Position, BushRevealRange);
+            if (tank.Team == PlayerTeam)
+            {
+                view.Stealthed = tank.Hp > 0 && _bushes.ConcealsAt(tank.Position);
+                continue;
+            }
+
+            var outsideVision = !AnyPlayerWithin(tank.Position, PlayerVisionRadius);
+            var unspottedInGrass = _bushes.ConcealsAt(tank.Position) && !AnyPlayerWithin(tank.Position, BushRevealRange);
+            view.Concealed = tank.Hp > 0 && (outsideVision || unspottedInGrass);
         }
     }
 
