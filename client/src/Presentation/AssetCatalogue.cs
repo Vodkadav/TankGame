@@ -17,7 +17,7 @@ public sealed record AssetCatalogue(string TankBody, string TankTurret, string B
         TankTurret: "res://src/Presentation/Tank/KenneyTankTurret.png",
         Bullet: "res://src/Presentation/Projectile/KenneyBullet.png",
         WallAtlas: "res://src/Presentation/Arena/Walls.png",
-        GroundTile: "res://src/Presentation/Arena/GroundSand.png",
+        GroundTile: "res://src/Presentation/Arena/IsoGroundDesert.png",
         PickupDisc: "res://src/Presentation/Arena/PickupDisc.png");
 
     /// <summary>The active set every view loads from. Defaults to <see cref="Default"/>.</summary>

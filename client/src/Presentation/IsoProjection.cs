@@ -11,9 +11,11 @@ namespace TankGame.Presentation;
 /// whole square-laid layer at once.</summary>
 public static class IsoProjection
 {
-    // Half a tile across in screen-X per world unit, a quarter in screen-Y — the 2:1 dimetric ratio.
-    private const float AxisX = 0.5f;
-    private const float AxisY = 0.25f;
+    // Screen-X shift per world unit (one across), screen-Y a half (the 2:1 dimetric ratio). At this
+    // scale a 64-unit world tile projects to a 128×64 screen diamond — the native size of the
+    // isometric pixel-art tiles, so they render crisp with no downscaling.
+    private const float AxisX = 1.0f;
+    private const float AxisY = 0.5f;
 
     // Godot's canvas Z range; depth keys are clamped into it so a huge map can't overflow ZIndex.
     private const int ZMax = 4096;
@@ -25,7 +27,7 @@ public static class IsoProjection
     /// <summary>The inverse of <see cref="WorldToScreen"/> — the flat world point under a screen
     /// position (used to aim the mouse at a world location). Being linear, it maps deltas too.</summary>
     public static NVector2 ScreenToWorld(NVector2 screen) =>
-        new(screen.X + (2f * screen.Y), (2f * screen.Y) - screen.X);
+        new((screen.X * 0.5f) + screen.Y, screen.Y - (screen.X * 0.5f));
 
     /// <summary>Back-to-front depth key: greater <c>x+y</c> is nearer the camera and draws over
     /// farther things. Fed to a view's <c>ZIndex</c> each frame.</summary>

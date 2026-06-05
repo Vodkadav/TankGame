@@ -54,10 +54,10 @@ public class TankViewTests : TestClass
         tank.Step(0.1f); // the model advances 10 units along +X; the view mirrors it, projected to iso
         _view.UpdateFromModel();
 
-        // World (10,0) projects to iso ((10-0)*0.5, (10+0)*0.25) = (5, 2.5).
-        if (Mathf.Abs(_view.Position.X - 5f) > 0.01f || Mathf.Abs(_view.Position.Y - 2.5f) > 0.01f)
+        // World (10,0) projects to iso ((10-0)*1, (10+0)*0.5) = (10, 5).
+        if (Mathf.Abs(_view.Position.X - 10f) > 0.01f || Mathf.Abs(_view.Position.Y - 5f) > 0.01f)
         {
-            throw new System.Exception($"View should mirror the tank to iso (5,2.5); was {_view.Position}.");
+            throw new System.Exception($"View should mirror the tank to iso (10,5); was {_view.Position}.");
         }
 
         var turret = _view.GetNode<Sprite2D>("Turret");

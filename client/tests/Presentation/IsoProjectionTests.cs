@@ -13,12 +13,12 @@ public class IsoProjectionTests : TestClass
     [Test]
     public void WorldToScreen_Maps2To1Dimetric()
     {
-        // One world unit east shifts half a tile right and a quarter down; one unit south shifts
-        // half left and a quarter down — the 2:1 diamond.
+        // One world unit east shifts one across and a half down; one unit south shifts one left and
+        // a half down — the 2:1 diamond at native tile scale.
         var screen = IsoProjection.WorldToScreen(new NVector2(130f, 64f));
-        if (Mathf.Abs(screen.X - 33f) > 0.001f || Mathf.Abs(screen.Y - 48.5f) > 0.001f)
+        if (Mathf.Abs(screen.X - 66f) > 0.001f || Mathf.Abs(screen.Y - 97f) > 0.001f)
         {
-            throw new System.Exception($"(130,64) should project to (33,48.5); was {screen}.");
+            throw new System.Exception($"(130,64) should project to (66,97); was {screen}.");
         }
     }
 

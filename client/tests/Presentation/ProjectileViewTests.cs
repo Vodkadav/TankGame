@@ -65,10 +65,10 @@ public class ProjectileViewTests : TestClass
         projectile.Step(0.1f); // the model advances 20 units; the view mirrors it, projected to iso
         _view.UpdateFromModel();
 
-        // World (70,50) projects to iso ((70-50)*0.5, (70+50)*0.25) = (10, 30).
-        if (Mathf.Abs(_view.Position.X - 10f) > 0.01f || Mathf.Abs(_view.Position.Y - 30f) > 0.01f)
+        // World (70,50) projects to iso ((70-50)*1, (70+50)*0.5) = (20, 60).
+        if (Mathf.Abs(_view.Position.X - 20f) > 0.01f || Mathf.Abs(_view.Position.Y - 60f) > 0.01f)
         {
-            throw new System.Exception($"View should mirror the projectile to iso (10,30); was {_view.Position}.");
+            throw new System.Exception($"View should mirror the projectile to iso (20,60); was {_view.Position}.");
         }
     }
 
@@ -82,10 +82,10 @@ public class ProjectileViewTests : TestClass
         projectile.Step(0.1f); // would travel 200 units, but the right wall snaps it to x=100
         _view.UpdateFromModel();
 
-        // Snapped world (100,50) projects to iso ((100-50)*0.5, (100+50)*0.25) = (25, 37.5).
-        if (Mathf.Abs(_view.Position.X - 25f) > 0.01f || Mathf.Abs(_view.Position.Y - 37.5f) > 0.01f)
+        // Snapped world (100,50) projects to iso ((100-50)*1, (100+50)*0.5) = (50, 75).
+        if (Mathf.Abs(_view.Position.X - 50f) > 0.01f || Mathf.Abs(_view.Position.Y - 75f) > 0.01f)
         {
-            throw new System.Exception($"View should mirror the snapped hit at iso (25,37.5); was {_view.Position}.");
+            throw new System.Exception($"View should mirror the snapped hit at iso (50,75); was {_view.Position}.");
         }
     }
 }

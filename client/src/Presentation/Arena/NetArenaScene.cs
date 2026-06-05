@@ -80,6 +80,22 @@ public partial class NetArenaScene : Node2D
 
     public override void _Process(double delta) => Tick((float)delta);
 
+    // Mouse-wheel zooms the camera (a playtest aid), reusing the local scene's clamped step.
+    public override void _UnhandledInput(InputEvent @event)
+    {
+        if (@event is InputEventMouseButton { Pressed: true } click)
+        {
+            if (click.ButtonIndex == MouseButton.WheelUp)
+            {
+                _camera.Zoom = ArenaScene.SteppedZoom(_camera.Zoom, zoomIn: true);
+            }
+            else if (click.ButtonIndex == MouseButton.WheelDown)
+            {
+                _camera.Zoom = ArenaScene.SteppedZoom(_camera.Zoom, zoomIn: false);
+            }
+        }
+    }
+
     /// <summary>One networked frame: pump the transport, then (once welcomed) send the local intent,
     /// predict the local tank, and keep its view-model and the camera on the prediction. Public so a
     /// test can step it without relying on engine frame timing.</summary>
