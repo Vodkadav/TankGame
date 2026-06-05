@@ -9,9 +9,10 @@ namespace TankGame.Presentation;
 /// which defaults to <see cref="Default"/>.</summary>
 public sealed record ArenaTheme(Color Ground, Color WallTint)
 {
-    /// <summary>Warm sandy ground, walls untinted — the look the owner's reference image asks for.</summary>
+    /// <summary>Warm sandy ground, walls untinted — the look the owner's reference image asks for. The
+    /// ground colour is a light warm tint multiplied over the sand texture, so the texture reads true.</summary>
     public static readonly ArenaTheme Sandy = new(
-        Ground: new Color(0.85f, 0.74f, 0.52f),
+        Ground: new Color(1f, 0.96f, 0.86f),
         WallTint: Colors.White);
 
     /// <summary>A cool grey-stone alternative that also tints the walls bluish, proving the seam swaps.</summary>

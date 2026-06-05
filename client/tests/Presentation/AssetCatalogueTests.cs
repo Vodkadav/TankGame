@@ -19,6 +19,7 @@ public class AssetCatalogueTests : TestClass
             AssetCatalogue.Default.TankTurret,
             AssetCatalogue.Default.Bullet,
             AssetCatalogue.Default.WallAtlas,
+            AssetCatalogue.Default.GroundTile,
         })
         {
             if (GD.Load<Texture2D>(path) is null)

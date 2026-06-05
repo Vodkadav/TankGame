@@ -434,25 +434,30 @@ public partial class ArenaScene : Node2D
         return layer;
     }
 
-    // A flat-coloured ground rectangle covering the whole field, drawn behind the walls and tanks
-    // (negative ZIndex). World-space Polygon2D so it tracks the camera; the theme picks its colour.
+    // A ground rectangle covering the whole field, drawn behind the walls and tanks (negative
+    // ZIndex). World-space Polygon2D so it tracks the camera; it tiles the themed ground texture
+    // (UV in pixels + texture-repeat → one tile per TileSize) tinted by the theme's ground colour.
     private static Polygon2D BuildGround(int widthCells, int heightCells, Color colour)
     {
         var w = widthCells * TileSize;
         var h = heightCells * TileSize;
+        var corners = new[]
+        {
+            new Vector2(0f, 0f),
+            new Vector2(w, 0f),
+            new Vector2(w, h),
+            new Vector2(0f, h),
+        };
         return new Polygon2D
         {
             Name = "Ground",
             Color = colour,
             ZIndex = -10,
             Position = new Vector2(GridOrigin.X, GridOrigin.Y),
-            Polygon = new[]
-            {
-                new Vector2(0f, 0f),
-                new Vector2(w, 0f),
-                new Vector2(w, h),
-                new Vector2(0f, h),
-            },
+            Polygon = corners,
+            Texture = GD.Load<Texture2D>(AssetCatalogue.Active.GroundTile),
+            UV = corners, // UV in texture pixels; with repeat this tiles once per ground-tile width
+            TextureRepeat = CanvasItem.TextureRepeatEnum.Enabled,
         };
     }
 

@@ -373,6 +373,12 @@ Catalogue and ordering: `docs/research/local-backlog.md`.
   translation key (`PickupFloater.LabelKeyFor`); `ArenaScene` subscribes per pickup and pops a floater
   at the spot. Seven `pickup.*` names added to `i18n/strings.csv` (EN/ES/DK). GameLogic 192 → 193,
   scene 65 → 69.
+- **Art pass — Kenney ground tiling** ✅ the flat ground colour is now the Kenney sand tile tiled across
+  the field. `scripts/prep_kenney_ground.py` resizes `tileSand1` → `GroundSand.png` (64 px);
+  `AssetCatalogue.GroundTile` adds it to the swap seam; `ArenaScene.BuildGround` gives the ground
+  `Polygon2D` the texture with pixel UVs + `TextureRepeat` (one tile per cell), tinted by
+  `ArenaTheme.Ground` (Sandy lightened to a warm near-white so the texture reads true; Slate recolours
+  the same sand to stone). CC0 credited.
 
 Test counts on `main`: GameLogic 193, Domain 32, Infrastructure 12, Architecture 6, 69 GoDotTest
 scene tests.
