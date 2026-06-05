@@ -441,8 +441,14 @@ Catalogue and ordering: `docs/research/local-backlog.md`.
   mutable; `PowerupView` mirrors it each frame). So a powerup shifts a fight until its holder falls,
   then drops onto the field somewhere new — also varying pickup locations within a match. `ArenaScene`
   spawns all pickups with `dropOnCarrierDeath: true`. GameLogic 208 (3 respawn tests → 3 drop tests).
+- **Weighted/clustered cell generation** ✅ `ArenaGenerator.Scatter` now picks each interior cell by a
+  weighted roll over six kinds (Floor/Brick/Steel/Crate/Bush/Sandbag) biased toward each already-placed
+  interior neighbour (`ClusterBonus`), so obstacles and grass form clumps instead of salt-and-pepper —
+  but the bias stops once a kind already runs `RunCap` (5) cells into the current one (owner's "cap at
+  5, then equal chance"). Floor is the majority so clustering keeps the ≥80%-open invariant. GameLogic
+  208 → 209.
 
-Test counts on `main`: GameLogic 208, Domain 32, Infrastructure 12, Architecture 6, 76 GoDotTest
+Test counts on `main`: GameLogic 209, Domain 32, Infrastructure 12, Architecture 6, 76 GoDotTest
 scene tests.
 
 **Owner ask (2026-06-04): map variety + progression — both now under way.** Captured in
