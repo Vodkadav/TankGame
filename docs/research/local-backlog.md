@@ -94,3 +94,27 @@ Suggested entry point when picked up: an **ADR for S8** (`ILevelSource`/`LevelPa
 (Done ✅ as of 2026-06-04; `PROGRESS.md` is authoritative for status.) Items are pulled
 forward into scheduled tickets only as they are built; until then this is aspirational,
 exactly like `feature-roadmap.md`.
+
+## Owner request backlog (2026-06-05, post-art-pass)
+
+Captured verbatim-in-spirit from two owner messages during the art/gameplay session.
+`PROGRESS.md` is authoritative for what is built; these are the outstanding asks. Done items
+struck through as they merge.
+
+| # | Request | Size | Notes |
+|---|---|---|---|
+| 21 | ~~AI roams when idle (was standing still)~~ | S | ✅ #112 |
+| 22 | Enemy tanks **visually hidden** when in grass (not just AI-blind) | S | view-side concealment using `BushField`; reveal up close like the AI |
+| 23 | Pickups spawn at **random** spots each match/round (not the same place) | S | seed/placement variety |
+| 24 | Pickup respawn → **drop where its carrier dies** (replace timed respawn). "thats best" | M | pickup tracks collector; on the collector's death it reappears at the death spot |
+| 25 | **Weighted/clustered** cell generation: higher chance to place a cell next to a like cell, capped at 5 consecutive (then equal odds) | M | cellular-automata-ish run-length-capped clustering in `ArenaGenerator` |
+| 26 | **Buildings, rivers + bridges** | L | new terrain: impassable water + passable bridge cells; multi-cell building obstacles. Exploratory ("see if we can") |
+| 27 | A powerup that **speeds up** the tank | XS | NOTE: `PowerupKind.SpeedBoost` already exists (×1.6/6 s) — confirm with owner / maybe a stronger or permanent variant |
+| 28 | **Missile** weapon: flies to the map edge, damaging everything in its wake | M | a long piercing/lance shot; new ammo or pickup |
+| 29 | **Telephone** pickup → calls in an **airstrike** | M | a pickup that, on collect, rains damage over an area after a delay |
+| 30 | **HUD top-left is unreadable** (meters/score overlap, stacked) — needs a clean layout | S | lay the top-left overlays out without overlap; high visibility |
+| 31 | **Game modes** TODO: capture the flag, king of the hill, destroy enemy statue, … | L | roadmap-level; each its own design + ADR. Recorded per owner ("add to the todo list") |
+
+**Suggested order:** 30 HUD (clear bug) → 22 grass-invisibility → 24 pickup-drop-on-death (+23 random) →
+25 weighted generation → 28 missile → 29 telephone airstrike → 26 buildings/rivers/bridges (big) →
+31 game modes (roadmap). 27 is likely already done.

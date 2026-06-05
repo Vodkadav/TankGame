@@ -426,8 +426,13 @@ Catalogue and ordering: `docs/research/local-backlog.md`.
   (holds a heading for `WanderTicks`, then picks a fresh random one, seeded per tank in `Bind`) instead
   of holding still; ambushers only lie in wait when they actually have a target in sight, otherwise they
   roam to hunt. GameLogic 209 → 208 (one redundant "can't-see" test folded away).
+- **HUD top-left readability** ✅ `MetersOverlay` and `BrickCounterOverlay` both anchored at the same
+  top-left spot (overlapping); now a shared `Hud` helper rows them (`LineY` 0/1) and gives every HUD
+  label a dark outline so white text reads over the textured ground. `ScoreOverlay` (top-right) styled
+  to match. scene 73 → 75. Owner backlog (both 2026-06-05 messages) recorded in
+  `docs/research/local-backlog.md` (#21–#31).
 
-Test counts on `main`: GameLogic 208, Domain 32, Infrastructure 12, Architecture 6, 73 GoDotTest
+Test counts on `main`: GameLogic 208, Domain 32, Infrastructure 12, Architecture 6, 75 GoDotTest
 scene tests.
 
 **Owner ask (2026-06-04): map variety + progression — both now under way.** Captured in

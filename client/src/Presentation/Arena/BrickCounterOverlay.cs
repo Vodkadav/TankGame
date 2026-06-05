@@ -22,7 +22,8 @@ public partial class BrickCounterOverlay : CanvasLayer
     {
         _label = new Label { Name = "BrickCounter" };
         _label.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.TopLeft);
-        _label.Position = new Vector2(8f, 8f);
+        _label.Position = new Vector2(Hud.Margin, Hud.LineY(1)); // top-left row 1, below the meters
+        Hud.Style(_label);
         AddChild(_label);
         Refresh();
     }
