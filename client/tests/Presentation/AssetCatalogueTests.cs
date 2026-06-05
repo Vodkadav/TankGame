@@ -18,12 +18,17 @@ public class AssetCatalogueTests : TestClass
             AssetCatalogue.Default.TankBody,
             AssetCatalogue.Default.TankTurret,
             AssetCatalogue.Default.Bullet,
-            AssetCatalogue.Default.WallAtlas,
             AssetCatalogue.Default.GroundTile,
             AssetCatalogue.Default.PickupDisc,
             AssetCatalogue.Default.WaterTile,
             AssetCatalogue.Default.BridgeTile,
             AssetCatalogue.Default.MountainTile,
+            AssetCatalogue.Default.BrickIntactTile,
+            AssetCatalogue.Default.BrickCrackedTile,
+            AssetCatalogue.Default.BrickRubbleTile,
+            AssetCatalogue.Default.SteelTile,
+            AssetCatalogue.Default.CrateTile,
+            AssetCatalogue.Default.BuildingTile,
         })
         {
             if (GD.Load<Texture2D>(path) is null)
@@ -55,7 +60,7 @@ public class AssetCatalogueTests : TestClass
                 throw new System.Exception("Swapping one asset should change just that entry.");
             }
 
-            if (AssetCatalogue.Active.WallAtlas != original.WallAtlas)
+            if (AssetCatalogue.Active.SteelTile != original.SteelTile)
             {
                 throw new System.Exception("Swapping one asset must leave the others untouched.");
             }

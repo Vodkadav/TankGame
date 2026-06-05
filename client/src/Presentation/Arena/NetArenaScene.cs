@@ -62,9 +62,9 @@ public partial class NetArenaScene : Node2D
         _grid = _level.BuildGrid();
         _arena = new GridArena(_grid, TileSize, GridOrigin);
 
-        var wallView = new WallGridView { Name = "WallGridView", RenderTileSize = (int)TileSize };
-        AddChild(wallView);
-        wallView.Bind(_grid);
+        var terrainView = new IsoTerrainView { Name = "IsoTerrainView" };
+        AddChild(terrainView);
+        terrainView.Bind(_grid, TileSize);
 
         _camera = new Camera2D { Name = "GameCamera", ProcessCallback = Camera2D.Camera2DProcessCallback.Physics };
         AddChild(_camera);

@@ -123,13 +123,8 @@ public partial class ArenaScene : Node2D
         var theme = GameSetup.Theme;
         AddChild(BuildGround(level.Width, level.Height, theme.Ground)); // behind everything
 
-        var wallView = new WallGridView { Name = "WallGridView", RenderTileSize = (int)TileSize };
-        wallView.Modulate = theme.WallTint; // recolour the wall sprites to the theme
-        AddChild(wallView);     // runs _Ready (builds the atlas TileSet)
-        wallView.Bind(grid);    // then draw the man-made walls and track damage
-
-        // Natural terrain (water/bridge/mountain) renders as native iso tiles that depth-sort; the
-        // man-made walls above stay on the sheared WallGridView until their own iso pass.
+        // Every non-floor cell — natural terrain (water/bridge/mountain) and the walls (brick/steel/
+        // crate/building) — renders as a native iso tile that depth-sorts against the tanks.
         var terrainView = new IsoTerrainView { Name = "IsoTerrainView" };
         AddChild(terrainView);
         terrainView.Bind(grid, TileSize);
