@@ -56,6 +56,7 @@ public partial class PowerupView : Node2D
         PowerupKind.Repair => new Color(0.2f, 0.9f, 0.3f),      // green
         PowerupKind.Shield => new Color(0.3f, 0.9f, 0.95f),     // cyan
         PowerupKind.Missile => new Color(1f, 0.35f, 0.1f),      // hot orange
+        PowerupKind.Telephone => new Color(0.85f, 0.2f, 0.85f), // magenta
         _ => Colors.White,
     };
 }

@@ -78,7 +78,7 @@ public sealed class Powerup : IPowerup
 
             if (Vector2.DistanceSquared(Position, tank.Position) <= _pickupRadius * _pickupRadius)
             {
-                _effect.ApplyTo(tank);
+                _effect.ApplyTo(tank, _world);
                 Collected?.Invoke(Kind);
                 if (_dropOnCarrierDeath)
                 {

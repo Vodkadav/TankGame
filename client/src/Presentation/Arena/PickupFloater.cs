@@ -56,6 +56,7 @@ public partial class PickupFloater : Node2D
         PowerupKind.Repair => "pickup.repair",
         PowerupKind.Shield => "pickup.shield",
         PowerupKind.Missile => "pickup.missile",
+        PowerupKind.Telephone => "pickup.telephone",
         _ => "pickup.unknown",
     };
 }
