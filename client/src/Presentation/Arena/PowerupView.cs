@@ -33,6 +33,7 @@ public partial class PowerupView : Node2D
         if (_powerup is not null)
         {
             Visible = _powerup.IsAvailable;
+            Position = new Vector2(_powerup.Position.X, _powerup.Position.Y); // it moves when it drops
         }
     }
 

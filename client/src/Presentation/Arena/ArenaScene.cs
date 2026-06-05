@@ -51,9 +51,6 @@ public partial class ArenaScene : Node2D
     private const int AmmoShots = 5;
     private const int RepairAmount = 2;
     private const int ShieldAmount = 3;
-    // Seconds before a collected pickup returns to the field — keeps the field stocked across a
-    // long round instead of one-per-round. Tunable balance knob.
-    private const float PickupRespawnDelay = 12f;
     private static readonly (PowerupKind Kind, IPickupEffect Effect)[] PowerupCatalogue =
     {
         (PowerupKind.SpeedBoost, new StatusEffectPickup(new StatusEffect(StatKind.Speed, Mult: 1.6f, AddFlat: 0f, Seconds: 6f))),
@@ -161,7 +158,7 @@ public partial class ArenaScene : Node2D
         {
             var (kind, effect) = PowerupCatalogue[i];
             var (x, y) = _layout.PickupCells[i];
-            _world.Spawn(new Powerup(_world, CellCentre(x, y), kind, effect, PickupRadius, PickupRespawnDelay));
+            _world.Spawn(new Powerup(_world, CellCentre(x, y), kind, effect, PickupRadius, dropOnCarrierDeath: true));
         }
     }
 

@@ -435,6 +435,12 @@ Catalogue and ordering: `docs/research/local-backlog.md`.
   gains `Concealed` (hides the view when set); `ArenaScene._Process` sets it for adversary tanks that
   are on a bush cell with no player-team tank within `BushRevealRange` (96) — so a lurking enemy
   genuinely vanishes until you get close. Versus (no AI, shared screen) is left alone. scene 75 → 76.
+- **Pickups drop where their carrier dies** ✅ (owner: "thats best") replaces the timed respawn.
+  `Powerup` takes `dropOnCarrierDeath` instead of `respawnDelay`: on collection it goes dormant in the
+  collector's hands (not reaped); when that tank dies it reappears at the death spot (`Position` now
+  mutable; `PowerupView` mirrors it each frame). So a powerup shifts a fight until its holder falls,
+  then drops onto the field somewhere new — also varying pickup locations within a match. `ArenaScene`
+  spawns all pickups with `dropOnCarrierDeath: true`. GameLogic 208 (3 respawn tests → 3 drop tests).
 
 Test counts on `main`: GameLogic 208, Domain 32, Infrastructure 12, Architecture 6, 76 GoDotTest
 scene tests.
