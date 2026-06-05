@@ -431,8 +431,12 @@ Catalogue and ordering: `docs/research/local-backlog.md`.
   label a dark outline so white text reads over the textured ground. `ScoreOverlay` (top-right) styled
   to match. scene 73 → 75. Owner backlog (both 2026-06-05 messages) recorded in
   `docs/research/local-backlog.md` (#21–#31).
+- **Enemy tanks hidden in grass (visual)** ✅ concealment is now visual, not just AI-blind. `TankView`
+  gains `Concealed` (hides the view when set); `ArenaScene._Process` sets it for adversary tanks that
+  are on a bush cell with no player-team tank within `BushRevealRange` (96) — so a lurking enemy
+  genuinely vanishes until you get close. Versus (no AI, shared screen) is left alone. scene 75 → 76.
 
-Test counts on `main`: GameLogic 208, Domain 32, Infrastructure 12, Architecture 6, 75 GoDotTest
+Test counts on `main`: GameLogic 208, Domain 32, Infrastructure 12, Architecture 6, 76 GoDotTest
 scene tests.
 
 **Owner ask (2026-06-04): map variety + progression — both now under way.** Captured in
