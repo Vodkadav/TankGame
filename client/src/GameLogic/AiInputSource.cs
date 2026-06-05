@@ -34,11 +34,18 @@ public sealed class AiInputSource : IInputSource
     // How far an ambusher will travel to reach a patch of grass to lie in wait (≈9 tiles).
     private const float AmbushSeekRange = 600f;
 
+    // Roughly how many ticks the AI holds a wander heading before picking a fresh one, so an idle
+    // tank roams the field looking for a fight instead of standing still.
+    private const int WanderTicks = 75;
+
     private readonly IWorld _world;
     private readonly IArena _arena;
     private readonly IConcealment? _concealment;
     private readonly bool _ambusher;
     private ITank? _self;
+    private Random _rng = new();
+    private Vector2 _wanderDirection;
+    private int _wanderCooldown;
 
     /// <param name="ambusher">When true (and concealment exists), this tank prefers to slip into grass
     /// and snipe from cover rather than charge — so some enemies lie in wait. Bind it after construction.</param>
@@ -52,7 +59,11 @@ public sealed class AiInputSource : IInputSource
 
     /// <summary>Links this controller to the tank it drives (resolves the construction cycle:
     /// the tank needs the input source, the input source needs the tank's position).</summary>
-    public void Bind(ITank self) => _self = self;
+    public void Bind(ITank self)
+    {
+        _self = self;
+        _rng = new Random(self.Id.GetHashCode()); // varied per tank, stable for one tank
+    }
 
     public TankInput Read()
     {
@@ -69,9 +80,9 @@ public sealed class AiInputSource : IInputSource
         var target = NearestVisibleEnemy();
         if (target is null)
         {
-            // No-one to fight: grab a pickup if one is in view, otherwise sit tight.
+            // No-one to fight: grab a pickup if one is in view, otherwise roam to find a fight.
             var loose = NearestReachablePowerup();
-            return loose is null ? Hold() : DriveToward(loose.Position);
+            return loose is null ? Wander() : DriveToward(loose.Position);
         }
 
         var delta = target.Position - _self.Position;
@@ -116,16 +127,36 @@ public sealed class AiInputSource : IInputSource
     private TankInput? Ambush()
     {
         var enemy = NearestVisibleEnemy();
-        var aim = enemy is null ? _self!.TurretRotation : AimAt(enemy.Position);
-        var fire = enemy is not null && Vector2.Distance(enemy.Position, _self!.Position) <= FireRange;
-
-        if (_concealment!.ConcealsAt(_self!.Position))
+        if (enemy is null)
         {
-            return new TankInput(Vector2.Zero, aim, fire); // hidden — lie in wait and snipe
+            return null; // nothing in sight to ambush — fall through to roam/hunt, don't just sit
+        }
+
+        var aim = AimAt(enemy.Position);
+        var fire = Vector2.Distance(enemy.Position, _self!.Position) <= FireRange;
+
+        if (_concealment!.ConcealsAt(_self.Position))
+        {
+            return new TankInput(Vector2.Zero, aim, fire); // hidden with prey in sight — lie in wait
         }
 
         var spot = _concealment.NearestConcealment(_self.Position, AmbushSeekRange);
         return spot is null ? null : new TankInput(DirectionTo(spot.Value), aim, fire);
+    }
+
+    // Roam: hold a heading for a while, then pick a fresh one, so an idle tank keeps moving and
+    // bumps into fights instead of standing still.
+    private TankInput Wander()
+    {
+        if (_wanderCooldown <= 0 || _wanderDirection == Vector2.Zero)
+        {
+            var angle = _rng.NextDouble() * Math.Tau;
+            _wanderDirection = new Vector2((float)Math.Cos(angle), (float)Math.Sin(angle));
+            _wanderCooldown = WanderTicks;
+        }
+
+        _wanderCooldown--;
+        return new TankInput(_wanderDirection, MathF.Atan2(_wanderDirection.Y, _wanderDirection.X), Fire: false);
     }
 
     private float AimAt(Vector2 point)

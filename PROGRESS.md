@@ -422,8 +422,12 @@ Catalogue and ordering: `docs/research/local-backlog.md`.
   `GridArena.DamageAt` path. `WallGridView` draws a crate frame (atlas extended to 5 frames via
   `gen_wall_atlas.py`). `ArenaGenerator` scatters crates (`CrateDensity` 0.06; brick trimmed to 0.08 to
   keep the ≥80%-open invariant). GameLogic 207 → 209, scene 71 → 73.
+- **AI roams when idle (fixes standing still)** ✅ an `AiInputSource` with no visible target now wanders
+  (holds a heading for `WanderTicks`, then picks a fresh random one, seeded per tank in `Bind`) instead
+  of holding still; ambushers only lie in wait when they actually have a target in sight, otherwise they
+  roam to hunt. GameLogic 209 → 208 (one redundant "can't-see" test folded away).
 
-Test counts on `main`: GameLogic 209, Domain 32, Infrastructure 12, Architecture 6, 73 GoDotTest
+Test counts on `main`: GameLogic 208, Domain 32, Infrastructure 12, Architecture 6, 73 GoDotTest
 scene tests.
 
 **Owner ask (2026-06-04): map variety + progression — both now under way.** Captured in
