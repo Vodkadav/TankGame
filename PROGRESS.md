@@ -481,8 +481,13 @@ Catalogue and ordering: `docs/research/local-backlog.md`.
   unclaimed + unlocked, claiming them — so never on an anchor, the river, or a bridge approach. Excluded
   from the open-floor metric. `WallGridView` + atlas add a building frame (8) → 9-frame atlas.
   GameLogic 219 → 220. **The terrain expansion (water/bridges/rivers, mountains, buildings) is in.**
+- **Firing-direction arrows** ✅ when an enemy tank shoots, a screen-edge arrow flashes toward it.
+  `FireArrow` (Presentation Node2D on a screen-space CanvasLayer) blinks ~3× over 1.5 s then frees
+  itself; `ArenaScene` watches new enemy-team projectile spawns and places an arrow near the viewport
+  edge pointing at the shooter (direction from the camera centre to the muzzle). Several can show at
+  once. scene 77 → 79.
 
-Test counts on `main`: GameLogic 220, Domain 38, Infrastructure 12, Architecture 6, 77 GoDotTest
+Test counts on `main`: GameLogic 220, Domain 38, Infrastructure 12, Architecture 6, 79 GoDotTest
 scene tests.
 
 **Owner ask (2026-06-04): map variety + progression — both now under way.** Captured in
