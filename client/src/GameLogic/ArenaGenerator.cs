@@ -67,29 +67,44 @@ public sealed class ArenaGenerator
     {
         var chosen = new List<(int X, int Y)>();
 
-        // Spawns first, in opposite corners; then enemies and pickups spread across the field. All
-        // are picked on the (still empty) interior so walls scatter around them, never on them.
-        var playerSpawn = PickInRegion(p, rng, chosen, 1, 1, Third(p.Width), Third(p.Height));
-        var player2Spawn = PickInRegion(p, rng, chosen,
+        // Carve a river with bridge crossings first and claim its cells, so anchors, walls, and
+        // terrain never land on the water or the bridges (the "claim a cell" rule).
+        var (riverCells, claimed, approaches) = CarveRiver(p, rng);
+
+        // Spawns first, in opposite corners; then enemies and pickups spread across the field. All are
+        // picked on unclaimed interior floor so walls scatter around them, never on them or the river.
+        var playerSpawn = PickInRegion(p, rng, chosen, claimed, 1, 1, Third(p.Width), Third(p.Height));
+        var player2Spawn = PickInRegion(p, rng, chosen, claimed,
             p.Width - 1 - Third(p.Width), p.Height - 1 - Third(p.Height), p.Width - 2, p.Height - 2);
 
         var enemySpawns = new List<(int X, int Y)>();
         for (var i = 0; i < p.EnemyCount; i++)
         {
-            enemySpawns.Add(PickInRegion(p, rng, chosen, 1, 1, p.Width - 2, p.Height - 2));
+            enemySpawns.Add(PickInRegion(p, rng, chosen, claimed, 1, 1, p.Width - 2, p.Height - 2));
         }
 
         var pickupCells = new List<(int X, int Y)>();
         for (var i = 0; i < p.PickupCount; i++)
         {
-            pickupCells.Add(PickInRegion(p, rng, chosen, 1, 1, p.Width - 2, p.Height - 2));
+            pickupCells.Add(PickInRegion(p, rng, chosen, claimed, 1, 1, p.Width - 2, p.Height - 2));
         }
 
         var locked = LockedMask(p, chosen, playerSpawn);
-        var (materials, bushes, sandbags) = Scatter(p, rng, locked);
+        foreach (var (ax, ay) in approaches)
+        {
+            Lock(p, locked, ax, ay); // keep the cells leading onto each bridge clear so it is crossable
+        }
 
-        // Wall off any floor the spawn can't reach; a locked anchor that ends up enclosed instead
-        // rejects this attempt (every anchor must stay reachable open floor).
+        var (materials, bushes, sandbags) = Scatter(p, rng, locked, claimed);
+
+        // Lay the river over the scattered land (its claimed cells are still floor here).
+        foreach (var (rx, ry, material) in riverCells)
+        {
+            materials[rx, ry] = material;
+        }
+
+        // Wall off any passable land the spawn cannot reach (across the river only via bridges); a
+        // locked anchor that ends up cut off instead rejects this attempt.
         var reached = FloodFillFloor(materials, playerSpawn.X, playerSpawn.Y);
         for (var x = 1; x < p.Width - 1; x++)
         {
@@ -124,7 +139,8 @@ public sealed class ArenaGenerator
     // every already-chosen anchor; relaxes to any free cell if separation cannot be met, so
     // placement always terminates even on a crowded small map. The pick is recorded in `chosen`.
     private static (int X, int Y) PickInRegion(
-        ArenaGenParams p, Random rng, List<(int X, int Y)> chosen, int xMin, int yMin, int xMax, int yMax)
+        ArenaGenParams p, Random rng, List<(int X, int Y)> chosen, bool[,] claimed,
+        int xMin, int yMin, int xMax, int yMax)
     {
         xMin = Math.Max(1, xMin);
         yMin = Math.Max(1, yMin);
@@ -135,9 +151,9 @@ public sealed class ArenaGenerator
         for (var attempt = 0; attempt < PlacementTries; attempt++)
         {
             var cell = (X: rng.Next(xMin, xMax + 1), Y: rng.Next(yMin, yMax + 1));
-            if (chosen.Contains(cell))
+            if (chosen.Contains(cell) || claimed[cell.X, cell.Y])
             {
-                continue;
+                continue; // never an already-taken anchor or a river cell
             }
 
             fallback = cell; // a free cell, kept in case nothing meets the separation preference
@@ -203,7 +219,7 @@ public sealed class ArenaGenerator
     private const double ClusterBonus = 0.45;
 
     private static (CellMaterial[,] Materials, bool[,] Bushes, bool[,] Sandbags) Scatter(
-        ArenaGenParams p, Random rng, bool[,] locked)
+        ArenaGenParams p, Random rng, bool[,] locked, bool[,] claimed)
     {
         var materials = new CellMaterial[p.Width, p.Height];
         var bushes = new bool[p.Width, p.Height];
@@ -221,9 +237,9 @@ public sealed class ArenaGenerator
                     continue;
                 }
 
-                if (locked[x, y])
+                if (locked[x, y] || claimed[x, y])
                 {
-                    materials[x, y] = CellMaterial.Floor; // kinds stays Floor
+                    materials[x, y] = CellMaterial.Floor; // a spawn clearing or a river cell — left for later
                     continue;
                 }
 
@@ -350,9 +366,9 @@ public sealed class ArenaGenerator
                     continue;
                 }
 
-                if (!seen[nx, ny] && materials[nx, ny] == CellMaterial.Floor)
+                if (!seen[nx, ny] && !CellMaterials.BlocksMovement(materials[nx, ny]))
                 {
-                    seen[nx, ny] = true;
+                    seen[nx, ny] = true; // floor and bridges are passable; water and walls are not
                     queue.Enqueue((nx, ny));
                 }
             }
@@ -371,6 +387,13 @@ public sealed class ArenaGenerator
         {
             for (var y = 1; y < height - 1; y++)
             {
+                // The river (water + bridges) is deliberate terrain, not clutter — measure the
+                // open-floor fraction over the land only, so a river does not trip the invariant.
+                if (materials[x, y] is CellMaterial.Water or CellMaterial.Bridge)
+                {
+                    continue;
+                }
+
                 interior++;
                 if (materials[x, y] == CellMaterial.Floor)
                 {
@@ -380,6 +403,53 @@ public sealed class ArenaGenerator
         }
 
         return interior == 0 ? 1d : floor / (double)interior;
+    }
+
+    // Carve a single river across the field with bridge crossings, claiming every cell so nothing else
+    // is generated on top of it. A vertical river gets 2 bridges; a horizontal one gets 3. Each bridge
+    // also returns its two perpendicular approach cells, which the caller keeps clear so it is crossable.
+    private static (System.Collections.Generic.List<(int X, int Y, CellMaterial Material)> Cells,
+        bool[,] Claimed, System.Collections.Generic.List<(int X, int Y)> Approaches) CarveRiver(
+        ArenaGenParams p, Random rng)
+    {
+        var cells = new System.Collections.Generic.List<(int, int, CellMaterial)>();
+        var claimed = new bool[p.Width, p.Height];
+        var approaches = new System.Collections.Generic.List<(int, int)>();
+
+        if (rng.Next(2) == 0) // vertical river
+        {
+            var rx = rng.Next(Third(p.Width), p.Width - Third(p.Width));
+            var bridges = new[] { p.Height / 3, 2 * p.Height / 3 };
+            for (var y = 1; y < p.Height - 1; y++)
+            {
+                var bridge = System.Array.IndexOf(bridges, y) >= 0;
+                cells.Add((rx, y, bridge ? CellMaterial.Bridge : CellMaterial.Water));
+                claimed[rx, y] = true;
+                if (bridge)
+                {
+                    approaches.Add((rx - 1, y));
+                    approaches.Add((rx + 1, y));
+                }
+            }
+        }
+        else // horizontal river
+        {
+            var ry = rng.Next(Third(p.Height), p.Height - Third(p.Height));
+            var bridges = new[] { p.Width / 4, p.Width / 2, 3 * p.Width / 4 };
+            for (var x = 1; x < p.Width - 1; x++)
+            {
+                var bridge = System.Array.IndexOf(bridges, x) >= 0;
+                cells.Add((x, ry, bridge ? CellMaterial.Bridge : CellMaterial.Water));
+                claimed[x, ry] = true;
+                if (bridge)
+                {
+                    approaches.Add((x, ry - 1));
+                    approaches.Add((x, ry + 1));
+                }
+            }
+        }
+
+        return (cells, claimed, approaches);
     }
 
     // Trivially-valid fallback: a bare arena (steel border, open interior) with anchors spread on a
