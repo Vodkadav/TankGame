@@ -362,8 +362,13 @@ Catalogue and ordering: `docs/research/local-backlog.md`.
   Credited CC0 in `docs/credits/assets.md`; extracted packs + `art-wip/` gitignored. Still placeholders:
   the bullet and the wall atlas (the latter needs a 4-frame damage layout — a follow-up), and the
   ground (flat theme colour, could tile `tileSand`). Needs an in-game eyeball pass for scale/pivot feel.
+- **AI seeks powerups** ✅ `AiInputSource` now pursues pickups as a secondary objective:
+  `NearestReachablePowerup` (available + within `PowerupSeekRange` 700 + line of sight). Combat keeps
+  priority — it fires/holds at stand-off when an enemy is in range; when the enemy is out of fire range
+  it detours through a nearby pickup while keeping the gun on the threat; with no enemy it just collects.
+  `DirectionTo` guards the zero-vector normalise. AiInputSource tests 10 → 15.
 
-Test counts on `main`: GameLogic 187, Domain 32, Infrastructure 12, Architecture 6, 65 GoDotTest
+Test counts on `main`: GameLogic 192, Domain 32, Infrastructure 12, Architecture 6, 65 GoDotTest
 scene tests.
 
 **Owner ask (2026-06-04): map variety + progression — both now under way.** Captured in

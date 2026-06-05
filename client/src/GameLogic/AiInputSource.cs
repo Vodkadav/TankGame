@@ -27,6 +27,10 @@ public sealed class AiInputSource : IInputSource
     // enough to brush the foliage. Beyond that the AI cannot pick it out of the cover.
     private const float BushRevealRange = 96f;
 
+    // How far the AI will break off to grab a pickup it can see (≈11 tiles). Smaller than the
+    // vision range so it collects nearby crates without abandoning the fight to chase a far one.
+    private const float PowerupSeekRange = 700f;
+
     private readonly IWorld _world;
     private readonly IArena _arena;
     private readonly IConcealment? _concealment;
@@ -53,16 +57,45 @@ public sealed class AiInputSource : IInputSource
         var target = NearestVisibleEnemy();
         if (target is null)
         {
-            return Hold();
+            // No-one to fight: grab a pickup if one is in view, otherwise sit tight.
+            var loose = NearestReachablePowerup();
+            return loose is null ? Hold() : DriveToward(loose.Position);
         }
 
         var delta = target.Position - _self.Position;
         var distance = delta.Length();
         var aim = MathF.Atan2(delta.Y, delta.X);
-        var move = distance > StandoffDistance ? Vector2.Normalize(delta) : Vector2.Zero;
-        var fire = distance <= FireRange; // the target is already known to be in sight
 
-        return new TankInput(move, aim, fire);
+        if (distance <= FireRange)
+        {
+            // Engaging: hold at stand-off and shoot — don't wander off for a pickup mid-fight.
+            var holdMove = distance > StandoffDistance ? Vector2.Normalize(delta) : Vector2.Zero;
+            return new TankInput(holdMove, aim, Fire: true);
+        }
+
+        // The enemy is seen but out of range: close in, detouring through a nearby pickup if there
+        // is one on the way, while keeping the gun trained on the threat.
+        var detour = NearestReachablePowerup();
+        var move = detour is not null
+            ? DirectionTo(detour.Position)
+            : Vector2.Normalize(delta);
+        return new TankInput(move, aim, Fire: false);
+    }
+
+    // Steer straight at a point (aim along the travel direction); used when chasing a pickup with
+    // no enemy to keep the gun on.
+    private TankInput DriveToward(Vector2 point)
+    {
+        var delta = point - _self!.Position;
+        return new TankInput(DirectionTo(point), MathF.Atan2(delta.Y, delta.X), Fire: false);
+    }
+
+    // Unit vector toward a point, or zero if we are already on it (avoids a NaN from normalising
+    // a zero vector when the AI is sitting on the pickup the instant before it is collected).
+    private Vector2 DirectionTo(Vector2 point)
+    {
+        var delta = point - _self!.Position;
+        return delta == Vector2.Zero ? Vector2.Zero : Vector2.Normalize(delta);
     }
 
     private TankInput Hold() => new(Vector2.Zero, _self?.TurretRotation ?? 0f, Fire: false);
@@ -100,6 +133,39 @@ public sealed class AiInputSource : IInputSource
 
             nearestDistance = distance;
             nearest = tank;
+        }
+
+        return nearest;
+    }
+
+    // The nearest pickup the AI can see and reach: available (not collected/dormant), within
+    // PowerupSeekRange, and with a clear line of sight (it won't chase a crate walled off behind
+    // steel it can't see past).
+    private IPowerup? NearestReachablePowerup()
+    {
+        IPowerup? nearest = null;
+        var nearestDistance = float.PositiveInfinity;
+
+        foreach (var entity in _world.Entities)
+        {
+            if (entity is not IPowerup powerup || !powerup.IsAvailable)
+            {
+                continue;
+            }
+
+            var distance = Vector2.Distance(powerup.Position, _self!.Position);
+            if (distance > PowerupSeekRange || distance >= nearestDistance)
+            {
+                continue;
+            }
+
+            if (!HasLineOfSight(_self.Position, powerup.Position, distance))
+            {
+                continue;
+            }
+
+            nearestDistance = distance;
+            nearest = powerup;
         }
 
         return nearest;
