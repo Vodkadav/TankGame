@@ -38,6 +38,24 @@ public class AiInputSourceTests
         public bool IsBlocked(Vector2 point) => false;
     }
 
+    // A positioned pickup on the field — enough for the AI to notice and steer toward.
+    private sealed class StubPowerup : IPowerup
+    {
+        public StubPowerup(Vector2 position, bool available = true)
+        {
+            Position = position;
+            IsAvailable = available;
+            Id = Guid.NewGuid();
+        }
+
+        public Guid Id { get; }
+        public Vector2 Position { get; }
+        public PowerupKind Kind => PowerupKind.SpeedBoost;
+        public bool IsAlive => true;
+        public bool IsAvailable { get; set; }
+        public void Step(float deltaSeconds) { }
+    }
+
     // Concealment everywhere — isolates the AI's "spot a bushed target only up close" rule.
     private sealed class AllConcealing : IConcealment
     {
@@ -228,5 +246,82 @@ public class AiInputSourceTests
         var intent = ai.Read();
 
         Assert.True(intent.Fire); // brushing the bush — the hidden tank is revealed and engaged
+    }
+
+    [Fact]
+    public void SeeksAvailablePowerup_WhenThereIsNoEnemy()
+    {
+        var world = new World();
+        var self = new StubTank(Vector2.Zero, team: 1);
+        world.Spawn(self);
+        world.Spawn(new StubPowerup(new Vector2(300f, 0f))); // a pickup on +X
+        var ai = AiDriving(self, world);
+
+        var intent = ai.Read();
+
+        Assert.True(intent.Move.X > 0f);        // drives toward the pickup
+        Assert.Equal(0f, intent.Aim, precision: 3);
+        Assert.False(intent.Fire);
+    }
+
+    [Fact]
+    public void IgnoresPowerups_WhileFiringOnAnEnemyInRange()
+    {
+        var world = new World();
+        var self = new StubTank(Vector2.Zero, team: 1);
+        world.Spawn(self);
+        world.Spawn(new StubTank(new Vector2(100f, 0f), team: 0)); // enemy in fire range on +X
+        world.Spawn(new StubPowerup(new Vector2(0f, 300f)));        // a pickup off on +Y
+        var ai = AiDriving(self, world);
+
+        var intent = ai.Read();
+
+        Assert.True(intent.Fire);                 // combat takes priority
+        Assert.Equal(Vector2.Zero, intent.Move);  // holds at standoff, does not wander to the pickup
+    }
+
+    [Fact]
+    public void DetoursForAPowerup_WhenTheEnemyIsOutOfFireRange()
+    {
+        var world = new World();
+        var self = new StubTank(Vector2.Zero, team: 1);
+        world.Spawn(self);
+        world.Spawn(new StubTank(new Vector2(600f, 0f), team: 0)); // seen on +X but beyond fire range
+        world.Spawn(new StubPowerup(new Vector2(0f, 300f)));        // a pickup on +Y to grab on the way
+        var ai = AiDriving(self, world);
+
+        var intent = ai.Read();
+
+        Assert.True(intent.Move.Y > 0f);            // steers toward the pickup
+        Assert.Equal(0f, intent.Aim, precision: 3); // still keeps the gun on the enemy
+        Assert.False(intent.Fire);
+    }
+
+    [Fact]
+    public void IgnoresAnUnavailablePowerup()
+    {
+        var world = new World();
+        var self = new StubTank(Vector2.Zero, team: 1);
+        world.Spawn(self);
+        world.Spawn(new StubPowerup(new Vector2(300f, 0f), available: false)); // dormant, respawning
+        var ai = AiDriving(self, world);
+
+        var intent = ai.Read();
+
+        Assert.Equal(Vector2.Zero, intent.Move); // nothing to chase
+    }
+
+    [Fact]
+    public void IgnoresAPowerupBeyondSeekRange()
+    {
+        var world = new World();
+        var self = new StubTank(Vector2.Zero, team: 1);
+        world.Spawn(self);
+        world.Spawn(new StubPowerup(new Vector2(5000f, 0f))); // way across the map
+        var ai = AiDriving(self, world);
+
+        var intent = ai.Read();
+
+        Assert.Equal(Vector2.Zero, intent.Move);
     }
 }
