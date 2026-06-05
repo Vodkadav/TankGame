@@ -325,11 +325,7 @@ public partial class ArenaScene : Node2D
         var view = GD.Load<PackedScene>("res://src/Presentation/Tank/TankView.tscn")
             .Instantiate<TankView>();
         view.Bind(tank);
-        if (tank.Team != PlayerTeam)
-        {
-            view.Modulate = new Color(1f, 0.5f, 0.5f); // tint adversaries red
-        }
-
+        view.ApplyTeamTint(tank.Team != PlayerTeam);
         return view;
     }
 
