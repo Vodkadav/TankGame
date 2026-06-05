@@ -451,8 +451,15 @@ Catalogue and ordering: `docs/research/local-backlog.md`.
   stopping only at steel. `PowerupKind.Missile` (Domain) + `MissileAmmo` (a single-lance piercing
   modifier with a huge `Pierce` budget, reusing `PiercingBehaviour`). `ArenaScene` lays a one-shot
   missile crate (hot-orange disc, `pickup.missile` EN/ES/DK). Field pickups 7 → 8. GameLogic 209 → 210.
+- **Telephone airstrike pickup** ✅ a telephone that calls in an airstrike on the collector's nearest
+  foe. `IPickupEffect.ApplyTo` now also gets the `IWorld` so an effect can spawn an entity;
+  `AirstrikePickup` spawns an `Airstrike` (`IAirstrike` Domain entity) at the nearest enemy tank, which
+  telegraphs for `AirstrikeDelay` then detonates once, damaging every tank in `Radius` that is not on
+  the caller's team (co-op allies + self spared), then expires. `AirstrikeView` draws a pulsing red
+  blast circle; `ArenaScene` lays a telephone crate (magenta, `pickup.telephone` EN/ES/DK). Field
+  pickups 8 → 9. GameLogic 210 → 215, scene 76 → 77.
 
-Test counts on `main`: GameLogic 210, Domain 32, Infrastructure 12, Architecture 6, 76 GoDotTest
+Test counts on `main`: GameLogic 215, Domain 32, Infrastructure 12, Architecture 6, 77 GoDotTest
 scene tests.
 
 **Owner ask (2026-06-04): map variety + progression — both now under way.** Captured in

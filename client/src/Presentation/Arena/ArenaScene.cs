@@ -51,6 +51,11 @@ public partial class ArenaScene : Node2D
     private const int AmmoShots = 5;
     private const int RepairAmount = 2;
     private const int ShieldAmount = 3;
+    // Telephone airstrike: a wide blast on the caller's nearest foe after a short telegraph, so tanks
+    // can scramble out. Tunable balance knobs.
+    private const float AirstrikeDelay = 1.6f;
+    private const float AirstrikeRadius = 110f;
+    private const int AirstrikeDamage = 3;
     private static readonly (PowerupKind Kind, IPickupEffect Effect)[] PowerupCatalogue =
     {
         (PowerupKind.SpeedBoost, new StatusEffectPickup(new StatusEffect(StatKind.Speed, Mult: 1.6f, AddFlat: 0f, Seconds: 6f))),
@@ -61,6 +66,7 @@ public partial class ArenaScene : Node2D
         (PowerupKind.Shield, new ShieldPickup(ShieldAmount)),
         (PowerupKind.PiercingAmmo, new AmmoPickup(new PiercingAmmo(pierces: 1, TileSize), AmmoShots)),
         (PowerupKind.Missile, new AmmoPickup(new MissileAmmo(TileSize), shots: 1)),
+        (PowerupKind.Telephone, new AirstrikePickup(AirstrikeDelay, AirstrikeRadius, AirstrikeDamage)),
     };
 
     // Two-player frames the whole field; the zoom is computed per map so any size fits on screen.
@@ -367,6 +373,7 @@ public partial class ArenaScene : Node2D
             ITank tank => BuildTankView(tank),
             IProjectile projectile => BuildProjectileView(projectile),
             IPowerup powerup => BuildPowerupView(powerup),
+            IAirstrike strike => BuildAirstrikeView(strike),
             _ => throw new NotSupportedException($"No view registered for {entity.GetType().Name}.")
         };
 
@@ -471,6 +478,13 @@ public partial class ArenaScene : Node2D
     {
         var view = new PowerupView();
         view.Bind(powerup);
+        return view;
+    }
+
+    private static AirstrikeView BuildAirstrikeView(IAirstrike strike)
+    {
+        var view = new AirstrikeView();
+        view.Bind(strike);
         return view;
     }
 
