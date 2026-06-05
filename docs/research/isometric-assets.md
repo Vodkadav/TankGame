@@ -55,10 +55,13 @@ One cohesive isometric wargame pack that covers most needs:
    scaled 2× (AxisX=1, AxisY=0.5) for crisp 128×64 tiles; mouse-wheel camera zoom added as a playtest
    aid. Natural terrain (#129): `IsoTerrainView` draws water/bridge/mountain as per-cell iso sprites —
    flat water/bridge below the entities, the raised mountain depth-sorted via `DepthOf` against the
-   tanks (the fork resolved in favour of per-cell sprites, not one flat tilemap). The **man-made walls**
-   (brick/steel/crate/building) still render via the Phase-1 sheared square `WallGridView` — their iso
-   pass rides with Phase 4 (buildings/crates) + a brick/steel slice, since PixVoxel terrain does not
-   cover them (best-fit: `Ruins`/Kenney iso blocks — an art pick).
+   tanks (the fork resolved in favour of per-cell sprites, not one flat tilemap). **Walls done (#131):**
+   the sheared square `WallGridView` is **retired** — `IsoTerrainView` now renders every non-floor cell,
+   and brick/steel/crate/building draw as **raised iso blocks** (top diamond + two shaded front faces)
+   that depth-sort against the tanks; brick keeps its three damage frames. The block art is generated
+   placeholder (`scripts/gen_iso_blocks.py`, swappable via the catalogue) since the library had no usable
+   2D iso wall tiles. This pulled Phase 4's crate/building tiles forward; Phase 4 now is just *nicer*
+   building/crate art if wanted.
 3. **Iso tanks** — directional `Tank_Large_face{0..3}` sprites; map `Tank.Rotation` → nearest facing,
    team → `colorN`; turret handled by a separate facing sprite or an overlaid barrel. Replaces `TankView`.
 4. **Buildings / crates** — solid building + crate iso sprites placed per cell.
@@ -67,8 +70,8 @@ One cohesive isometric wargame pack that covers most needs:
    code-rendered minimap.
 7. **Explosions / projectiles** — PixVoxel explosion frames on death + airstrike; shot sprites.
 
-The asset catalogue (`AssetCatalogue`) and the per-cell tile mapping (`WallGridView.FrameFor`) are the
-seams these phases plug into; the move/shot blocking, generation, and combat are unchanged.
+The asset catalogue (`AssetCatalogue`) and the per-cell tile mapping (`IsoTerrainView.TextureFor`) are
+the seams these phases plug into; the move/shot blocking, generation, and combat are unchanged.
 
 ## Phase 1 starting checklist (fresh session) — ✅ COMPLETE
 
