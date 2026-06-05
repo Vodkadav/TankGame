@@ -400,8 +400,12 @@ Catalogue and ordering: `docs/research/local-backlog.md`.
   last wins). `Tank.LoadAmmo(modifier, shots)` applies + refreshes shots, `Reset`s on depletion.
   `IWeapon`/`BehaviourWeapon`/`SpreadWeapon`/`PiercingWeapon` removed; `IProjectileBehaviour` classes
   unchanged. GameLogic 196 → 200 (new `AmmoLoadoutTests`).
+- **Projectile direction + Kenney bullet** ✅ `IProjectile.Direction` (the live unit heading, updated
+  on a bounce) lets `ProjectileView` rotate the bullet to face travel. `scripts/prep_kenney_bullet.py`
+  turns `bulletSand2` → `KenneyBullet.png` (east-facing); `AssetCatalogue.Bullet` repointed at it. CC0
+  credited. Scene 69 → 70.
 
-Test counts on `main`: GameLogic 200, Domain 32, Infrastructure 12, Architecture 6, 69 GoDotTest
+Test counts on `main`: GameLogic 200, Domain 32, Infrastructure 12, Architecture 6, 70 GoDotTest
 scene tests.
 
 **Owner ask (2026-06-04): map variety + progression — both now under way.** Captured in

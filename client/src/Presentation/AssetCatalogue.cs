@@ -15,7 +15,7 @@ public sealed record AssetCatalogue(string TankBody, string TankTurret, string B
     public static readonly AssetCatalogue Default = new(
         TankBody: "res://src/Presentation/Tank/KenneyTankBody.png",
         TankTurret: "res://src/Presentation/Tank/KenneyTankTurret.png",
-        Bullet: "res://src/Presentation/Projectile/Bullet.png",
+        Bullet: "res://src/Presentation/Projectile/KenneyBullet.png",
         WallAtlas: "res://src/Presentation/Arena/Walls.png",
         GroundTile: "res://src/Presentation/Arena/GroundSand.png",
         PickupDisc: "res://src/Presentation/Arena/PickupDisc.png");

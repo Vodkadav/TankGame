@@ -28,6 +28,7 @@ public class ProjectileContractTests
         public Guid Id { get; }
         public int Team => 0;
         public Vector2 Position { get; private set; }
+        public Vector2 Direction => _direction;
         public bool IsAlive { get; private set; }
 
         public void Step(float deltaSeconds)
