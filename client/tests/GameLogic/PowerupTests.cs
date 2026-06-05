@@ -55,6 +55,22 @@ public class PowerupTests
     }
 
     [Fact]
+    public void Powerup_RaisesCollected_WithItsKind_WhenPickedUp()
+    {
+        var world = new World();
+        var tank = TankAt(world, Vector2.Zero, new NoInput());
+        var powerup = SpeedPowerupAt(world, Vector2.Zero);
+        PowerupKind? collected = null;
+        powerup.Collected += kind => collected = kind;
+        world.Spawn(tank);
+        world.Spawn(powerup);
+
+        world.Step(0.016f);
+
+        Assert.Equal(PowerupKind.SpeedBoost, collected); // fired so Presentation can show a floater
+    }
+
+    [Fact]
     public void Powerup_IsNotCollected_WhenNoTankIsWithinRange()
     {
         var world = new World();

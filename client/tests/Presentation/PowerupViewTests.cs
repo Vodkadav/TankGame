@@ -17,6 +17,7 @@ public class PowerupViewTests : TestClass
         public PowerupKind Kind { get; }
         public bool IsAlive => true;
         public bool IsAvailable { get; set; } = true;
+        public event System.Action<PowerupKind>? Collected { add { } remove { } }
         public void Step(float deltaSeconds) { }
     }
 

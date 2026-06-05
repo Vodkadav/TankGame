@@ -53,6 +53,7 @@ public class AiInputSourceTests
         public PowerupKind Kind => PowerupKind.SpeedBoost;
         public bool IsAlive => true;
         public bool IsAvailable { get; set; }
+        public event Action<PowerupKind>? Collected { add { } remove { } }
         public void Step(float deltaSeconds) { }
     }
 
