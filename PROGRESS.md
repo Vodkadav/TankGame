@@ -337,8 +337,17 @@ Catalogue and ordering: `docs/research/local-backlog.md`.
   `TankView.ApplyTeamTint(isEnemy)` owns applying it. Both `ArenaScene` and `NetArenaScene` now call it
   instead of each hardcoding the same red `Color`, so one neutral tank texture will read as either side
   once the tintable art lands.
+- **S9 — match modifiers** ✅ (`docs/adr/0015-match-modifiers.md`) the first S9 *gameplay* slice:
+  "everyone starts with effect X". `MatchModifier` (GameLogic) carries a list of `StartingEffects`
+  applied to every tank at spawn via `ApplyTo(Tank)`; reuses the ADR-0012 stats machinery, so no new
+  combat code. `MatchModifier.Permanent` builds an infinite-duration effect (`Stats.Step` never expires
+  one whose remaining time stays positive); `None` (default) is a no-op and `Blitz` (everyone faster +
+  rapid-firing) is a real, tested preset. `GameSetup.Modifier` is the match-level seam (beside Mode /
+  Series / Seed / size / Theme); `ArenaScene.SpawnTank` applies it uniformly to player, P2, and AI.
+  Local only — `NetArenaScene` (authoritative) untouched. Deferred: a title-screen selector, the
+  mine/oil-slick trap modifiers (need art + hazard entities), NPC-animal XP.
 
-Test counts on `main`: GameLogic 184, Domain 32, Infrastructure 12, Architecture 6, 61 GoDotTest
+Test counts on `main`: GameLogic 187, Domain 32, Infrastructure 12, Architecture 6, 61 GoDotTest
 scene tests.
 
 **Owner ask (2026-06-04): map variety + progression — both now under way.** Captured in
@@ -346,9 +355,9 @@ scene tests.
 **generation** slice is done (ADR-0014, generated battlefield above) and the **theming seam** is in
 (`ArenaTheme` ground/wall palette above); still deferred: biome/ground **sprites** (art pass), a
 title-screen theme + size picker. **S9 progression/meters/match-modifiers** — the **damage + K/D meters**
-slice is done (HUD above); still deferred: cosmetic-only unlocks, match modifiers ("everyone starts
-with effect X" / extra-traps / shootable NPC-animal-XP) and the XP layer (post-systems content).
-Each remaining slice gets its own ADR before build.
+slice (HUD) and the **match-modifier framework** ("everyone starts with effect X", ADR-0015) are done;
+still deferred: cosmetic-only unlocks, the trap modifiers (mine / oil-slick) and shootable NPC-animal-XP,
+and the XP layer (post-systems content). Each remaining slice gets its own ADR before build.
 
 ### M3 — 2-player real-time via a single Durable Object (scaffolding underway)
 

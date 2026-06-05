@@ -31,6 +31,10 @@ public static class GameSetup
     /// can later set it; defaults to the sandy reference look.</summary>
     public static ArenaTheme Theme { get; set; } = ArenaTheme.Default;
 
+    /// <summary>The active match modifier (S9): a whole-round rule applied to every tank at spawn.
+    /// A title control can later set it; defaults to none (a plain match).</summary>
+    public static MatchModifier Modifier { get; set; } = MatchModifier.None;
+
     /// <summary>The running best-of-N series; survives per-round scene reloads.</summary>
     public static SeriesTracker Series { get; private set; } = new(RoundsToWin);
 
