@@ -36,7 +36,7 @@ public class PowerupViewTests : TestClass
     public void Cleanup() => _view.QueueFree();
 
     [Test]
-    public void Bind_PlacesTheNode_AndDrawsTheKindsColouredShape()
+    public void Bind_PlacesTheNode_AndTintsTheDiscByKind()
     {
         var powerup = new StubPowerup(new NVector2(120f, 64f), PowerupKind.RapidFire);
 
@@ -47,11 +47,15 @@ public class PowerupViewTests : TestClass
             throw new Exception($"View should sit at the powerup's position; was {_view.Position}.");
         }
 
-        var shape = _view.GetNodeOrNull<Polygon2D>("Shape")
-            ?? throw new Exception("PowerupView must draw a 'Shape' Polygon2D.");
-        if (shape.Color != PowerupView.ColourFor(PowerupKind.RapidFire))
+        var disc = _view.GetNodeOrNull<Sprite2D>("Disc")
+            ?? throw new Exception("PowerupView must draw a 'Disc' Sprite2D.");
+        if (disc.Texture is null)
         {
-            throw new Exception($"Shape colour should match the kind; was {shape.Color}.");
+            throw new Exception("The disc must load the pickup-disc texture from the catalogue.");
+        }
+        if (disc.Modulate != PowerupView.ColourFor(PowerupKind.RapidFire))
+        {
+            throw new Exception($"Disc tint should match the kind; was {disc.Modulate}.");
         }
     }
 

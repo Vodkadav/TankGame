@@ -379,6 +379,13 @@ Catalogue and ordering: `docs/research/local-backlog.md`.
   `Polygon2D` the texture with pixel UVs + `TextureRepeat` (one tile per cell), tinted by
   `ArenaTheme.Ground` (Sandy lightened to a warm near-white so the texture reads true; Slate recolours
   the same sand to stone). CC0 credited.
+- **Art pass — glowing pickup discs** ✅ the code-built coloured diamond is now a glowing disc.
+  `scripts/gen_pickup_disc.py` (PIL) makes a neutral white disc + dark coin edge + soft glow halo
+  (`PickupDisc.png`); `AssetCatalogue.PickupDisc` adds it to the seam; `PowerupView` renders it as a
+  `Sprite2D` tinted per `PowerupKind` via Modulate (one disc, every pickup by colour — distinguished
+  further by the #103 floating name). Base SDXL could not make a clean neutral/tintable disc (its
+  attempts were coloured/hazy/shadowed), so the disc is deterministic PIL — the "generated" half of the
+  hybrid; SDXL per-kind icon-discs remain a possible follow-up.
 
 Test counts on `main`: GameLogic 193, Domain 32, Infrastructure 12, Architecture 6, 69 GoDotTest
 scene tests.
