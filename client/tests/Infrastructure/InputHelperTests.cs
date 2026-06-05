@@ -25,19 +25,20 @@ public class InputHelperTests
         => Assert.Equal(NVector2.Zero, KeyboardMouseInputSource.ReadMove(false, false, false, false));
 
     [Fact]
-    public void ComputeAim_MouseRightOfCentre_IsZeroRadians()
+    public void ComputeAim_MouseRightOfCentre_PointsNorthEastInWorld()
     {
-        // viewport 200x100 -> centre (100,50); mouse to the right on the same row.
+        // viewport 200x100 -> centre (100,50); mouse a screen-step right. Inverting the iso
+        // projection, a purely rightward screen offset is the world direction (1,-1) -> -π/4.
         var aim = KeyboardMouseInputSource.ComputeAim(new NVector2(180f, 50f), new NVector2(200f, 100f));
-        Assert.Equal(0f, aim, precision: 4);
+        Assert.Equal(-MathF.PI / 4f, aim, precision: 4);
     }
 
     [Fact]
-    public void ComputeAim_MouseBelowCentre_IsHalfPi()
+    public void ComputeAim_MouseBelowCentre_PointsSouthEastInWorld()
     {
-        // +Y is down in screen space, so straight below centre is +π/2.
+        // A purely downward screen offset inverts to the world direction (1,1) -> +π/4.
         var aim = KeyboardMouseInputSource.ComputeAim(new NVector2(100f, 90f), new NVector2(200f, 100f));
-        Assert.Equal(MathF.PI / 2f, aim, precision: 4);
+        Assert.Equal(MathF.PI / 4f, aim, precision: 4);
     }
 
     [Fact]

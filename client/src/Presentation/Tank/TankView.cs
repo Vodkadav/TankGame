@@ -59,7 +59,9 @@ public partial class TankView : Node2D
             return;
         }
 
-        Position = new Vector2(_tank.Position.X, _tank.Position.Y);
+        var screen = IsoProjection.WorldToScreen(_tank.Position);
+        Position = new Vector2(screen.X, screen.Y);
+        ZIndex = IsoProjection.DepthOf(_tank.Position); // nearer (greater x+y) draws over farther
         _body.Rotation = _tank.Rotation;
         _turret.Rotation = _tank.TurretRotation;
         UpdateHealthBar();

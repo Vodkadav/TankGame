@@ -62,12 +62,13 @@ public class ProjectileViewTests : TestClass
         var projectile = new Projectile(arena, new NVector2(50f, 50f), new NVector2(1f, 0f), speed: 200f);
         _view.Bind(projectile);
 
-        projectile.Step(0.1f); // the model advances 20 units; the view only mirrors
+        projectile.Step(0.1f); // the model advances 20 units; the view mirrors it, projected to iso
         _view.UpdateFromModel();
 
-        if (Mathf.Abs(_view.Position.X - 70f) > 0.01f)
+        // World (70,50) projects to iso ((70-50)*0.5, (70+50)*0.25) = (10, 30).
+        if (Mathf.Abs(_view.Position.X - 10f) > 0.01f || Mathf.Abs(_view.Position.Y - 30f) > 0.01f)
         {
-            throw new System.Exception($"View should mirror the projectile to x=70; was {_view.Position.X}.");
+            throw new System.Exception($"View should mirror the projectile to iso (10,30); was {_view.Position}.");
         }
     }
 
@@ -81,9 +82,10 @@ public class ProjectileViewTests : TestClass
         projectile.Step(0.1f); // would travel 200 units, but the right wall snaps it to x=100
         _view.UpdateFromModel();
 
-        if (Mathf.Abs(_view.Position.X - 100f) > 0.01f)
+        // Snapped world (100,50) projects to iso ((100-50)*0.5, (100+50)*0.25) = (25, 37.5).
+        if (Mathf.Abs(_view.Position.X - 25f) > 0.01f || Mathf.Abs(_view.Position.Y - 37.5f) > 0.01f)
         {
-            throw new System.Exception($"View should mirror the snapped hit at x=100; was {_view.Position.X}.");
+            throw new System.Exception($"View should mirror the snapped hit at iso (25,37.5); was {_view.Position}.");
         }
     }
 }

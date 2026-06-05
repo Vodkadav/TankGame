@@ -97,7 +97,8 @@ public partial class NetArenaScene : Node2D
         _predicted.Predict(frame);
         SyncLocalFromPrediction(slot);
 
-        _camera.Position = new Vector2(_predicted.Position.X, _predicted.Position.Y);
+        var camera = IsoProjection.WorldToScreen(_predicted.Position);
+        _camera.Position = new Vector2(camera.X, camera.Y);
     }
 
     // The server welcomed us: remember the slot and start predicting our tank from its spawn (the

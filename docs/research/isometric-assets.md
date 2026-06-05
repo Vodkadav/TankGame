@@ -45,9 +45,11 @@ One cohesive isometric wargame pack that covers most needs:
 
 ## Implementation phases (each its own PR, GameLogic untouched)
 
-1. **Iso projection foundation** — an `IsoProjection` helper (grid X,Y ↔ iso screen) used by every view;
-   Y-sort (`YSortEnabled`/`ZIndex` by `x+y`) so nearer things draw over farther; switch the ground/wall
-   render to an isometric `TileMapLayer`. Keep current art for one frame, then swap tiles.
+1. **Iso projection foundation** — ✅ **DONE** (#TBD). `IsoProjection` helper (`WorldToScreen` /
+   `ScreenToWorld` / `DepthOf` / `ScreenTransform`); every entity view projects its position and sets
+   `ZIndex` from `x+y`; the static layers (ground, wall tilemap, bush/sandbag overlays) shear via the
+   affine `ScreenTransform`; mouse aim inverts the projection. GameLogic untouched. Proper iso
+   `TileMapLayer` + tiles come in Phase 2.
 2. **Iso ground + terrain** — PixVoxel terrain tiles for floor/water/bridge/mountain via the iso tilemap
    (replaces the flat ground polygon + the square `Walls.png` atlas).
 3. **Iso tanks** — directional `Tank_Large_face{0..3}` sprites; map `Tank.Rotation` → nearest facing,
@@ -61,10 +63,12 @@ One cohesive isometric wargame pack that covers most needs:
 The asset catalogue (`AssetCatalogue`) and the per-cell tile mapping (`WallGridView.FrameFor`) are the
 seams these phases plug into; the move/shot blocking, generation, and combat are unchanged.
 
-## Phase 1 starting checklist (fresh session)
+## Phase 1 starting checklist (fresh session) — ✅ COMPLETE
 
 Goal: render the *existing* world isometrically with **no GameLogic change** and no new art yet — prove
-the projection + depth sort, then later phases swap in iso tiles/sprites.
+the projection + depth sort, then later phases swap in iso tiles/sprites. All items below are done; the
+square wall tilemap and code-built overlays are sheared into iso via `IsoProjection.ScreenTransform`
+(item 4's "keep the square `WallGridView` but project its tile positions" path).
 
 1. **`IsoProjection` helper** (Presentation, pure): `WorldToScreen(Vector2 world)` →
    `new Vector2((world.X - world.Y) * 0.5f, (world.X + world.Y) * 0.25f)` (2:1 dimetric; tune the Y
