@@ -3,23 +3,25 @@ namespace TankGame.Presentation;
 /// <summary>The single source of truth for every sprite resource path. Views load their textures from
 /// <see cref="Active"/> in code — nothing hardcodes a <c>res://</c> path in a scene or a view — so
 /// swapping an asset is a one-line change here, never a hunt through scenes and code. Swap one asset
-/// with <c>AssetCatalogue.Active = AssetCatalogue.Default with { TankBody = "res://…" }</c>, or a whole
+/// with <c>AssetCatalogue.Active = AssetCatalogue.Default with { TankHull = "res://…" }</c>, or a whole
 /// set by pointing <see cref="Active"/> at another catalogue (e.g. the imported Kenney CC0 pack).</summary>
 public sealed record AssetCatalogue(
-    string TankBody, string TankTurret, string Bullet,
+    string TankHull, string TankTurret, int TankFacings, string Bullet,
     string GroundTile, string PickupDisc,
     string WaterTile, string BridgeTile, string MountainTile,
     string BrickIntactTile, string BrickCrackedTile, string BrickRubbleTile,
     string SteelTile, string CrateTile, string BuildingTile,
     string BushTile, string SandbagTile)
 {
-    /// <summary>The active sprite set. The tank hull + turret are the imported Kenney CC0 art
-    /// (neutral sand, tinted per team via <c>TankView.ApplyTeamTint</c>); the ground/terrain are native
-    /// PixVoxel iso tiles; the walls are generated iso blocks (placeholder, raised — see
-    /// <c>scripts/gen_iso_blocks.py</c>). Repoint any entry to swap one asset.</summary>
+    /// <summary>The active sprite set. The tank is the iso Super_Tank (CC BY 4.0, Zsky_01) rendered to
+    /// directional sprite strips — a hull strip and an independently-aiming turret strip of
+    /// <c>TankFacings</c> frames each (neutral tan, tinted per team via <c>TankView.ApplyTeamTint</c>);
+    /// the ground/terrain are native PixVoxel iso tiles; the walls are generated iso blocks (placeholder,
+    /// raised — see <c>scripts/gen_iso_blocks.py</c>). Repoint any entry to swap one asset.</summary>
     public static readonly AssetCatalogue Default = new(
-        TankBody: "res://src/Presentation/Tank/KenneyTankBody.png",
-        TankTurret: "res://src/Presentation/Tank/KenneyTankTurret.png",
+        TankHull: "res://src/Presentation/Tank/IsoTankHull.png",
+        TankTurret: "res://src/Presentation/Tank/IsoTankTurret.png",
+        TankFacings: 16,
         Bullet: "res://src/Presentation/Projectile/KenneyBullet.png",
         GroundTile: "res://src/Presentation/Arena/IsoGroundSeamless.png",
         PickupDisc: "res://src/Presentation/Arena/PickupDisc.png",

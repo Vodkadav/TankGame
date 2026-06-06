@@ -15,7 +15,7 @@ public class AssetCatalogueTests : TestClass
         // a sprite blank, so guard that every default path actually resolves to a texture.
         foreach (var path in new[]
         {
-            AssetCatalogue.Default.TankBody,
+            AssetCatalogue.Default.TankHull,
             AssetCatalogue.Default.TankTurret,
             AssetCatalogue.Default.Bullet,
             AssetCatalogue.Default.GroundTile,
@@ -55,9 +55,9 @@ public class AssetCatalogueTests : TestClass
         var original = AssetCatalogue.Active;
         try
         {
-            AssetCatalogue.Active = original with { TankBody = "res://src/Presentation/Projectile/Bullet.png" };
+            AssetCatalogue.Active = original with { TankHull = "res://src/Presentation/Projectile/Bullet.png" };
 
-            if (AssetCatalogue.Active.TankBody != "res://src/Presentation/Projectile/Bullet.png")
+            if (AssetCatalogue.Active.TankHull != "res://src/Presentation/Projectile/Bullet.png")
             {
                 throw new System.Exception("Swapping one asset should change just that entry.");
             }
