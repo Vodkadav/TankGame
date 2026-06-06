@@ -21,8 +21,10 @@ public partial class TankView : Node2D
     private const float GroundContactFromBottom = 33f;
 
     // Frame 0 of each strip depicts a facing rotated a quarter turn from the model's zero heading
-    // (the render camera matches IsoProjection's, with the model's forward along -Y). Added to the
-    // model angle before snapping to a frame. Playtest-tunable: a wrong facing is a single change here.
+    // (the render camera matches IsoProjection's, with the model's forward along -Y). The rendered
+    // frames wind opposite the game angle (the iso camera mirrors the turn), so the model angle is
+    // subtracted from this offset before snapping to a frame — otherwise the turret tracks the mouse
+    // backwards. Playtest-tunable: a wrong facing is a single change here.
     private const float FacingOffset = Mathf.Pi / 2f;
 
     private ITank? _tank;
@@ -113,8 +115,8 @@ public partial class TankView : Node2D
         var screen = IsoProjection.WorldToScreen(_tank.Position);
         Position = new Vector2(screen.X, screen.Y);
         ZIndex = IsoProjection.DepthOf(_tank.Position); // nearer (greater x+y) draws over farther
-        SelectFrame(_hull, IsoSpriteFacing.FrameIndex(_tank.Rotation + FacingOffset, _facings));
-        SelectFrame(_gun, IsoSpriteFacing.FrameIndex(_tank.TurretRotation + FacingOffset, _facings));
+        SelectFrame(_hull, IsoSpriteFacing.FrameIndex(FacingOffset - _tank.Rotation, _facings));
+        SelectFrame(_gun, IsoSpriteFacing.FrameIndex(FacingOffset - _tank.TurretRotation, _facings));
         UpdateHealthBar();
         UpdateShieldBar();
     }
