@@ -31,27 +31,30 @@ public class TankViewTests : TestClass
     public void Cleanup() => _view.QueueFree();
 
     [Test]
-    public void Scene_LoadsBodyAndTurretTextures_FromTheCatalogue()
+    public void Scene_LoadsHullAndTurretStrips_FromTheCatalogue()
     {
         var body = _view.GetNode<Sprite2D>("Body");
         var turret = _view.GetNode<Sprite2D>("Turret");
+        var hull = body.Texture as AtlasTexture;
+        var gun = turret.Texture as AtlasTexture;
 
-        if (body.Texture != GD.Load<Texture2D>(AssetCatalogue.Active.TankBody)
-            || turret.Texture != GD.Load<Texture2D>(AssetCatalogue.Active.TankTurret))
+        if (hull is null || gun is null
+            || hull.Atlas != GD.Load<Texture2D>(AssetCatalogue.Active.TankHull)
+            || gun.Atlas != GD.Load<Texture2D>(AssetCatalogue.Active.TankTurret))
         {
-            throw new System.Exception("Body and Turret sprites must load their textures from the asset catalogue.");
+            throw new System.Exception("Body and Turret sprites must draw from the catalogue's directional strips.");
         }
     }
 
     [Test]
-    public void UpdateFromModel_MirrorsTheTankPositionAndRotations()
+    public void UpdateFromModel_MirrorsPosition_AndAimsTheTurretIndependentlyOfTheHull()
     {
         var input = new FixedInput(new TankInput(new NVector2(1f, 0f), Aim: 0.75f, Fire: false));
         var arena = new RectArena(new NVector2(-500f, -500f), new NVector2(500f, 500f));
         var tank = new Tank(input, new World(), arena, NVector2.Zero, speed: 100f, fireInterval: 0.3f, projectileSpeed: 600f);
         _view.Bind(tank);
 
-        tank.Step(0.1f); // the model advances 10 units along +X; the view mirrors it, projected to iso
+        tank.Step(0.1f); // the model advances 10 units along +X (heading 0); the turret aims at 0.75 rad
         _view.UpdateFromModel();
 
         // World (10,0) projects to iso ((10-0)*1, (10+0)*0.5) = (10, 5).
@@ -60,10 +63,26 @@ public class TankViewTests : TestClass
             throw new System.Exception($"View should mirror the tank to iso (10,5); was {_view.Position}.");
         }
 
+        // The facing drives the directional frame, not a sprite rotation — the sprites never spin.
         var turret = _view.GetNode<Sprite2D>("Turret");
-        if (Mathf.Abs(turret.Rotation - 0.75f) > 0.001f)
+        var body = _view.GetNode<Sprite2D>("Body");
+        if (turret.Rotation != 0f || body.Rotation != 0f)
         {
-            throw new System.Exception($"Turret should aim at 0.75 rad; was {turret.Rotation}.");
+            throw new System.Exception("Iso facing is by frame selection, so the sprites must not rotate.");
+        }
+
+        var facings = AssetCatalogue.Active.TankFacings;
+        var hull = (AtlasTexture)body.Texture;
+        var gun = (AtlasTexture)turret.Texture;
+        var frameWidth = hull.Atlas.GetWidth() / (float)facings;
+        var hullFrame = Mathf.RoundToInt(hull.Region.Position.X / frameWidth);
+        var gunFrame = Mathf.RoundToInt(gun.Region.Position.X / frameWidth);
+
+        // Aiming 0.75 rad off the chassis is ~2 of the 16 directional steps, so the turret frame leads
+        // the hull frame by 2 — proving the turret picks its own frame from the aim.
+        if (gunFrame != ((hullFrame + 2) % facings))
+        {
+            throw new System.Exception($"Turret frame should lead the hull by 2 (aim 0.75 rad); hull={hullFrame}, gun={gunFrame}.");
         }
     }
 

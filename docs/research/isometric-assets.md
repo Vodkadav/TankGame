@@ -62,8 +62,17 @@ One cohesive isometric wargame pack that covers most needs:
    placeholder (`scripts/gen_iso_blocks.py`, swappable via the catalogue) since the library had no usable
    2D iso wall tiles. This pulled Phase 4's crate/building tiles forward; Phase 4 now is just *nicer*
    building/crate art if wanted.
-3. **Iso tanks** — directional `Tank_Large_face{0..3}` sprites; map `Tank.Rotation` → nearest facing,
-   team → `colorN`; turret handled by a separate facing sprite or an overlaid barrel. Replaces `TankView`.
+3. **Iso tanks** — ✅ **DONE.** The flat top-down tank — the last clearly-non-iso element — is replaced
+   by a 3D-rendered iso tank. The PixVoxel `Tank_*` tokens were only 4 facings and monolithic (no
+   independent turret), so the owner chose to render the CC BY 4.0 low-poly **Super_Tank** (Zsky_01,
+   `military_vehicles_lp`) to sprite strips instead: `scripts/render_iso_tank.py` (Blender, headless)
+   splits the fused mesh into a hull and an independently-rotating turret about the turret-ring axis and
+   renders **16 iso facings** of each at the iso camera angle; `scripts/pack_iso_tank.py` (PIL) union-crops
+   and stitches the two strips (`IsoTankHull.png` / `IsoTankTurret.png`). `TankView` now picks the hull
+   frame from `Tank.Rotation` and the turret frame from `TurretRotation` via the pure `IsoSpriteFacing`
+   quantiser (no sprite rotation), keeping the independent aim the flat sprite had; neutral tan, tinted
+   per team via `ApplyTeamTint`. Facing calibration is one constant (`TankView.FacingOffset`),
+   eyeball-tunable on playtest. Swappable via the catalogue (`TankHull`/`TankTurret`/`TankFacings`).
 4. **Buildings / crates** — solid building + crate iso sprites placed per cell.
 5. **Bushes / nature** — Nature Kit bush sprites for concealment cells.
 6. **UI re-skin + minimap** — fantasy-ui-borders panels for the title/HUD/game-over; cursor reticle; a
