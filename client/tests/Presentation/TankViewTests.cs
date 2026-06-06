@@ -78,11 +78,12 @@ public class TankViewTests : TestClass
         var hullFrame = Mathf.RoundToInt(hull.Region.Position.X / frameWidth);
         var gunFrame = Mathf.RoundToInt(gun.Region.Position.X / frameWidth);
 
-        // Aiming 0.75 rad off the chassis is ~2 of the 16 directional steps, so the turret frame leads
-        // the hull frame by 2 — proving the turret picks its own frame from the aim.
-        if (gunFrame != ((hullFrame + 2) % facings))
+        // Aiming 0.75 rad off the chassis is ~2 of the 16 directional steps. The rendered frames wind
+        // opposite the game angle (the iso camera mirrors the turn), so a positive aim shifts the turret
+        // frame down by 2 — proving the turret picks its own frame from the aim, the right way round.
+        if (gunFrame != ((((hullFrame - 2) % facings) + facings) % facings))
         {
-            throw new System.Exception($"Turret frame should lead the hull by 2 (aim 0.75 rad); hull={hullFrame}, gun={gunFrame}.");
+            throw new System.Exception($"Turret frame should trail the hull by 2 (aim 0.75 rad); hull={hullFrame}, gun={gunFrame}.");
         }
     }
 
