@@ -24,6 +24,23 @@ public static class ModelFit
         model.Position = new Vector3(-centre.X * scale, y, -centre.Z * scale);
     }
 
+    /// <summary>Overrides every surface of <paramref name="model"/> with one flat colour — used to give
+    /// kit models a suitable colour when their original (external Kenney colormap) texture is not shipped
+    /// with the bare .glb, so they would otherwise render white.</summary>
+    public static void Tint(Node3D model, Color albedo)
+    {
+        var material = new StandardMaterial3D
+        {
+            AlbedoColor = albedo,
+            Roughness = 1f,
+            SpecularMode = BaseMaterial3D.SpecularModeEnum.Disabled,
+        };
+        foreach (var mi in MeshInstances(model))
+        {
+            mi.MaterialOverride = material;
+        }
+    }
+
     // Union of the model's MeshInstance3D bounding boxes in the MODEL's own local space — each mesh's
     // global transform is taken relative to the model root, so the measurement is independent of where
     // the model sits in the world (it may be parented at a cell's world position). The model must be in

@@ -29,6 +29,17 @@ public partial class Terrain3DView : Node3D
         [CellMaterial.Bridge] = "res://src/Presentation/Arena/models/TerrainBridge.glb",
     };
 
+    // The bare Kenney .glb ship without their shared colormap texture, so these models render white — give
+    // each a suitable flat colour. Bridge (Nature Kit) keeps its own look, so it is not listed here.
+    private static readonly Dictionary<CellMaterial, Color> TintColours = new()
+    {
+        [CellMaterial.Brick] = new Color(0.72f, 0.34f, 0.24f),
+        [CellMaterial.Crate] = new Color(0.60f, 0.43f, 0.24f),
+        [CellMaterial.Steel] = new Color(0.56f, 0.59f, 0.63f),
+        [CellMaterial.Building] = new Color(0.80f, 0.76f, 0.68f),
+        [CellMaterial.Mountain] = new Color(0.52f, 0.50f, 0.46f),
+    };
+
     private readonly Dictionary<CellMaterial, PackedScene> _cache = new();
     private readonly Dictionary<(int X, int Y), Node3D> _destructibles = new();
     private IWallGrid _grid = null!;
@@ -110,6 +121,11 @@ public partial class Terrain3DView : Node3D
         var model = Model(material).Instantiate<Node3D>();
         holder.AddChild(model); // add first so global transforms are valid for the fit measure
         ModelFit.Apply(model, _tileSize * footprint, seatOnGround: true);
+        if (TintColours.TryGetValue(material, out var colour))
+        {
+            ModelFit.Tint(model, colour);
+        }
+
         holder.AddChild(DebugLabel.Make(material.ToString(), 75f));
         return holder;
     }
