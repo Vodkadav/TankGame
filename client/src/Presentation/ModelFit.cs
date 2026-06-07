@@ -24,6 +24,22 @@ public static class ModelFit
         model.Position = new Vector3(-centre.X * scale, y, -centre.Z * scale);
     }
 
+    /// <summary>Like <see cref="Apply"/> but fills a rectangular footprint, scaling X and Z independently
+    /// to <paramref name="spanX"/> × <paramref name="spanZ"/> (height scales with their average) — for a
+    /// model that should fill a multi-cell region such as a building over a block of cells.</summary>
+    public static void ApplyBox(Node3D model, float spanX, float spanZ, bool seatOnGround)
+    {
+        var box = Measure(model);
+        var sx = box.Size.X > 1e-4f ? spanX / box.Size.X : 1f;
+        var sz = box.Size.Z > 1e-4f ? spanZ / box.Size.Z : 1f;
+        var sy = (sx + sz) / 2f;
+        model.Scale = new Vector3(sx, sy, sz);
+
+        var centre = box.GetCenter();
+        var y = seatOnGround ? -box.Position.Y * sy : -centre.Y * sy;
+        model.Position = new Vector3(-centre.X * sx, y, -centre.Z * sz);
+    }
+
     /// <summary>Overrides every surface of <paramref name="model"/> with one flat colour — used to give
     /// kit models a suitable colour when their original (external Kenney colormap) texture is not shipped
     /// with the bare .glb, so they would otherwise render white.</summary>
