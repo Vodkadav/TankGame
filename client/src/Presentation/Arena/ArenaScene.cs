@@ -60,7 +60,7 @@ public partial class ArenaScene : Node2D
     // can scramble out. Tunable balance knobs.
     private const int PowerupCount = 9;
     private const float AirstrikeZoneRadius = 70f;
-    private const float AirstrikeStep = 0.45f;
+    private const float AirstrikeStep = 0.09f; // 5x faster — a rapid sweep
     private const int AirstrikeDamage = 3;
 
     private (PowerupKind Kind, IPickupEffect Effect)[] _powerups = null!;

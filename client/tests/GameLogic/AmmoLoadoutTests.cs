@@ -123,6 +123,35 @@ public class AmmoLoadoutTests
     }
 
     [Fact]
+    public void FiredMissile_PiercesThroughMultipleTanks_DamagingEach()
+    {
+        var combat = new CombatResolver(hitRadius: 28f);
+        var world = new World(combat);
+        var arena = new OpenArena();
+        var a = new Tank(new NoInput(), world, arena, new Vector2(50f, 0f), 100f, 0.3f, 600f, maxHp: 5, team: 0);
+        var b = new Tank(new NoInput(), world, arena, new Vector2(110f, 0f), 100f, 0.3f, 600f, maxHp: 5, team: 0);
+        world.Spawn(a);
+        world.Spawn(b);
+
+        var loadout = new AmmoLoadout();
+        new MissileAmmo(tileSize: 64f).ApplyTo(loadout);
+        loadout.Fire(world, arena, Vector2.Zero, new Vector2(1f, 0f), speed: 600f, team: 2);
+
+        for (var i = 0; i < 6; i++)
+        {
+            world.Step(0.05f);
+        }
+
+        Assert.True(a.Hp < a.MaxHp, "the missile should damage the first tank");
+        Assert.True(b.Hp < b.MaxHp, "and pierce through to damage the second tank too");
+    }
+
+    private sealed class NoInput : IInputSource
+    {
+        public TankInput Read() => new(Vector2.Zero, Aim: 0f, Fire: false);
+    }
+
+    [Fact]
     public void Behaviour_IsOneAxis_PiercingReplacesBouncing()
     {
         var loadout = new AmmoLoadout();

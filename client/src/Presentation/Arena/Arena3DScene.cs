@@ -34,7 +34,7 @@ public partial class Arena3DScene : Node3D
     private const int ShieldAmount = 3;
     private const int PowerupCount = 9;
     private const float AirstrikeZoneRadius = 70f;
-    private const float AirstrikeStep = 0.45f;
+    private const float AirstrikeStep = 0.09f; // 5x faster than before — a rapid sweep
     private const int AirstrikeDamage = 3;
 
     private (PowerupKind Kind, IPickupEffect Effect)[] _powerups = null!;

@@ -27,8 +27,10 @@ public partial class Tank3DView : Node3D
     private Node3D _turret = null!;
     private StandardMaterial3D _bodyMaterial = null!;
     private int _team;
-    private MeshInstance3D _healthBar = null!;
     private MeshInstance3D _shieldBar = null!;
+    private ShaderMaterial _healthFill = null!;
+    private ShaderMaterial _shieldFill = null!;
+    private bool _wasAlive = true;
 
     public override void _Ready()
     {
@@ -70,8 +72,15 @@ public partial class Tank3DView : Node3D
             return;
         }
 
-        Visible = _tank.Hp > 0; // downed/awaiting respawn → hidden
-        if (!Visible)
+        var alive = _tank.Hp > 0;
+        if (_wasAlive && !alive)
+        {
+            SpawnDeathExplosion(); // a fireball where it died, so the kill reads
+        }
+
+        _wasAlive = alive;
+        Visible = alive; // downed/awaiting respawn → hidden
+        if (!alive)
         {
             return;
         }
@@ -87,51 +96,83 @@ public partial class Tank3DView : Node3D
         UpdateBars();
     }
 
-    // Billboarded health (and over-shield) bars floating above the tank, always facing the camera: a
-    // near-black border, a dark background, and a bright foreground whose width is the % of life left.
-    // NoDepthTest means draw order = add order, so each layer sits over the previous.
+    // A billboarded progress-bar: a border, a dark background, and a foreground that fills from the LEFT
+    // to the percent of life left (a shader, so it is properly left-anchored, not centre-scaled). The
+    // vertex billboard keeps it camera-facing; depth test off draws it over everything.
+    private const string BarShaderCode = @"
+shader_type spatial;
+render_mode unshaded, cull_disabled, depth_test_disabled;
+uniform float ratio : hint_range(0.0, 1.0) = 1.0;
+uniform vec3 fg : source_color = vec3(0.45, 0.95, 0.5);
+uniform vec3 bg : source_color = vec3(0.16, 0.16, 0.19);
+uniform vec3 border : source_color = vec3(0.02, 0.02, 0.03);
+uniform float aspect = 7.6;
+void vertex() {
+    MODELVIEW_MATRIX = VIEW_MATRIX * mat4(INV_VIEW_MATRIX[0], INV_VIEW_MATRIX[1], INV_VIEW_MATRIX[2], MODEL_MATRIX[3]);
+}
+void fragment() {
+    float by = 0.16;
+    float bx = by / aspect;
+    bool inB = UV.x < bx || UV.x > 1.0 - bx || UV.y < by || UV.y > 1.0 - by;
+    vec3 c = border;
+    if (!inB) {
+        float fx = (UV.x - bx) / (1.0 - 2.0 * bx);
+        c = fx < ratio ? fg : bg;
+    }
+    ALBEDO = c;
+}";
+
+    private static Shader _barShader = null!;
+
     private void BuildBars()
     {
-        AddChild(Bar("BarBorder", new Color(0.02f, 0.02f, 0.03f, 0.9f), HealthBarY, BarWidth + 5f, BarHeight + 5f));
-        AddChild(Bar("BarBacking", new Color(0.16f, 0.16f, 0.19f, 0.95f), HealthBarY, BarWidth, BarHeight));
-        _healthBar = Bar("HealthBar", FullHealthColour, HealthBarY, BarWidth, BarHeight);
-        AddChild(_healthBar);
-        _shieldBar = Bar("ShieldBar", new Color(0.55f, 0.92f, 0.98f), ShieldBarY, BarWidth, BarHeight);
+        _barShader ??= new Shader { Code = BarShaderCode };
+        _healthFill = BarMaterial(new Vector3(0.45f, 0.95f, 0.5f));
+        AddChild(BarQuad(_healthFill, HealthBarY));
+        _shieldFill = BarMaterial(new Vector3(0.40f, 0.85f, 0.98f));
+        _shieldBar = BarQuad(_shieldFill, ShieldBarY);
         _shieldBar.Visible = false;
         AddChild(_shieldBar);
     }
 
-    private static readonly Color FullHealthColour = new(0.45f, 0.95f, 0.5f);
-
-    private static MeshInstance3D Bar(string name, Color colour, float y, float width, float height) => new()
+    private static ShaderMaterial BarMaterial(Vector3 fg)
     {
-        Name = name,
-        Mesh = new QuadMesh { Size = new Vector2(width, height) },
+        var mat = new ShaderMaterial { Shader = _barShader };
+        mat.SetShaderParameter("fg", fg);
+        mat.SetShaderParameter("aspect", BarWidth / BarHeight);
+        mat.SetShaderParameter("ratio", 1f);
+        return mat;
+    }
+
+    private static MeshInstance3D BarQuad(ShaderMaterial mat, float y) => new()
+    {
+        Mesh = new QuadMesh { Size = new Vector2(BarWidth, BarHeight) },
         Position = new Vector3(0f, y, 0f),
-        MaterialOverride = new StandardMaterial3D
-        {
-            AlbedoColor = colour,
-            ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded,
-            BillboardMode = BaseMaterial3D.BillboardModeEnum.Enabled,
-            Transparency = BaseMaterial3D.TransparencyEnum.Alpha,
-            NoDepthTest = true,
-        },
+        MaterialOverride = mat,
     };
 
     private void UpdateBars()
     {
-        var hpRatio = _tank!.MaxHp > 0 ? Mathf.Clamp((float)_tank.Hp / _tank.MaxHp, 0f, 1f) : 0f;
-        _healthBar.Scale = new Vector3(hpRatio, 1f, 1f);
-        ((StandardMaterial3D)_healthBar.MaterialOverride).AlbedoColor = hpRatio > 0.5f ? FullHealthColour
-            : hpRatio > 0.25f ? new Color(0.98f, 0.85f, 0.35f)
-            : new Color(0.98f, 0.42f, 0.42f);
+        var hp = _tank!.MaxHp > 0 ? Mathf.Clamp((float)_tank.Hp / _tank.MaxHp, 0f, 1f) : 0f;
+        _healthFill.SetShaderParameter("ratio", hp);
+        _healthFill.SetShaderParameter("fg", hp > 0.5f ? new Vector3(0.45f, 0.95f, 0.5f)
+            : hp > 0.25f ? new Vector3(0.98f, 0.85f, 0.35f)
+            : new Vector3(0.98f, 0.42f, 0.42f));
 
         _shieldBar.Visible = _tank.Shield > 0;
         if (_shieldBar.Visible)
         {
-            var sRatio = _tank.MaxHp > 0 ? Mathf.Clamp((float)_tank.Shield / _tank.MaxHp, 0f, 1f) : 1f;
-            _shieldBar.Scale = new Vector3(sRatio, 1f, 1f);
+            var s = _tank.MaxHp > 0 ? Mathf.Clamp((float)_tank.Shield / _tank.MaxHp, 0f, 1f) : 1f;
+            _shieldFill.SetShaderParameter("ratio", s);
         }
+    }
+
+    private void SpawnDeathExplosion()
+    {
+        var boom = new Explosion3D();
+        boom.Init(48f);
+        boom.Position = Position; // the tank's last world position
+        GetParent()?.AddChild(boom);
     }
 
     private static Node3D? FindPart(Node node, string contains)
