@@ -13,9 +13,10 @@ public sealed record AssetCatalogue(
     string SteelTile, string CrateTile, string BuildingTile,
     string BushTile, string SandbagTile)
 {
-    /// <summary>The active sprite set. The tank is the iso Super_Tank (CC BY 4.0, Zsky_01) rendered to
-    /// directional sprite strips — a hull strip and an independently-aiming turret strip of
-    /// <c>TankFacings</c> frames each (neutral tan, tinted per team via <c>TankView.ApplyTeamTint</c>);
+    /// <summary>The active sprite set. The tank is a procedural cartoon tank (built by
+    /// <c>scripts/render_cartoon_tank.py</c>) rendered to directional sprite strips — a hull strip and an
+    /// independently-aiming turret strip of <c>TankFacings</c> frames each (near-white neutral base,
+    /// tinted per team via <c>TankView.ApplyTeamTint</c>);
     /// the ground/terrain are native PixVoxel iso tiles; the walls are generated iso blocks (placeholder,
     /// raised — see <c>scripts/gen_iso_blocks.py</c>). Repoint any entry to swap one asset.</summary>
     public static readonly AssetCatalogue Default = new(
