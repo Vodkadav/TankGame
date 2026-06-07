@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Numerics;
+using TankGame.Domain;
 
 namespace TankGame.GameLogic;
 
@@ -41,4 +42,7 @@ public sealed class ProjectileState
     /// <summary>Tanks this shot has already damaged — so a piercing shot that overlaps the same
     /// tank across several ticks hits it once, not once per tick.</summary>
     public readonly HashSet<Guid> HitTanks = new();
+
+    /// <summary>How the view should draw this shot (ordinary bullet vs missile). Cosmetic only.</summary>
+    public ProjectileStyle Style;
 }

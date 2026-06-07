@@ -27,6 +27,10 @@ public sealed class AmmoLoadout
     /// <summary>Pierce budget seeded on each pellet (0 = no piercing).</summary>
     public int Pierce { get; set; }
 
+    /// <summary>How the pellets are drawn (ordinary bullet vs missile). Cosmetic; the behaviour axis
+    /// modifiers set it (a missile is a missile, a bouncing/piercing/plain shot is a bullet).</summary>
+    public ProjectileStyle Style { get; set; } = ProjectileStyle.Normal;
+
     /// <summary>Returns the loadout to the ordinary single straight shot.</summary>
     public void Reset()
     {
@@ -34,6 +38,7 @@ public sealed class AmmoLoadout
         SpreadRadians = 0f;
         BehaviourFactory = Straight;
         Pierce = 0;
+        Style = ProjectileStyle.Normal;
     }
 
     /// <summary>Spawns this shot — <see cref="SpreadCount"/> pellets fanned symmetrically about the
@@ -49,7 +54,7 @@ public sealed class AmmoLoadout
             var angle = baseAngle + firstOffset + (SpreadRadians * i);
             var pelletDir = new Vector2(MathF.Cos(angle), MathF.Sin(angle));
             world.Spawn(new Projectile(arena, muzzle, pelletDir, speed, team: team,
-                behaviour: BehaviourFactory(), pierce: Pierce, owner: owner));
+                behaviour: BehaviourFactory(), pierce: Pierce, owner: owner, style: Style));
         }
     }
 }

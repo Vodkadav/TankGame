@@ -106,6 +106,22 @@ public class AmmoLoadoutTests
     }
 
     [Fact]
+    public void Default_FiresANormalStyledProjectile()
+    {
+        Fired(out var world);
+        var shot = Assert.Single(world.Entities.OfType<Projectile>());
+        Assert.Equal(ProjectileStyle.Normal, shot.Style);
+    }
+
+    [Fact]
+    public void MissileAmmo_FiresAMissileStyledProjectile()
+    {
+        Fired(out var world, new MissileAmmo(tileSize: 64f));
+        var shot = Assert.Single(world.Entities.OfType<Projectile>());
+        Assert.Equal(ProjectileStyle.Missile, shot.Style);
+    }
+
+    [Fact]
     public void Behaviour_IsOneAxis_PiercingReplacesBouncing()
     {
         var loadout = new AmmoLoadout();
