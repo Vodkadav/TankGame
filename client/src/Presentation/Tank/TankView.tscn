@@ -4,7 +4,3 @@
 
 [node name="TankView" type="Node2D"]
 script = ExtResource("1_view")
-
-[node name="Body" type="Sprite2D" parent="."]
-
-[node name="Turret" type="Sprite2D" parent="."]

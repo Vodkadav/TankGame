@@ -332,11 +332,14 @@ Catalogue and ordering: `docs/research/local-backlog.md`.
   whatever wall art is loaded — **source-agnostic, not blocked on the art pass**. Ships `Sandy` +
   `Slate` so the swap is real and tested. Deferred: a title-screen theme picker; biome/ground sprites
   (art pass).
-- **Tank team tinting** ✅ `TeamPalette` (Presentation) is the single source of the per-team
-  `Sprite2D.Modulate` tint — up to four distinct team colours (team 0 player = green, then red, blue,
-  yellow; wraps modulo the palette), and `TankView.ApplyTeamTint(int team)` owns applying it. Both
-  `ArenaScene` and `NetArenaScene` tint by `tank.Team`, so the one near-white cartoon tank texture reads
-  as a vivid per-side colour.
+- **Live 3D tank + team colours** ✅ The tank is a real 3D model (`Tank3D.glb`, MrEliptik low-poly)
+  rendered live in a per-tank `SubViewport` under a fixed orthographic iso camera and composited into the
+  2D world by `TankView` — the hull and the independently-aiming `Turret` node rotate in real time, so no
+  directional-frame snapping. `TeamPalette` (Presentation) is the single source of four bright team
+  colours (team 0 player = green, then red, blue, yellow; wraps modulo); `TankView.ApplyTeamTint(int
+  team)` recolours just the body material, while the lights stay yellow and the tracks/cannon black. Both
+  `ArenaScene` and `NetArenaScene` colour by `tank.Team`. A grow/cull-front next-pass gives the cartoon
+  outline. (Superseded the sprite-baked tank pipeline.)
 - **S9 — match modifiers** ✅ (`docs/adr/0015-match-modifiers.md`) the first S9 *gameplay* slice:
   "everyone starts with effect X". `MatchModifier` (GameLogic) carries a list of `StartingEffects`
   applied to every tank at spawn via `ApplyTo(Tank)`; reuses the ADR-0012 stats machinery, so no new
