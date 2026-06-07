@@ -32,13 +32,18 @@ public partial class Arena3DScene : Node3D
     private const int AmmoShots = 5;
     private const int RepairAmount = 2;
     private const int ShieldAmount = 3;
-    private const float AirstrikeDelay = 1.6f;
-    private const float AirstrikeRadius = 110f;
+    private const int PowerupCount = 9;
+    private const float AirstrikeZoneRadius = 70f;
+    private const float AirstrikeStep = 0.45f;
     private const int AirstrikeDamage = 3;
 
-    private static readonly (PowerupKind Kind, IPickupEffect Effect)[] PowerupCatalogue =
+    private (PowerupKind Kind, IPickupEffect Effect)[] _powerups = null!;
+
+    // Built in _Ready once the field size is known (the airstrike needs the field bounds to plan its
+    // carpet-bomb swathe).
+    private (PowerupKind Kind, IPickupEffect Effect)[] PowerupCatalogue(NVector2 fieldMax) => new[]
     {
-        (PowerupKind.SpeedBoost, new StatusEffectPickup(new StatusEffect(StatKind.Speed, Mult: 1.6f, AddFlat: 0f, Seconds: 6f))),
+        (PowerupKind.SpeedBoost, (IPickupEffect)new StatusEffectPickup(new StatusEffect(StatKind.Speed, Mult: 1.6f, AddFlat: 0f, Seconds: 6f))),
         (PowerupKind.RapidFire, new StatusEffectPickup(new StatusEffect(StatKind.FireInterval, Mult: 0.5f, AddFlat: 0f, Seconds: 6f))),
         (PowerupKind.BouncingAmmo, new AmmoPickup(new BouncingAmmo(bounces: 3), AmmoShots)),
         (PowerupKind.SpreadAmmo, new AmmoPickup(new SpreadAmmo(count: 3, radians: 0.18f), AmmoShots)),
@@ -46,7 +51,7 @@ public partial class Arena3DScene : Node3D
         (PowerupKind.Shield, new ShieldPickup(ShieldAmount)),
         (PowerupKind.PiercingAmmo, new AmmoPickup(new PiercingAmmo(pierces: 1, TileSize), AmmoShots)),
         (PowerupKind.Missile, new AmmoPickup(new MissileAmmo(TileSize), shots: 1)),
-        (PowerupKind.Telephone, new AirstrikePickup(AirstrikeDelay, AirstrikeRadius, AirstrikeDamage)),
+        (PowerupKind.Telephone, new AirstrikePickup(GridOrigin, fieldMax, AirstrikeZoneRadius, AirstrikeStep, AirstrikeDamage)),
     };
 
     // Orthographic ¾ camera. Eyeball-gated on playtest.
@@ -73,8 +78,9 @@ public partial class Arena3DScene : Node3D
     {
         var dim = Mathf.Max(GameSetup.ArenaWidth, GameSetup.ArenaHeight); // a square arena, not oblong
         _layout = new ArenaGenerator().Generate(
-            new ArenaGenParams(dim, dim, GameSetup.ArenaSeed, EnemyCount, PowerupCatalogue.Length));
+            new ArenaGenParams(dim, dim, GameSetup.ArenaSeed, EnemyCount, PowerupCount));
         var level = _layout.Map;
+        _powerups = PowerupCatalogue(new NVector2(level.Width * TileSize, level.Height * TileSize));
         var grid = level.BuildGrid();
         _arena = new GridArena(grid, TileSize, GridOrigin);
         _bushes = new BushField(level.Bushes, TileSize, GridOrigin);
@@ -287,9 +293,9 @@ public partial class Arena3DScene : Node3D
     // reaches the scene by the same spawn-event path as every other entity.
     private void SpawnPowerups()
     {
-        for (var i = 0; i < PowerupCatalogue.Length; i++)
+        for (var i = 0; i < _powerups.Length; i++)
         {
-            var (kind, effect) = PowerupCatalogue[i];
+            var (kind, effect) = _powerups[i];
             var (x, y) = _layout.PickupCells[i];
             _world.Spawn(new Powerup(_world, CellCentre(x, y), kind, effect, PickupRadius, dropOnCarrierDeath: true));
         }

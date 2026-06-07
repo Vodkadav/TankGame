@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
 using TankGame.Domain;
@@ -61,31 +62,79 @@ public sealed class AmmoPickup : IPickupEffect
     public void ApplyTo(Tank tank, IWorld world) => tank.LoadAmmo(_modifier, _shots);
 }
 
-/// <summary>A telephone: on pickup it calls in an <see cref="Airstrike"/> on the collector's nearest
-/// foe (a different team), which detonates after a short telegraph. Does nothing if no enemy is on the
-/// field. Spawns the strike into the world the pickup hands it.</summary>
+/// <summary>A telephone: on pickup it calls in a carpet-bombing <see cref="Airstrike"/> that covers a
+/// connected swathe of the field (about <see cref="CoverFraction"/> of it) — a run of blast zones that
+/// light up one after another and then detonate in the same order. The swathe grows out from the
+/// collector's nearest foe (or the field centre), so it sweeps toward the action. Spawns the strike into
+/// the world the pickup hands it.</summary>
 public sealed class AirstrikePickup : IPickupEffect
 {
-    private readonly float _delay;
-    private readonly float _radius;
+    /// <summary>Fraction of the field the carpet bomb blankets.</summary>
+    public const float CoverFraction = 0.4f;
+
+    private readonly Vector2 _min;
+    private readonly Vector2 _max;
+    private readonly float _zoneRadius;
+    private readonly float _step;
     private readonly int _damage;
 
-    public AirstrikePickup(float delay, float radius, int damage)
+    /// <param name="min">Field minimum corner (world units).</param>
+    /// <param name="max">Field maximum corner.</param>
+    /// <param name="zoneRadius">Blast radius of each zone.</param>
+    /// <param name="step">Seconds between each zone lighting up (and each detonation).</param>
+    /// <param name="damage">Damage each zone deals to a caught tank.</param>
+    public AirstrikePickup(Vector2 min, Vector2 max, float zoneRadius, float step, int damage)
     {
-        _delay = delay;
-        _radius = radius;
+        _min = min;
+        _max = max;
+        _zoneRadius = zoneRadius;
+        _step = step;
         _damage = damage;
     }
 
     public void ApplyTo(Tank tank, IWorld world)
     {
-        var target = NearestFoe(tank, world);
-        if (target is null)
+        var zones = BuildSwathe(NearestFoe(tank, world)?.Position ?? Centre());
+        if (zones.Count > 0)
         {
-            return; // no-one to strike
+            world.Spawn(new Airstrike(world, zones, tank.Team, _zoneRadius, _step, _damage));
+        }
+    }
+
+    private Vector2 Centre() => (_min + _max) * 0.5f;
+
+    // Grow a connected blob of zones (a grid spaced by the zone radius) out from the cell nearest the
+    // start point, in breadth-first order, until it blankets CoverFraction of the field. The BFS order is
+    // the order the zones light up and then detonate, so the carpet sweeps outward.
+    private List<Vector2> BuildSwathe(Vector2 start)
+    {
+        var spacing = _zoneRadius;
+        var cols = System.Math.Max(1, (int)((_max.X - _min.X) / spacing));
+        var rows = System.Math.Max(1, (int)((_max.Y - _min.Y) / spacing));
+        var target = System.Math.Max(1, (int)(CoverFraction * cols * rows));
+
+        var sx = System.Math.Clamp((int)((start.X - _min.X) / spacing), 0, cols - 1);
+        var sy = System.Math.Clamp((int)((start.Y - _min.Y) / spacing), 0, rows - 1);
+
+        var visited = new HashSet<(int, int)>();
+        var order = new List<Vector2>();
+        var queue = new Queue<(int X, int Y)>();
+        queue.Enqueue((sx, sy));
+        visited.Add((sx, sy));
+        while (queue.Count > 0 && order.Count < target)
+        {
+            var (cx, cy) = queue.Dequeue();
+            order.Add(new Vector2(_min.X + ((cx + 0.5f) * spacing), _min.Y + ((cy + 0.5f) * spacing)));
+            foreach (var (nx, ny) in new[] { (cx, cy - 1), (cx + 1, cy), (cx, cy + 1), (cx - 1, cy) })
+            {
+                if (nx >= 0 && ny >= 0 && nx < cols && ny < rows && visited.Add((nx, ny)))
+                {
+                    queue.Enqueue((nx, ny));
+                }
+            }
         }
 
-        world.Spawn(new Airstrike(world, target.Position, tank.Team, _delay, _radius, _damage));
+        return order;
     }
 
     private static Tank? NearestFoe(Tank caller, IWorld world)

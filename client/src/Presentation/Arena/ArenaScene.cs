@@ -58,12 +58,16 @@ public partial class ArenaScene : Node2D
     private const int ShieldAmount = 3;
     // Telephone airstrike: a wide blast on the caller's nearest foe after a short telegraph, so tanks
     // can scramble out. Tunable balance knobs.
-    private const float AirstrikeDelay = 1.6f;
-    private const float AirstrikeRadius = 110f;
+    private const int PowerupCount = 9;
+    private const float AirstrikeZoneRadius = 70f;
+    private const float AirstrikeStep = 0.45f;
     private const int AirstrikeDamage = 3;
-    private static readonly (PowerupKind Kind, IPickupEffect Effect)[] PowerupCatalogue =
+
+    private (PowerupKind Kind, IPickupEffect Effect)[] _powerups = null!;
+
+    private (PowerupKind Kind, IPickupEffect Effect)[] PowerupCatalogue(NVector2 fieldMax) => new[]
     {
-        (PowerupKind.SpeedBoost, new StatusEffectPickup(new StatusEffect(StatKind.Speed, Mult: 1.6f, AddFlat: 0f, Seconds: 6f))),
+        (PowerupKind.SpeedBoost, (IPickupEffect)new StatusEffectPickup(new StatusEffect(StatKind.Speed, Mult: 1.6f, AddFlat: 0f, Seconds: 6f))),
         (PowerupKind.RapidFire, new StatusEffectPickup(new StatusEffect(StatKind.FireInterval, Mult: 0.5f, AddFlat: 0f, Seconds: 6f))),
         (PowerupKind.BouncingAmmo, new AmmoPickup(new BouncingAmmo(bounces: 3), AmmoShots)),
         (PowerupKind.SpreadAmmo, new AmmoPickup(new SpreadAmmo(count: 3, radians: 0.18f), AmmoShots)),
@@ -71,7 +75,7 @@ public partial class ArenaScene : Node2D
         (PowerupKind.Shield, new ShieldPickup(ShieldAmount)),
         (PowerupKind.PiercingAmmo, new AmmoPickup(new PiercingAmmo(pierces: 1, TileSize), AmmoShots)),
         (PowerupKind.Missile, new AmmoPickup(new MissileAmmo(TileSize), shots: 1)),
-        (PowerupKind.Telephone, new AirstrikePickup(AirstrikeDelay, AirstrikeRadius, AirstrikeDamage)),
+        (PowerupKind.Telephone, new AirstrikePickup(GridOrigin, fieldMax, AirstrikeZoneRadius, AirstrikeStep, AirstrikeDamage)),
     };
 
     // Two-player frames the whole field; the zoom is computed per map so any size fits on screen.
@@ -112,6 +116,7 @@ public partial class ArenaScene : Node2D
 
         _layout = new ArenaGenerator().Generate(BuildArenaParams(GameSetup.ArenaSeed));
         var level = _layout.Map;
+        _powerups = PowerupCatalogue(new NVector2(level.Width * TileSize, level.Height * TileSize));
         var grid = level.BuildGrid();
         _arena = new GridArena(grid, TileSize, GridOrigin);
         _bushes = new BushField(level.Bushes, TileSize, GridOrigin);
@@ -170,16 +175,16 @@ public partial class ArenaScene : Node2D
     // The procedural-arena recipe (S8): a battlefield of the match's size, from the match seed,
     // with the generator placing the spawns and one cell per pickup in the catalogue.
     private static ArenaGenParams BuildArenaParams(int seed) =>
-        new(GameSetup.ArenaWidth, GameSetup.ArenaHeight, seed, EnemyCount, PowerupCatalogue.Length);
+        new(GameSetup.ArenaWidth, GameSetup.ArenaHeight, seed, EnemyCount, PowerupCount);
 
     // Lay each catalogue pickup at the cell the generator chose for it (same count by construction),
     // spawning it through the world so it reaches the screen by the same spawn-event path as every
     // other entity (a PowerupView via the type-switch).
     private void SpawnPowerups()
     {
-        for (var i = 0; i < PowerupCatalogue.Length; i++)
+        for (var i = 0; i < _powerups.Length; i++)
         {
-            var (kind, effect) = PowerupCatalogue[i];
+            var (kind, effect) = _powerups[i];
             var (x, y) = _layout.PickupCells[i];
             _world.Spawn(new Powerup(_world, CellCentre(x, y), kind, effect, PickupRadius, dropOnCarrierDeath: true));
         }
