@@ -21,7 +21,7 @@ public class TankViewTests : TestClass
     [Setup]
     public void Setup()
     {
-        // Loading the scene also imports/loads the placeholder textures (M1-T2).
+        // Loading the scene builds the 3D tank in its SubViewport and loads Tank3D.glb (M1-T2).
         _view = GD.Load<PackedScene>("res://src/Presentation/Tank/TankView.tscn")
             .Instantiate<TankView>();
         TestScene.AddChild(_view);
@@ -30,19 +30,41 @@ public class TankViewTests : TestClass
     [Cleanup]
     public void Cleanup() => _view.QueueFree();
 
-    [Test]
-    public void Scene_LoadsHullAndTurretStrips_FromTheCatalogue()
+    private static T? Find<T>(Node node, System.Func<T, bool>? pred = null) where T : Node
     {
-        var body = _view.GetNode<Sprite2D>("Body");
-        var turret = _view.GetNode<Sprite2D>("Turret");
-        var hull = body.Texture as AtlasTexture;
-        var gun = turret.Texture as AtlasTexture;
-
-        if (hull is null || gun is null
-            || hull.Atlas != GD.Load<Texture2D>(AssetCatalogue.Active.TankHull)
-            || gun.Atlas != GD.Load<Texture2D>(AssetCatalogue.Active.TankTurret))
+        if (node is T hit && (pred is null || pred(hit)))
         {
-            throw new System.Exception("Body and Turret sprites must draw from the catalogue's directional strips.");
+            return hit;
+        }
+
+        foreach (var child in node.GetChildren())
+        {
+            if (Find(child, pred) is { } found)
+            {
+                return found;
+            }
+        }
+
+        return null;
+    }
+
+    private static bool YawClose(float a, float b)
+    {
+        var d = Mathf.Wrap(a - b, -Mathf.Pi, Mathf.Pi);
+        return Mathf.Abs(d) < 0.02f;
+    }
+
+    [Test]
+    public void Scene_BuildsThe3DTankInASubViewport()
+    {
+        var viewport = Find<SubViewport>(_view);
+        var sprite = Find<Sprite2D>(_view);
+        var hull = Find<Node3D>(_view, n => n.Name.ToString().Contains("Base"));
+        var turret = Find<Node3D>(_view, n => n.Name.ToString().Contains("Turret"));
+
+        if (viewport is null || sprite is null || hull is null || turret is null)
+        {
+            throw new System.Exception("TankView must build a SubViewport, a display Sprite2D, and the 3D hull + turret nodes.");
         }
     }
 
@@ -54,7 +76,7 @@ public class TankViewTests : TestClass
         var tank = new Tank(input, new World(), arena, NVector2.Zero, speed: 100f, fireInterval: 0.3f, projectileSpeed: 600f);
         _view.Bind(tank);
 
-        tank.Step(0.1f); // the model advances 10 units along +X (heading 0); the turret aims at 0.75 rad
+        tank.Step(0.1f); // advances 10 units along +X (heading 0); the turret aims at 0.75 rad
         _view.UpdateFromModel();
 
         // World (10,0) projects to iso ((10-0)*1, (10+0)*0.5) = (10, 5).
@@ -63,27 +85,29 @@ public class TankViewTests : TestClass
             throw new System.Exception($"View should mirror the tank to iso (10,5); was {_view.Position}.");
         }
 
-        // The facing drives the directional frame, not a sprite rotation — the sprites never spin.
-        var turret = _view.GetNode<Sprite2D>("Turret");
-        var body = _view.GetNode<Sprite2D>("Body");
-        if (turret.Rotation != 0f || body.Rotation != 0f)
+        var hull = Find<Node3D>(_view, n => n.Name.ToString().Contains("Base"))!;
+        var turret = Find<Node3D>(_view, n => n.Name.ToString().Contains("Turret"))!;
+
+        // The turret is a child of the hull, so its world yaw is hull.Y + turret.Y. Aiming 0.75 off the
+        // chassis must leave the turret's world yaw 0.75 from the hull's — proving it aims independently
+        // (and the right way: the rendered turn winds opposite the game angle, so it trails).
+        var worldDelta = turret.Rotation.Y; // turret local yaw == turretWorld - hullWorld by construction
+        if (!YawClose(worldDelta, tank.Rotation - tank.TurretRotation))
         {
-            throw new System.Exception("Iso facing is by frame selection, so the sprites must not rotate.");
+            throw new System.Exception($"Turret should aim 0.75 rad off the hull independently; local yaw was {worldDelta}.");
         }
+    }
 
-        var facings = AssetCatalogue.Active.TankFacings;
-        var hull = (AtlasTexture)body.Texture;
-        var gun = (AtlasTexture)turret.Texture;
-        var frameWidth = hull.Atlas.GetWidth() / (float)facings;
-        var hullFrame = Mathf.RoundToInt(hull.Region.Position.X / frameWidth);
-        var gunFrame = Mathf.RoundToInt(gun.Region.Position.X / frameWidth);
+    [Test]
+    public void ApplyTeamTint_PaintsTheBodyMaterial_WithTheTeamColour()
+    {
+        _view.ApplyTeamTint(1);
+        var body = Find<MeshInstance3D>(_view, m => m.Name.ToString().Contains("Base"))!;
+        var mat = body.GetSurfaceOverrideMaterial(0) as StandardMaterial3D;
 
-        // Aiming 0.75 rad off the chassis is ~2 of the 16 directional steps. The rendered frames wind
-        // opposite the game angle (the iso camera mirrors the turn), so a positive aim shifts the turret
-        // frame down by 2 — proving the turret picks its own frame from the aim, the right way round.
-        if (gunFrame != ((((hullFrame - 2) % facings) + facings) % facings))
+        if (mat is null || mat.AlbedoColor != TeamPalette.TintFor(1))
         {
-            throw new System.Exception($"Turret frame should trail the hull by 2 (aim 0.75 rad); hull={hullFrame}, gun={gunFrame}.");
+            throw new System.Exception($"The body material should take team 1's colour; was {mat?.AlbedoColor}.");
         }
     }
 
@@ -134,38 +158,20 @@ public class TankViewTests : TestClass
     }
 
     [Test]
-    public void ApplyTeamTint_PaintsEachTeamItsOwnColour()
+    public void Stealthed_DarkensTheTank()
     {
-        _view.ApplyTeamTint(1);
-        if (_view.Modulate != TeamPalette.TintFor(1))
-        {
-            throw new System.Exception($"A team-1 view should carry team 1's colour; was {_view.Modulate}.");
-        }
-
-        _view.ApplyTeamTint(0);
-        if (_view.Modulate != TeamPalette.TintFor(0))
-        {
-            throw new System.Exception($"A team-0 view should carry team 0's colour; was {_view.Modulate}.");
-        }
-    }
-
-    [Test]
-    public void Stealthed_DarkensTheTank_OverItsTeamTint()
-    {
-        _view.ApplyTeamTint(0);
-        var lit = _view.Modulate;
+        var sprite = Find<Sprite2D>(_view)!;
 
         _view.Stealthed = true; // sitting in a bush
-        var stealthed = _view.Modulate;
-        if (stealthed.V >= lit.V)
+        if (sprite.Modulate.V >= 1f)
         {
-            throw new System.Exception($"A stealthed tank should be darker; was {stealthed} vs {lit}.");
+            throw new System.Exception($"A stealthed tank should be darkened; modulate was {sprite.Modulate}.");
         }
 
         _view.Stealthed = false; // left the bush
-        if (_view.Modulate != lit)
+        if (sprite.Modulate != Colors.White)
         {
-            throw new System.Exception($"Leaving cover should restore the team tint; was {_view.Modulate}.");
+            throw new System.Exception($"Leaving cover should restore full brightness; was {sprite.Modulate}.");
         }
     }
 
