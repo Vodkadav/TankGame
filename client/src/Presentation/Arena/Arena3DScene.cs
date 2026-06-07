@@ -54,6 +54,9 @@ public partial class Arena3DScene : Node3D
     private const float CamYawDeg = 45f;
     private const float CamDistance = 2500f;
     private const float CamOrthoSize = 820f; // world units shown vertically (~13 cells)
+    private const float MinOrthoSize = 200f;
+    private const float MaxOrthoSize = 2400f;
+    private const float ZoomStep = 1.12f;
 
     private static readonly NVector2 GridOrigin = NVector2.Zero;
 
@@ -90,6 +93,50 @@ public partial class Arena3DScene : Node3D
 
         SpawnPowerups();
         SpawnTanks();
+        BuildPreviewHud();
+    }
+
+    private bool _labelsShown = true;
+
+    // Mouse wheel zooms the orthographic camera (smaller size = closer); the L key toggles the debug
+    // name tags. Preview aids while the 3D port is built up.
+    public override void _UnhandledInput(InputEvent @event)
+    {
+        if (@event is InputEventMouseButton { Pressed: true } click)
+        {
+            if (click.ButtonIndex == MouseButton.WheelUp)
+            {
+                _camera.Size = Mathf.Clamp(_camera.Size / ZoomStep, MinOrthoSize, MaxOrthoSize);
+            }
+            else if (click.ButtonIndex == MouseButton.WheelDown)
+            {
+                _camera.Size = Mathf.Clamp(_camera.Size * ZoomStep, MinOrthoSize, MaxOrthoSize);
+            }
+        }
+        else if (@event is InputEventKey { Pressed: true, Keycode: Key.L })
+        {
+            _labelsShown = !_labelsShown;
+            foreach (var node in GetTree().GetNodesInGroup(DebugLabel.Group))
+            {
+                if (node is Label3D label)
+                {
+                    label.Visible = _labelsShown;
+                }
+            }
+        }
+    }
+
+    // A screen-space "Replay" button (reloads the scene) so the owner can re-watch the match while
+    // inspecting the 3D assets.
+    private void BuildPreviewHud()
+    {
+        var layer = new CanvasLayer { Name = "PreviewHud" };
+        var replay = new Button { Name = "Replay", Text = "hud.replay" };
+        replay.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.BottomLeft);
+        replay.Position += new Vector2(16f, -16f);
+        replay.Pressed += () => GetTree().ReloadCurrentScene();
+        layer.AddChild(replay);
+        AddChild(layer);
     }
 
     public override void _Process(double delta)

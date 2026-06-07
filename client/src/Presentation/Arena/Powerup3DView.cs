@@ -36,6 +36,7 @@ public partial class Powerup3DView : Node3D
         ModelFit.Apply(model, EmblemSpan, seatOnGround: false); // centred so it spins in place
 
         AddChild(GlowDisc(PowerupView.ColourFor(_powerup.Kind))); // coloured pad so it reads as a pickup
+        AddChild(DebugLabel.Make(_powerup.Kind.ToString(), HoverHeight + 26f));
         UpdateFromModel();
     }
 
