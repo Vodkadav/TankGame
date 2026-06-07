@@ -71,8 +71,9 @@ public partial class Arena3DScene : Node3D
 
     public override void _Ready()
     {
+        var dim = Mathf.Max(GameSetup.ArenaWidth, GameSetup.ArenaHeight); // a square arena, not oblong
         _layout = new ArenaGenerator().Generate(
-            new ArenaGenParams(GameSetup.ArenaWidth, GameSetup.ArenaHeight, GameSetup.ArenaSeed, EnemyCount, PowerupCatalogue.Length));
+            new ArenaGenParams(dim, dim, GameSetup.ArenaSeed, EnemyCount, PowerupCatalogue.Length));
         var level = _layout.Map;
         var grid = level.BuildGrid();
         _arena = new GridArena(grid, TileSize, GridOrigin);
@@ -199,10 +200,17 @@ public partial class Arena3DScene : Node3D
         var h = heightCells * TileSize;
 
         // A noise-mottled sand so the ground reads dusty rather than a flat shiny slab.
-        var noise = new FastNoiseLite { NoiseType = FastNoiseLite.NoiseTypeEnum.SimplexSmooth, Frequency = 0.04f };
+        var noise = new FastNoiseLite { NoiseType = FastNoiseLite.NoiseTypeEnum.SimplexSmooth, Frequency = 0.05f };
+        // A patchwork of brown, yellow, grey and green so the ground reads as varied dusty terrain.
         var ramp = new Gradient();
-        ramp.SetColor(0, new Color(0.58f, 0.47f, 0.29f)); // dusty dirt
-        ramp.SetColor(1, new Color(0.78f, 0.66f, 0.44f)); // lighter sand
+        ramp.Offsets = new[] { 0f, 0.34f, 0.67f, 1f };
+        ramp.Colors = new[]
+        {
+            new Color(0.40f, 0.47f, 0.30f), // green
+            new Color(0.52f, 0.40f, 0.26f), // brown
+            new Color(0.78f, 0.67f, 0.42f), // yellow sand
+            new Color(0.54f, 0.54f, 0.52f), // grey
+        };
         var sand = new NoiseTexture2D { Noise = noise, Width = 256, Height = 256, Seamless = true, ColorRamp = ramp };
 
         var ground = new MeshInstance3D

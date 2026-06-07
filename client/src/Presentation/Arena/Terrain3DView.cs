@@ -35,11 +35,13 @@ public partial class Terrain3DView : Node3D
     // its own embedded texture (a real city model), so it is NOT tinted.
     private static readonly Dictionary<CellMaterial, Color> TintColours = new()
     {
-        [CellMaterial.Brick] = new Color(0.74f, 0.33f, 0.22f),   // red brick block
+        [CellMaterial.Brick] = new Color(0.55f, 0.41f, 0.26f),   // wooden fence
         [CellMaterial.Crate] = new Color(0.58f, 0.41f, 0.22f),   // wood
         [CellMaterial.Steel] = new Color(0.38f, 0.42f, 0.50f),   // dark steel-blue (was washing out white)
         [CellMaterial.Mountain] = new Color(0.46f, 0.44f, 0.40f), // rock
     };
+
+    private static readonly Color BuildingColour = new(0.74f, 0.62f, 0.50f); // warm concrete
 
     private readonly Dictionary<CellMaterial, PackedScene> _cache = new();
     private readonly Dictionary<(int X, int Y), Node3D> _destructibles = new();
@@ -59,8 +61,9 @@ public partial class Terrain3DView : Node3D
             }
         }
 
+        BuildBuildings(grid); // one model per connected block of building cells, not one per cell
         BuildBushes(bushes);
-        BuildSandbags(sandbags);
+        BuildOilPuddles(sandbags);
         grid.CellChanged += OnCellChanged;
     }
 
@@ -92,6 +95,7 @@ public partial class Terrain3DView : Node3D
         switch (cell.Material)
         {
             case CellMaterial.Floor:
+            case CellMaterial.Building: // buildings are placed as one model per block, in BuildBuildings
                 return;
             case CellMaterial.Water:
                 AddWater(centre, $"Water_{x}_{y}");
@@ -181,35 +185,95 @@ public partial class Terrain3DView : Node3D
         }
     }
 
-    private void BuildSandbags(bool[,] sandbags)
+    // The slow-going patches render as a dark oil spill: two merged flat discs (a filled figure-8), the
+    // larger overlapping a smaller one. Oily sheen (low roughness, a little metallic).
+    private void BuildOilPuddles(bool[,] oil)
     {
-        var mesh = new BoxMesh { Size = new Vector3(_tileSize * 0.8f, 16f, _tileSize * 0.8f) };
-        for (var x = 0; x < sandbags.GetLength(0); x++)
+        var slick = new StandardMaterial3D
         {
-            for (var y = 0; y < sandbags.GetLength(1); y++)
+            AlbedoColor = new Color(0.05f, 0.05f, 0.07f),
+            Metallic = 0.4f,
+            Roughness = 0.2f,
+        };
+        for (var x = 0; x < oil.GetLength(0); x++)
+        {
+            for (var y = 0; y < oil.GetLength(1); y++)
             {
-                if (!sandbags[x, y])
+                if (!oil[x, y])
                 {
                     continue;
                 }
 
                 var centre = CellCentre(x, y);
-                var bag = new MeshInstance3D
-                {
-                    Name = $"Sandbag_{x}_{y}",
-                    Mesh = mesh,
-                    Position = new Vector3(centre.X, 8f, centre.Y),
-                    MaterialOverride = new StandardMaterial3D
-                    {
-                        AlbedoColor = new Color(0.40f, 0.44f, 0.30f), // olive-khaki, distinct from the sand
-                        Roughness = 1f,
-                        SpecularMode = BaseMaterial3D.SpecularModeEnum.Disabled,
-                    },
-                };
-                bag.AddChild(DebugLabel.Make("Sandbag", 40f));
-                AddChild(bag);
+                var holder = new Node3D { Name = $"Oil_{x}_{y}", Position = new Vector3(centre.X, 0.6f, centre.Y) };
+                AddChild(holder);
+                holder.AddChild(Blob(slick, 22f, new Vector3(-7f, 0f, -4f)));  // larger lobe
+                holder.AddChild(Blob(slick, 15f, new Vector3(13f, 0f, 7f)));   // smaller lobe → a filled "8"
+                holder.AddChild(DebugLabel.Make("Oil", 30f));
             }
         }
+    }
+
+    private static MeshInstance3D Blob(Material material, float radius, Vector3 offset) => new()
+    {
+        Mesh = new CylinderMesh { TopRadius = radius, BottomRadius = radius, Height = 0.8f },
+        Position = offset,
+        MaterialOverride = material,
+    };
+
+    // Each connected block of building cells (the generator lays them as small rectangles) is one
+    // building model stretched over the whole block, instead of a separate building per cell.
+    private void BuildBuildings(IWallGrid grid)
+    {
+        var visited = new bool[grid.Width, grid.Height];
+        for (var x = 0; x < grid.Width; x++)
+        {
+            for (var y = 0; y < grid.Height; y++)
+            {
+                if (visited[x, y] || grid.GetCell(x, y).Material != CellMaterial.Building)
+                {
+                    continue;
+                }
+
+                int minX = x, maxX = x, minY = y, maxY = y;
+                var queue = new Queue<(int X, int Y)>();
+                queue.Enqueue((x, y));
+                visited[x, y] = true;
+                while (queue.Count > 0)
+                {
+                    var (cx, cy) = queue.Dequeue();
+                    minX = Mathf.Min(minX, cx); maxX = Mathf.Max(maxX, cx);
+                    minY = Mathf.Min(minY, cy); maxY = Mathf.Max(maxY, cy);
+                    foreach (var (nx, ny) in new[] { (cx - 1, cy), (cx + 1, cy), (cx, cy - 1), (cx, cy + 1) })
+                    {
+                        if (nx >= 0 && ny >= 0 && nx < grid.Width && ny < grid.Height && !visited[nx, ny]
+                            && grid.GetCell(nx, ny).Material == CellMaterial.Building)
+                        {
+                            visited[nx, ny] = true;
+                            queue.Enqueue((nx, ny));
+                        }
+                    }
+                }
+
+                PlaceBuilding(minX, maxX, minY, maxY);
+            }
+        }
+    }
+
+    private void PlaceBuilding(int minX, int maxX, int minY, int maxY)
+    {
+        var centreX = (minX + maxX + 1) / 2f * _tileSize;
+        var centreZ = (minY + maxY + 1) / 2f * _tileSize;
+        var spanX = (maxX - minX + 1) * _tileSize;
+        var spanZ = (maxY - minY + 1) * _tileSize;
+
+        var holder = new Node3D { Name = $"Building_{minX}_{minY}", Position = new Vector3(centreX, 0f, centreZ) };
+        AddChild(holder);
+        var model = Model(CellMaterial.Building).Instantiate<Node3D>();
+        holder.AddChild(model);
+        ModelFit.ApplyBox(model, spanX * 0.98f, spanZ * 0.98f, seatOnGround: true);
+        ModelFit.Tint(model, BuildingColour);
+        holder.AddChild(DebugLabel.Make("Building", 90f));
     }
 
     private NVector2 CellCentre(int x, int y) => new((x + 0.5f) * _tileSize, (y + 0.5f) * _tileSize);
