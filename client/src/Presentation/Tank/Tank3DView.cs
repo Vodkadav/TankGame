@@ -14,7 +14,8 @@ public partial class Tank3DView : Node3D
     // is scaled up to roughly fill a cell. HeadingOffset calibrates the model's nose to game-angle 0.
     private const float ModelScale = 32f;
     private const float ModelYOffset = 0f;
-    private const float HeadingOffsetDeg = 0f;
+    // The GLB imports nose-along +Z; game-angle 0 should face world +X, so a +90° offset aligns them.
+    private const float HeadingOffsetDeg = 90f;
 
     private const float BarWidth = 46f;
     private const float BarHeight = 6f;
