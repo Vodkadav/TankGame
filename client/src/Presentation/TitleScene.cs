@@ -24,6 +24,7 @@ public partial class TitleScene : Control
         menu.AddChild(ModeButton("OnePlayer", "title.one_player", GameMode.OnePlayer));
         menu.AddChild(ModeButton("Coop", "title.two_player_coop", GameMode.TwoPlayerCoop));
         menu.AddChild(ModeButton("Versus", "title.two_player_versus", GameMode.TwoPlayerVersus));
+        menu.AddChild(ThreeDButton());
         menu.AddChild(JoinTestButton());
 
         AddChild(menu);
@@ -43,6 +44,21 @@ public partial class TitleScene : Control
             if (GetTree().CurrentScene == this)
             {
                 GetTree().ChangeSceneToFile("res://src/Presentation/Arena/NetArena.tscn");
+            }
+        };
+        return button;
+    }
+
+    // The work-in-progress 3D arena (ADR-0017), kept parallel to the iso game during the port.
+    private Button ThreeDButton()
+    {
+        var button = new Button { Name = "ThreeD", Text = "title.three_d" };
+        button.Pressed += () =>
+        {
+            GameSetup.StartNewMatch(GameMode.OnePlayer);
+            if (GetTree().CurrentScene == this)
+            {
+                GetTree().ChangeSceneToFile("res://src/Presentation/Arena/Arena3D.tscn");
             }
         };
         return button;
