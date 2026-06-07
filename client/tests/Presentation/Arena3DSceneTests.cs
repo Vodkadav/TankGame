@@ -69,4 +69,22 @@ public class Arena3DSceneTests : TestClass
             throw new System.Exception("3D arena must render terrain (walls) via a Terrain3DView.");
         }
     }
+
+    [Test]
+    public void Arena3D_SpawnsThePickups_AsPowerupViews()
+    {
+        var powerups = 0;
+        foreach (var child in _arena.GetChildren())
+        {
+            if (child is Powerup3DView)
+            {
+                powerups++;
+            }
+        }
+
+        if (powerups != 9)
+        {
+            throw new System.Exception($"3D arena must spawn the nine field pickups; saw {powerups}.");
+        }
+    }
 }
