@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Generic;
 using Godot;
 using TankGame.Domain;
@@ -6,30 +5,39 @@ using NVector2 = System.Numerics.Vector2;
 
 namespace TankGame.Presentation;
 
-/// <summary>Renders the arena's terrain in 3D (ADR-0017, the 3D replacement for <c>IsoTerrainView</c>):
-/// a box per wall cell (brick/crate/steel/mountain/building), a plane per water cell, a deck per bridge
-/// cell, plus bush clumps and sandbag mounds on the passable cells. Subscribes to the grid's
-/// <see cref="IWallGrid.CellChanged"/> so a brick that cracks recolours and a destroyed wall disappears,
-/// keeping the view a pure mirror of the model. The depth buffer sorts everything — no ZIndex.</summary>
+/// <summary>Renders the arena's terrain in 3D (ADR-0017, the 3D replacement for <c>IsoTerrainView</c>)
+/// from real CC0 Kenney models — a brick/crate/steel/mountain/building per wall cell, a wooden deck per
+/// bridge cell, grass tufts on bush cells — plus water planes and sandbag mounds. Each model is
+/// auto-fitted at runtime: its bounding box is measured and it is scaled to the cell and seated on the
+/// ground, so no per-model scale constant is needed. Subscribes to <see cref="IWallGrid.CellChanged"/> so
+/// a destroyed wall disappears. The depth buffer sorts everything — no ZIndex.</summary>
 public partial class Terrain3DView : Node3D
 {
-    private const float WallHeight = 64f;
-    private const float MountainHeight = 122f;
+    private const float WallFootprint = 0.98f;     // walls fill the cell
+    private const float MountainFootprint = 1.2f;  // rocks spill a little past the cell
+    private const float BushFootprint = 0.85f;
+    private const float BridgeFootprint = 1.0f;
     private const float WaterY = 1.5f;
-    private const float BridgeDeckHeight = 10f;
 
+    private static readonly Dictionary<CellMaterial, string> ModelPaths = new()
+    {
+        [CellMaterial.Brick] = "res://src/Presentation/Arena/models/TerrainBrick.glb",
+        [CellMaterial.Crate] = "res://src/Presentation/Arena/models/TerrainCrate.glb",
+        [CellMaterial.Steel] = "res://src/Presentation/Arena/models/TerrainSteel.glb",
+        [CellMaterial.Mountain] = "res://src/Presentation/Arena/models/TerrainMountain.glb",
+        [CellMaterial.Building] = "res://src/Presentation/Arena/models/TerrainBuilding.glb",
+        [CellMaterial.Bridge] = "res://src/Presentation/Arena/models/TerrainBridge.glb",
+    };
+
+    private readonly Dictionary<CellMaterial, PackedScene> _cache = new();
+    private readonly Dictionary<(int X, int Y), Node3D> _destructibles = new();
     private IWallGrid _grid = null!;
     private float _tileSize;
-    private readonly Dictionary<(int X, int Y), MeshInstance3D> _wallNodes = new();
-    private BoxMesh _wallBox = null!;
-    private BoxMesh _mountainBox = null!;
 
     public void Bind(IWallGrid grid, bool[,] bushes, bool[,] sandbags, float tileSize)
     {
         _grid = grid;
         _tileSize = tileSize;
-        _wallBox = new BoxMesh { Size = new Vector3(tileSize, WallHeight, tileSize) };
-        _mountainBox = new BoxMesh { Size = new Vector3(tileSize, MountainHeight, tileSize) };
 
         for (var x = 0; x < grid.Width; x++)
         {
@@ -39,9 +47,8 @@ public partial class Terrain3DView : Node3D
             }
         }
 
-        BuildScatter(bushes, BushMesh(), "Bush");
-        BuildScatter(sandbags, SandbagMesh(), "Sandbag");
-
+        BuildBushes(bushes);
+        BuildSandbags(sandbags);
         grid.CellChanged += OnCellChanged;
     }
 
@@ -53,14 +60,18 @@ public partial class Terrain3DView : Node3D
         }
     }
 
+    // Only destructibles (brick/crate) ever change, always to Floor — drop the model when they break.
     private void OnCellChanged(WallCellChanged change)
     {
-        if (_wallNodes.Remove((change.X, change.Y), out var old))
+        if (CellMaterials.BlocksMovement(change.Cell.Material))
         {
-            old.QueueFree(); // brick cracked or broke — rebuild it (or leave it gone if now floor)
+            return; // still solid (a brick that only lost hit points) — keep the model
         }
 
-        BuildCell(change.X, change.Y, change.Cell);
+        if (_destructibles.Remove((change.X, change.Y), out var node))
+        {
+            node.QueueFree();
+        }
     }
 
     private void BuildCell(int x, int y, WallCell cell)
@@ -71,52 +82,97 @@ public partial class Terrain3DView : Node3D
             case CellMaterial.Floor:
                 return;
             case CellMaterial.Water:
-                AddFlat(centre, WaterY, _tileSize, new Color(0.20f, 0.42f, 0.66f), $"Water_{x}_{y}");
+                AddWater(centre, $"Water_{x}_{y}");
                 return;
             case CellMaterial.Bridge:
-                AddBox(new BoxMesh { Size = new Vector3(_tileSize, BridgeDeckHeight, _tileSize) },
-                    centre, BridgeDeckHeight / 2f, new Color(0.55f, 0.40f, 0.24f), $"Bridge_{x}_{y}");
+                Place(cell.Material, centre, BridgeFootprint, $"Bridge_{x}_{y}");
                 return;
             case CellMaterial.Mountain:
-                Track(x, y, AddBox(_mountainBox, centre, MountainHeight / 2f, WallColour(cell), $"Mountain_{x}_{y}"));
+                Place(cell.Material, centre, MountainFootprint, $"Mountain_{x}_{y}");
                 return;
             default:
-                Track(x, y, AddBox(_wallBox, centre, WallHeight / 2f, WallColour(cell), $"Wall_{x}_{y}"));
+                var node = Place(cell.Material, centre, WallFootprint, $"Wall_{x}_{y}");
+                if (cell.Material is CellMaterial.Brick or CellMaterial.Crate)
+                {
+                    _destructibles[(x, y)] = node; // track so it can be removed when destroyed
+                }
+
                 return;
         }
     }
 
-    private void Track(int x, int y, MeshInstance3D node) => _wallNodes[(x, y)] = node;
-
-    private MeshInstance3D AddBox(Mesh mesh, NVector2 centre, float halfHeight, Color colour, string name)
+    // Instance the model for a material, auto-fit it to the cell, and seat it on the ground.
+    private Node3D Place(CellMaterial material, NVector2 centre, float footprint, string name)
     {
-        var node = new MeshInstance3D
-        {
-            Name = name,
-            Mesh = mesh,
-            Position = new Vector3(centre.X, halfHeight, centre.Y),
-            MaterialOverride = new StandardMaterial3D { AlbedoColor = colour, Roughness = 1f },
-        };
-        AddChild(node);
-        return node;
+        var holder = new Node3D { Name = name, Position = new Vector3(centre.X, 0f, centre.Y) };
+        AddChild(holder);
+
+        var model = Model(material).Instantiate<Node3D>();
+        holder.AddChild(model); // add first so global transforms are valid for the AABB measure
+
+        var box = MeasureAabb(model);
+        var span = Mathf.Max(box.Size.X, box.Size.Z);
+        var scale = span > 0.0001f ? (_tileSize * footprint) / span : 1f;
+        model.Scale = new Vector3(scale, scale, scale);
+        // Re-centre on the cell and seat the model's base on the ground after scaling.
+        model.Position = new Vector3(-box.GetCenter().X * scale, -box.Position.Y * scale, -box.GetCenter().Z * scale);
+        return holder;
     }
 
-    private void AddFlat(NVector2 centre, float y, float size, Color colour, string name) =>
+    private PackedScene Model(CellMaterial material)
+    {
+        if (!_cache.TryGetValue(material, out var scene))
+        {
+            scene = GD.Load<PackedScene>(ModelPaths[material]);
+            _cache[material] = scene;
+        }
+
+        return scene;
+    }
+
+    private void AddWater(NVector2 centre, string name) =>
         AddChild(new MeshInstance3D
         {
             Name = name,
-            Mesh = new PlaneMesh { Size = new Vector2(size, size) },
-            Position = new Vector3(centre.X, y, centre.Y),
-            MaterialOverride = new StandardMaterial3D { AlbedoColor = colour, Roughness = 0.4f },
+            Mesh = new PlaneMesh { Size = new Vector2(_tileSize, _tileSize) },
+            Position = new Vector3(centre.X, WaterY, centre.Y),
+            MaterialOverride = new StandardMaterial3D { AlbedoColor = new Color(0.20f, 0.42f, 0.66f), Roughness = 0.3f },
         });
 
-    private void BuildScatter(bool[,] cells, Mesh mesh, string name)
+    private void BuildBushes(bool[,] bushes)
     {
-        for (var x = 0; x < cells.GetLength(0); x++)
+        var scene = GD.Load<PackedScene>("res://src/Presentation/Arena/models/TerrainBush.glb");
+        for (var x = 0; x < bushes.GetLength(0); x++)
         {
-            for (var y = 0; y < cells.GetLength(1); y++)
+            for (var y = 0; y < bushes.GetLength(1); y++)
             {
-                if (!cells[x, y])
+                if (!bushes[x, y])
+                {
+                    continue;
+                }
+
+                var centre = CellCentre(x, y);
+                var holder = new Node3D { Name = $"Bush_{x}_{y}", Position = new Vector3(centre.X, 0f, centre.Y) };
+                AddChild(holder);
+                var model = scene.Instantiate<Node3D>();
+                holder.AddChild(model);
+                var box = MeasureAabb(model);
+                var span = Mathf.Max(box.Size.X, box.Size.Z);
+                var scale = span > 0.0001f ? (_tileSize * BushFootprint) / span : 1f;
+                model.Scale = new Vector3(scale, scale, scale);
+                model.Position = new Vector3(-box.GetCenter().X * scale, -box.Position.Y * scale, -box.GetCenter().Z * scale);
+            }
+        }
+    }
+
+    private void BuildSandbags(bool[,] sandbags)
+    {
+        var mesh = new BoxMesh { Size = new Vector3(_tileSize * 0.8f, 16f, _tileSize * 0.8f) };
+        for (var x = 0; x < sandbags.GetLength(0); x++)
+        {
+            for (var y = 0; y < sandbags.GetLength(1); y++)
+            {
+                if (!sandbags[x, y])
                 {
                     continue;
                 }
@@ -124,36 +180,54 @@ public partial class Terrain3DView : Node3D
                 var centre = CellCentre(x, y);
                 AddChild(new MeshInstance3D
                 {
-                    Name = $"{name}_{x}_{y}",
+                    Name = $"Sandbag_{x}_{y}",
                     Mesh = mesh,
-                    Position = new Vector3(centre.X, mesh is SphereMesh ? 12f : 8f, centre.Y),
-                    MaterialOverride = name == "Bush"
-                        ? new StandardMaterial3D { AlbedoColor = new Color(0.24f, 0.48f, 0.22f), Roughness = 1f }
-                        : new StandardMaterial3D { AlbedoColor = new Color(0.72f, 0.64f, 0.42f), Roughness = 1f },
+                    Position = new Vector3(centre.X, 8f, centre.Y),
+                    MaterialOverride = new StandardMaterial3D { AlbedoColor = new Color(0.72f, 0.64f, 0.42f), Roughness = 1f },
                 });
             }
         }
     }
 
-    private Mesh BushMesh() => new SphereMesh { Radius = _tileSize * 0.38f, Height = _tileSize * 0.42f };
-
-    private Mesh SandbagMesh() => new BoxMesh { Size = new Vector3(_tileSize * 0.8f, 16f, _tileSize * 0.8f) };
-
-    // Brick and crate darken as they lose hit points, so damage reads before they break into floor.
-    private static Color WallColour(WallCell cell) => cell.Material switch
+    // Union of the model's MeshInstance3D bounding boxes, in the model's own space (it sits at the origin
+    // while measured, so each instance's global transform is its transform relative to the model).
+    private static Aabb MeasureAabb(Node3D model)
     {
-        CellMaterial.Brick => Damaged(new Color(0.80f, 0.38f, 0.26f), cell.Hp, GameLogic.WallGrid.DefaultBrickHp),
-        CellMaterial.Crate => Damaged(new Color(0.62f, 0.45f, 0.25f), cell.Hp, GameLogic.WallGrid.DefaultCrateHp),
-        CellMaterial.Steel => new Color(0.55f, 0.57f, 0.60f),
-        CellMaterial.Mountain => new Color(0.42f, 0.44f, 0.42f),
-        CellMaterial.Building => new Color(0.74f, 0.74f, 0.72f),
-        _ => new Color(0.5f, 0.5f, 0.5f),
-    };
+        Aabb? box = null;
+        foreach (var mi in MeshInstances(model))
+        {
+            var local = TransformAabb(mi.GlobalTransform, mi.GetAabb());
+            box = box is null ? local : box.Value.Merge(local);
+        }
 
-    private static Color Damaged(Color full, int hp, int maxHp)
+        return box ?? new Aabb(Vector3.Zero, Vector3.One);
+    }
+
+    private static Aabb TransformAabb(Transform3D t, Aabb a)
     {
-        var t = maxHp > 0 ? Mathf.Clamp(hp / (float)maxHp, 0.35f, 1f) : 1f;
-        return new Color(full.R * t, full.G * t, full.B * t);
+        var result = new Aabb(t * a.Position, Vector3.Zero);
+        for (var i = 1; i < 8; i++)
+        {
+            result = result.Expand(t * a.GetEndpoint(i));
+        }
+
+        return result;
+    }
+
+    private static IEnumerable<MeshInstance3D> MeshInstances(Node node)
+    {
+        if (node is MeshInstance3D mi && mi.Mesh is not null)
+        {
+            yield return mi;
+        }
+
+        foreach (var child in node.GetChildren())
+        {
+            foreach (var found in MeshInstances(child))
+            {
+                yield return found;
+            }
+        }
     }
 
     private NVector2 CellCentre(int x, int y) => new((x + 0.5f) * _tileSize, (y + 0.5f) * _tileSize);
