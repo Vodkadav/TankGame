@@ -17,6 +17,8 @@ public partial class Powerup3DView : Node3D
 
     private IPowerup? _powerup;
     private Node3D _emblem = null!;
+    private bool _bob;     // text emblems bob instead of spinning
+    private float _bobTime;
 
     public void Bind(IPowerup powerup) => _powerup = powerup;
 
@@ -31,14 +33,41 @@ public partial class Powerup3DView : Node3D
 
         _emblem = new Node3D { Name = "Emblem", Position = new Vector3(0f, HoverHeight, 0f) };
         AddChild(_emblem);
-        var model = GD.Load<PackedScene>(EmblemPath(_powerup.Kind)).Instantiate<Node3D>();
-        _emblem.AddChild(model);
-        ModelFit.Apply(model, EmblemSpan, seatOnGround: false); // centred so it spins in place
-        ModelFit.Tint(model, EmblemColour(_powerup.Kind)); // the bare kit .glb are untextured (white)
+        BuildEmblem(_powerup.Kind);
 
         AddChild(GlowDisc(PowerupView.ColourFor(_powerup.Kind))); // coloured pad so it reads as a pickup
         AddChild(DebugLabel.Make(_powerup.Kind.ToString(), HoverHeight + 26f));
         UpdateFromModel();
+    }
+
+    private void BuildEmblem(PowerupKind kind)
+    {
+        switch (kind)
+        {
+            case PowerupKind.SpreadAmmo: // a bold "x3" tag that bobs to catch the eye, not a model
+                _bob = true;
+                _emblem.AddChild(new Label3D
+                {
+                    Text = "x3",
+                    Billboard = BaseMaterial3D.BillboardModeEnum.Enabled,
+                    NoDepthTest = true,
+                    FontSize = 130,
+                    PixelSize = 0.35f,
+                    OutlineSize = 48,
+                    OutlineModulate = Colors.Black,
+                    Modulate = new Color(1f, 0.85f, 0.3f),
+                });
+                return;
+            case PowerupKind.Missile: // a procedural rocket (no single-piece rocket asset exists)
+                _emblem.AddChild(Rocket.Build(new Color(0.9f, 0.35f, 0.2f), EmblemSpan));
+                return;
+            default:
+                var model = GD.Load<PackedScene>(EmblemPath(kind)).Instantiate<Node3D>();
+                _emblem.AddChild(model);
+                ModelFit.Apply(model, EmblemSpan, seatOnGround: false);
+                ModelFit.Tint(model, EmblemColour(kind)); // the bare kit .glb are untextured (white)
+                return;
+        }
     }
 
     public override void _Process(double delta)
@@ -48,7 +77,16 @@ public partial class Powerup3DView : Node3D
             return;
         }
 
-        _emblem.RotateY((float)delta * SpinSpeed);
+        if (_bob)
+        {
+            _bobTime += (float)delta;
+            _emblem.Position = new Vector3(0f, HoverHeight + (Mathf.Sin(_bobTime * 2.2f) * 6f), 0f);
+        }
+        else
+        {
+            _emblem.RotateY((float)delta * SpinSpeed);
+        }
+
         UpdateFromModel();
     }
 

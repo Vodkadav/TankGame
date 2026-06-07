@@ -46,7 +46,6 @@ public partial class Tank3DView : Node3D
         }
 
         BuildBars();
-        AddChild(DebugLabel.Make("Tank", 100f));
     }
 
     public void Bind(ITank tank) => _tank = tank;

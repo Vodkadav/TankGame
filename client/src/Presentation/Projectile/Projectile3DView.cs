@@ -19,7 +19,7 @@ public partial class Projectile3DView : Node3D
     public override void _Ready()
     {
         _missile = _projectile?.Style == ProjectileStyle.Missile;
-        AddChild(_missile ? MissileMesh() : BulletMesh());
+        AddChild(_missile ? Rocket.Build(new Color(0.85f, 0.85f, 0.88f), 34f) : BulletMesh());
         UpdateFromModel();
     }
 
@@ -45,15 +45,6 @@ public partial class Projectile3DView : Node3D
         Name = "Bullet",
         Mesh = new SphereMesh { Radius = 6f, Height = 12f },
         MaterialOverride = Glow(new Color(1f, 0.85f, 0.3f), new Color(1f, 0.7f, 0.2f)),
-    };
-
-    // A capsule lying along +Z (rotated from its default +Y), so the view's yaw aims it along travel.
-    private static MeshInstance3D MissileMesh() => new()
-    {
-        Name = "Missile",
-        Mesh = new CapsuleMesh { Radius = 5f, Height = 30f },
-        RotationDegrees = new Vector3(90f, 0f, 0f),
-        MaterialOverride = Glow(new Color(0.95f, 0.35f, 0.18f), new Color(1f, 0.45f, 0.15f)),
     };
 
     private static StandardMaterial3D Glow(Color albedo, Color emission) => new()
