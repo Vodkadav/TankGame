@@ -187,7 +187,8 @@ public partial class Arena3DScene : Node3D
                 BackgroundColor = new Color(0.45f, 0.62f, 0.78f), // sky
                 AmbientLightSource = Godot.Environment.AmbientSource.Color,
                 AmbientLightColor = new Color(0.7f, 0.72f, 0.78f),
-                AmbientLightEnergy = 1.1f,
+                AmbientLightEnergy = 0.9f,
+                TonemapMode = Godot.Environment.ToneMapper.Aces, // compress highlights so light colours don't blow out to white
             },
         });
     }
@@ -196,6 +197,14 @@ public partial class Arena3DScene : Node3D
     {
         var w = widthCells * TileSize;
         var h = heightCells * TileSize;
+
+        // A noise-mottled sand so the ground reads dusty rather than a flat shiny slab.
+        var noise = new FastNoiseLite { NoiseType = FastNoiseLite.NoiseTypeEnum.SimplexSmooth, Frequency = 0.04f };
+        var ramp = new Gradient();
+        ramp.SetColor(0, new Color(0.58f, 0.47f, 0.29f)); // dusty dirt
+        ramp.SetColor(1, new Color(0.78f, 0.66f, 0.44f)); // lighter sand
+        var sand = new NoiseTexture2D { Noise = noise, Width = 256, Height = 256, Seamless = true, ColorRamp = ramp };
+
         var ground = new MeshInstance3D
         {
             Name = "Ground",
@@ -203,12 +212,40 @@ public partial class Arena3DScene : Node3D
             Position = new Vector3(w / 2f, 0f, h / 2f),
             MaterialOverride = new StandardMaterial3D
             {
-                AlbedoColor = new Color(0.74f, 0.62f, 0.40f), // sand, a touch richer
+                AlbedoTexture = sand,
+                Uv1Scale = new Vector3(widthCells / 4f, heightCells / 4f, 1f), // tile every ~4 cells
                 Roughness = 1f,
-                SpecularMode = BaseMaterial3D.SpecularModeEnum.Disabled, // kill the shine
+                SpecularMode = BaseMaterial3D.SpecularModeEnum.Disabled,
             },
         };
         AddChild(ground);
+
+        ScatterDirt(w, h);
+    }
+
+    // A sprinkle of darker dirt patches across the field for extra texture. Deterministic positions.
+    private void ScatterDirt(float w, float h)
+    {
+        var patch = new CylinderMesh { TopRadius = 26f, BottomRadius = 26f, Height = 0.5f };
+        var material = new StandardMaterial3D
+        {
+            AlbedoColor = new Color(0.46f, 0.37f, 0.24f, 0.6f),
+            Transparency = BaseMaterial3D.TransparencyEnum.Alpha,
+            Roughness = 1f,
+            SpecularMode = BaseMaterial3D.SpecularModeEnum.Disabled,
+        };
+        for (var i = 1; i <= 32; i++)
+        {
+            var px = ((i * 2654435761u) % (uint)Mathf.Max(1f, w));
+            var pz = ((i * 40503u * 7919u) % (uint)Mathf.Max(1f, h));
+            AddChild(new MeshInstance3D
+            {
+                Name = $"Dirt_{i}",
+                Mesh = patch,
+                Position = new Vector3(px, 0.6f, pz),
+                MaterialOverride = material,
+            });
+        }
     }
 
     private void SpawnTanks()
