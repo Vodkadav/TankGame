@@ -108,14 +108,8 @@ public partial class Terrain3DView : Node3D
         AddChild(holder);
 
         var model = Model(material).Instantiate<Node3D>();
-        holder.AddChild(model); // add first so global transforms are valid for the AABB measure
-
-        var box = MeasureAabb(model);
-        var span = Mathf.Max(box.Size.X, box.Size.Z);
-        var scale = span > 0.0001f ? (_tileSize * footprint) / span : 1f;
-        model.Scale = new Vector3(scale, scale, scale);
-        // Re-centre on the cell and seat the model's base on the ground after scaling.
-        model.Position = new Vector3(-box.GetCenter().X * scale, -box.Position.Y * scale, -box.GetCenter().Z * scale);
+        holder.AddChild(model); // add first so global transforms are valid for the fit measure
+        ModelFit.Apply(model, _tileSize * footprint, seatOnGround: true);
         return holder;
     }
 
@@ -156,11 +150,7 @@ public partial class Terrain3DView : Node3D
                 AddChild(holder);
                 var model = scene.Instantiate<Node3D>();
                 holder.AddChild(model);
-                var box = MeasureAabb(model);
-                var span = Mathf.Max(box.Size.X, box.Size.Z);
-                var scale = span > 0.0001f ? (_tileSize * BushFootprint) / span : 1f;
-                model.Scale = new Vector3(scale, scale, scale);
-                model.Position = new Vector3(-box.GetCenter().X * scale, -box.Position.Y * scale, -box.GetCenter().Z * scale);
+                ModelFit.Apply(model, _tileSize * BushFootprint, seatOnGround: true);
             }
         }
     }
@@ -185,47 +175,6 @@ public partial class Terrain3DView : Node3D
                     Position = new Vector3(centre.X, 8f, centre.Y),
                     MaterialOverride = new StandardMaterial3D { AlbedoColor = new Color(0.72f, 0.64f, 0.42f), Roughness = 1f },
                 });
-            }
-        }
-    }
-
-    // Union of the model's MeshInstance3D bounding boxes, in the model's own space (it sits at the origin
-    // while measured, so each instance's global transform is its transform relative to the model).
-    private static Aabb MeasureAabb(Node3D model)
-    {
-        Aabb? box = null;
-        foreach (var mi in MeshInstances(model))
-        {
-            var local = TransformAabb(mi.GlobalTransform, mi.GetAabb());
-            box = box is null ? local : box.Value.Merge(local);
-        }
-
-        return box ?? new Aabb(Vector3.Zero, Vector3.One);
-    }
-
-    private static Aabb TransformAabb(Transform3D t, Aabb a)
-    {
-        var result = new Aabb(t * a.Position, Vector3.Zero);
-        for (var i = 1; i < 8; i++)
-        {
-            result = result.Expand(t * a.GetEndpoint(i));
-        }
-
-        return result;
-    }
-
-    private static IEnumerable<MeshInstance3D> MeshInstances(Node node)
-    {
-        if (node is MeshInstance3D mi && mi.Mesh is not null)
-        {
-            yield return mi;
-        }
-
-        foreach (var child in node.GetChildren())
-        {
-            foreach (var found in MeshInstances(child))
-            {
-                yield return found;
             }
         }
     }
