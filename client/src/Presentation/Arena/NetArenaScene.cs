@@ -150,6 +150,7 @@ public partial class NetArenaScene : Node2D
                 tank.TurretRotation = state.TurretRotation;
                 tank.Hp = state.Hp;
                 tank.Team = state.Team;
+                _views[state.Slot].ApplyTeamTint(tank.Team);
                 if (firstSighting)
                 {
                     _status.SetStatus(NetStatusOverlay.Player2JoinedKey); // the opponent is here
@@ -176,6 +177,7 @@ public partial class NetArenaScene : Node2D
         tank.TurretRotation = _predicted.TurretRotation;
         tank.Hp = _predicted.Hp;
         tank.Team = _predicted.Team;
+        _views[slot].ApplyTeamTint(tank.Team);
     }
 
     private NetTank EnsureTank(byte slot)
@@ -191,7 +193,6 @@ public partial class NetArenaScene : Node2D
         var view = GD.Load<PackedScene>("res://src/Presentation/Tank/TankView.tscn").Instantiate<TankView>();
         view.Name = $"TankView{slot}";
         view.Bind(tank);
-        view.ApplyTeamTint(slot != _localSlot); // tint the opponent so the two read apart
         AddChild(view);
         _views[slot] = view;
         return tank;

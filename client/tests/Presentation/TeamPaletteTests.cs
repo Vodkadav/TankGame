@@ -9,22 +9,28 @@ public class TeamPaletteTests : TestClass
     public TeamPaletteTests(Node testScene) : base(testScene) { }
 
     [Test]
-    public void Friendly_IsUntinted()
+    public void EachOfTheFourTeams_HasADistinctColour()
     {
-        // A friendly tank renders the sprite as-authored (white multiply = no tint).
-        if (TeamPalette.TintFor(isEnemy: false) != Colors.White)
+        var colours = new[] { TeamPalette.TintFor(0), TeamPalette.TintFor(1), TeamPalette.TintFor(2), TeamPalette.TintFor(3) };
+        for (var i = 0; i < colours.Length; i++)
         {
-            throw new System.Exception("A friendly tank should be untinted (white Modulate).");
+            for (var j = i + 1; j < colours.Length; j++)
+            {
+                if (colours[i] == colours[j])
+                {
+                    throw new System.Exception($"Teams {i} and {j} must read apart; both were {colours[i]}.");
+                }
+            }
         }
     }
 
     [Test]
-    public void Enemy_IsTinted_AndDistinctFromFriendly()
+    public void TeamIndex_WrapsModuloTheFourColours()
     {
-        var enemy = TeamPalette.TintFor(isEnemy: true);
-        if (enemy == Colors.White || enemy == TeamPalette.TintFor(isEnemy: false))
+        // A fifth team reuses the first colour so any team index is renderable.
+        if (TeamPalette.TintFor(4) != TeamPalette.TintFor(0) || TeamPalette.TintFor(-1) != TeamPalette.TintFor(3))
         {
-            throw new System.Exception($"An enemy tank should carry a distinct tint; was {enemy}.");
+            throw new System.Exception("Team colours must wrap modulo the palette size.");
         }
     }
 }

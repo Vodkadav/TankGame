@@ -332,11 +332,11 @@ Catalogue and ordering: `docs/research/local-backlog.md`.
   whatever wall art is loaded — **source-agnostic, not blocked on the art pass**. Ships `Sandy` +
   `Slate` so the swap is real and tested. Deferred: a title-screen theme picker; biome/ground sprites
   (art pass).
-- **Art-pass prep — tank team tinting (seam)** ✅ `TeamPalette` (Presentation) is the single source of
-  the per-team `Sprite2D.Modulate` tint (friendly = white/as-authored, enemy = reddened), and
-  `TankView.ApplyTeamTint(isEnemy)` owns applying it. Both `ArenaScene` and `NetArenaScene` now call it
-  instead of each hardcoding the same red `Color`, so one neutral tank texture will read as either side
-  once the tintable art lands.
+- **Tank team tinting** ✅ `TeamPalette` (Presentation) is the single source of the per-team
+  `Sprite2D.Modulate` tint — up to four distinct team colours (team 0 player = green, then red, blue,
+  yellow; wraps modulo the palette), and `TankView.ApplyTeamTint(int team)` owns applying it. Both
+  `ArenaScene` and `NetArenaScene` tint by `tank.Team`, so the one near-white cartoon tank texture reads
+  as a vivid per-side colour.
 - **S9 — match modifiers** ✅ (`docs/adr/0015-match-modifiers.md`) the first S9 *gameplay* slice:
   "everyone starts with effect X". `MatchModifier` (GameLogic) carries a list of `StartingEffects`
   applied to every tank at spawn via `ApplyTo(Tank)`; reuses the ADR-0012 stats machinery, so no new

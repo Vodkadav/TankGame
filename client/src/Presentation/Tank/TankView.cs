@@ -75,11 +75,11 @@ public partial class TankView : Node2D
     private Color _teamTint = Colors.White;
     private bool _stealthed;
 
-    /// <summary>Tints the whole view to mark which side it is on (white = friendly, reddened =
-    /// enemy), so one neutral tank texture reads as either team.</summary>
-    public void ApplyTeamTint(bool isEnemy)
+    /// <summary>Tints the whole view to its team colour (green/red/blue/yellow for teams 0-3), so one
+    /// neutral tank texture reads as a vivid per-side colour.</summary>
+    public void ApplyTeamTint(int team)
     {
-        _teamTint = TeamPalette.TintFor(isEnemy);
+        _teamTint = TeamPalette.TintFor(team);
         ApplyTint();
     }
 

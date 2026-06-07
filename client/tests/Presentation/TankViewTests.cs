@@ -134,25 +134,25 @@ public class TankViewTests : TestClass
     }
 
     [Test]
-    public void ApplyTeamTint_TintsEnemies_AndLeavesAlliesUntinted()
+    public void ApplyTeamTint_PaintsEachTeamItsOwnColour()
     {
-        _view.ApplyTeamTint(isEnemy: true);
-        if (_view.Modulate != TeamPalette.TintFor(isEnemy: true))
+        _view.ApplyTeamTint(1);
+        if (_view.Modulate != TeamPalette.TintFor(1))
         {
-            throw new System.Exception($"An enemy view should carry the enemy tint; was {_view.Modulate}.");
+            throw new System.Exception($"A team-1 view should carry team 1's colour; was {_view.Modulate}.");
         }
 
-        _view.ApplyTeamTint(isEnemy: false);
-        if (_view.Modulate != Colors.White)
+        _view.ApplyTeamTint(0);
+        if (_view.Modulate != TeamPalette.TintFor(0))
         {
-            throw new System.Exception($"A friendly view should be untinted; was {_view.Modulate}.");
+            throw new System.Exception($"A team-0 view should carry team 0's colour; was {_view.Modulate}.");
         }
     }
 
     [Test]
     public void Stealthed_DarkensTheTank_OverItsTeamTint()
     {
-        _view.ApplyTeamTint(isEnemy: false);
+        _view.ApplyTeamTint(0);
         var lit = _view.Modulate;
 
         _view.Stealthed = true; // sitting in a bush
