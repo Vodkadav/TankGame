@@ -1,0 +1,6 @@
+[gd_scene load_steps=2 format=3 uid="uid://b0000000007"]
+
+[ext_resource type="Script" path="res://src/Presentation/Arena/Arena3DScene.cs" id="1_arena3d"]
+
+[node name="Arena3D" type="Node3D"]
+script = ExtResource("1_arena3d")
