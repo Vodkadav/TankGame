@@ -27,7 +27,6 @@ public partial class Arena3DScene : Node3D
     private const int EnemyTeam = 1;
     private const int EnemyCount = 3;
     private const int StartingLives = 3;
-    private const float WallHeight = 64f;
 
     // Orthographic ¾ camera. Eyeball-gated on playtest.
     private const float CamPitchDeg = 52f;
@@ -63,7 +62,11 @@ public partial class Arena3DScene : Node3D
 
         BuildEnvironment();
         BuildGround(level.Width, level.Height);
-        BuildWalls(grid);
+
+        var terrain = new Terrain3DView { Name = "Terrain3DView" };
+        AddChild(terrain);
+        terrain.Bind(grid, level.Bushes, _layout.Sandbags, TileSize);
+
         SpawnTanks();
     }
 
@@ -133,40 +136,6 @@ public partial class Arena3DScene : Node3D
         };
         AddChild(ground);
     }
-
-    private void BuildWalls(IWallGrid grid)
-    {
-        var box = new BoxMesh { Size = new Vector3(TileSize, WallHeight, TileSize) };
-        for (var x = 0; x < grid.Width; x++)
-        {
-            for (var y = 0; y < grid.Height; y++)
-            {
-                var material = grid.GetCell(x, y).Material;
-                if (material is CellMaterial.Floor or CellMaterial.Bridge or CellMaterial.Water)
-                {
-                    continue; // PR2 gives water/bridge their own meshes; floor is the ground plane
-                }
-
-                var centre = CellCentre(x, y);
-                AddChild(new MeshInstance3D
-                {
-                    Mesh = box,
-                    Position = new Vector3(centre.X, WallHeight / 2f, centre.Y),
-                    MaterialOverride = new StandardMaterial3D { AlbedoColor = WallColour(material), Roughness = 1f },
-                });
-            }
-        }
-    }
-
-    private static Color WallColour(CellMaterial material) => material switch
-    {
-        CellMaterial.Brick => new Color(0.78f, 0.36f, 0.24f),
-        CellMaterial.Crate => new Color(0.60f, 0.44f, 0.24f),
-        CellMaterial.Steel => new Color(0.55f, 0.57f, 0.60f),
-        CellMaterial.Mountain => new Color(0.40f, 0.42f, 0.40f),
-        CellMaterial.Building => new Color(0.72f, 0.72f, 0.70f),
-        _ => new Color(0.5f, 0.5f, 0.5f),
-    };
 
     private void SpawnTanks()
     {

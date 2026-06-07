@@ -28,6 +28,7 @@ public class Arena3DSceneTests : TestClass
         var tankViews = 0;
         Camera3D? camera = null;
         MeshInstance3D? ground = null;
+        Terrain3DView? terrain = null;
         foreach (var child in _arena.GetChildren())
         {
             switch (child)
@@ -37,6 +38,9 @@ public class Arena3DSceneTests : TestClass
                     break;
                 case Camera3D cam:
                     camera = cam;
+                    break;
+                case Terrain3DView t:
+                    terrain = t;
                     break;
                 case MeshInstance3D g when g.Name.ToString() == "Ground":
                     ground = g;
@@ -57,6 +61,12 @@ public class Arena3DSceneTests : TestClass
         if (ground is null)
         {
             throw new System.Exception("3D arena must lay a ground mesh.");
+        }
+
+        // The generated arena has a steel border, so the terrain view must hold wall meshes.
+        if (terrain is null || terrain.GetChildCount() == 0)
+        {
+            throw new System.Exception("3D arena must render terrain (walls) via a Terrain3DView.");
         }
     }
 }
