@@ -39,7 +39,6 @@ public partial class Terrain3DView : Node3D
         [CellMaterial.Mountain] = new Color(0.46f, 0.44f, 0.40f), // rock
     };
 
-    private static readonly Color BuildingColour = new(0.64f, 0.48f, 0.36f); // warm brick-brown (clearly not white)
 
     private readonly Dictionary<CellMaterial, PackedScene> _cache = new();
     private readonly Dictionary<(int X, int Y), Node3D> _destructibles = new();
@@ -294,7 +293,8 @@ public partial class Terrain3DView : Node3D
         var model = Model(CellMaterial.Building).Instantiate<Node3D>();
         holder.AddChild(model);
         ModelFit.ApplyBox(model, spanX * 0.98f, spanZ * 0.98f, seatOnGround: true);
-        ModelFit.Tint(model, BuildingColour);
+        // No tint — this model ships with its colormap texture embedded, so its walls/roof/windows/
+        // chimneys keep their own colours.
     }
 
     private NVector2 CellCentre(int x, int y) => new((x + 0.5f) * _tileSize, (y + 0.5f) * _tileSize);

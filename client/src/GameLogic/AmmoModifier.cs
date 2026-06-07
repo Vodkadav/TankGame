@@ -67,14 +67,15 @@ public sealed class PiercingAmmo : AmmoModifier
     }
 }
 
-/// <summary>A missile: a single shot with a huge pierce budget, so it plows through a whole line of
-/// tanks and destructible walls — damaging everything in its wake — and only stops at steel (or the
-/// map's steel border). Reuses the piercing behaviour with a big budget.</summary>
+/// <summary>A missile: a shot with a huge pierce budget that plows through a whole line of tanks and
+/// destructible walls — damaging everything in its wake — and only stops at steel (or the map's steel
+/// border). It is the behaviour axis (piercing) plus the missile style, and it STACKS with the spread
+/// axis: collecting spread as well fires a fan of missiles. Reuses the piercing behaviour.</summary>
 public sealed class MissileAmmo : AmmoModifier
 {
-    /// <summary>How many tanks/destructible cells the missile can punch through — effectively a whole
-    /// line across the field.</summary>
-    public const int Pierce = 50;
+    /// <summary>How many tanks/destructible cells the missile can punch through — far more than a field
+    /// is wide, so it never runs out before steel or the border.</summary>
+    public const int Pierce = 999;
 
     private readonly float _tileSize;
 
@@ -82,8 +83,7 @@ public sealed class MissileAmmo : AmmoModifier
 
     public override void ApplyTo(AmmoLoadout loadout)
     {
-        loadout.SpreadCount = 1; // a single lance, never fanned
-        loadout.SpreadRadians = 0f;
+        // Leaves the spread axis untouched, so spread + missile fires three missiles (the pickups stack).
         loadout.BehaviourFactory = () => new PiercingBehaviour(_tileSize);
         loadout.Pierce = Pierce;
         loadout.Style = ProjectileStyle.Missile;
