@@ -87,21 +87,26 @@ public partial class Tank3DView : Node3D
         UpdateBars();
     }
 
-    // Billboarded health (and over-shield) bars floating above the tank, always facing the camera.
+    // Billboarded health (and over-shield) bars floating above the tank, always facing the camera: a
+    // near-black border, a dark background, and a bright foreground whose width is the % of life left.
+    // NoDepthTest means draw order = add order, so each layer sits over the previous.
     private void BuildBars()
     {
-        AddChild(Bar("BarBacking", new Color(0.1f, 0.1f, 0.1f, 0.7f), HealthBarY, BarWidth));
-        _healthBar = Bar("HealthBar", new Color(0.2f, 0.8f, 0.2f), HealthBarY, BarWidth);
+        AddChild(Bar("BarBorder", new Color(0.02f, 0.02f, 0.03f, 0.9f), HealthBarY, BarWidth + 5f, BarHeight + 5f));
+        AddChild(Bar("BarBacking", new Color(0.16f, 0.16f, 0.19f, 0.95f), HealthBarY, BarWidth, BarHeight));
+        _healthBar = Bar("HealthBar", FullHealthColour, HealthBarY, BarWidth, BarHeight);
         AddChild(_healthBar);
-        _shieldBar = Bar("ShieldBar", new Color(0.3f, 0.9f, 0.95f), ShieldBarY, BarWidth);
+        _shieldBar = Bar("ShieldBar", new Color(0.55f, 0.92f, 0.98f), ShieldBarY, BarWidth, BarHeight);
         _shieldBar.Visible = false;
         AddChild(_shieldBar);
     }
 
-    private static MeshInstance3D Bar(string name, Color colour, float y, float width) => new()
+    private static readonly Color FullHealthColour = new(0.45f, 0.95f, 0.5f);
+
+    private static MeshInstance3D Bar(string name, Color colour, float y, float width, float height) => new()
     {
         Name = name,
-        Mesh = new QuadMesh { Size = new Vector2(width, BarHeight) },
+        Mesh = new QuadMesh { Size = new Vector2(width, height) },
         Position = new Vector3(0f, y, 0f),
         MaterialOverride = new StandardMaterial3D
         {
@@ -117,9 +122,9 @@ public partial class Tank3DView : Node3D
     {
         var hpRatio = _tank!.MaxHp > 0 ? Mathf.Clamp((float)_tank.Hp / _tank.MaxHp, 0f, 1f) : 0f;
         _healthBar.Scale = new Vector3(hpRatio, 1f, 1f);
-        ((StandardMaterial3D)_healthBar.MaterialOverride).AlbedoColor = hpRatio > 0.5f ? new Color(0.2f, 0.8f, 0.2f)
-            : hpRatio > 0.25f ? new Color(0.9f, 0.8f, 0.1f)
-            : new Color(0.9f, 0.2f, 0.2f);
+        ((StandardMaterial3D)_healthBar.MaterialOverride).AlbedoColor = hpRatio > 0.5f ? FullHealthColour
+            : hpRatio > 0.25f ? new Color(0.98f, 0.85f, 0.35f)
+            : new Color(0.98f, 0.42f, 0.42f);
 
         _shieldBar.Visible = _tank.Shield > 0;
         if (_shieldBar.Visible)
