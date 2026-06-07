@@ -201,7 +201,12 @@ public partial class Arena3DScene : Node3D
             Name = "Ground",
             Mesh = new PlaneMesh { Size = new Vector2(w, h) },
             Position = new Vector3(w / 2f, 0f, h / 2f),
-            MaterialOverride = new StandardMaterial3D { AlbedoColor = new Color(0.82f, 0.71f, 0.50f), Roughness = 1f },
+            MaterialOverride = new StandardMaterial3D
+            {
+                AlbedoColor = new Color(0.74f, 0.62f, 0.40f), // sand, a touch richer
+                Roughness = 1f,
+                SpecularMode = BaseMaterial3D.SpecularModeEnum.Disabled, // kill the shine
+            },
         };
         AddChild(ground);
     }
