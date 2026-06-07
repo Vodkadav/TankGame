@@ -14,7 +14,7 @@ namespace TankGame.Presentation;
 public partial class Terrain3DView : Node3D
 {
     private const float WallFootprint = 0.98f;     // walls fill the cell
-    private const float MountainFootprint = 1.2f;  // rocks spill a little past the cell
+    private const float MountainFootprint = 1.7f;  // rocks overlap their neighbours into one mass
     private const float BushFootprint = 0.85f;
     private const float BridgeFootprint = 1.0f;
     private const float WaterY = 1.5f;
@@ -31,13 +31,14 @@ public partial class Terrain3DView : Node3D
 
     // The bare Kenney .glb ship without their shared colormap texture, so these models render white — give
     // each a suitable flat colour. Bridge (Nature Kit) keeps its own look, so it is not listed here.
+    // Brick/steel are plain blocks tinted here; crate/mountain keep shape but get a colour; building keeps
+    // its own embedded texture (a real city model), so it is NOT tinted.
     private static readonly Dictionary<CellMaterial, Color> TintColours = new()
     {
-        [CellMaterial.Brick] = new Color(0.72f, 0.34f, 0.24f),
-        [CellMaterial.Crate] = new Color(0.60f, 0.43f, 0.24f),
-        [CellMaterial.Steel] = new Color(0.56f, 0.59f, 0.63f),
-        [CellMaterial.Building] = new Color(0.80f, 0.76f, 0.68f),
-        [CellMaterial.Mountain] = new Color(0.52f, 0.50f, 0.46f),
+        [CellMaterial.Brick] = new Color(0.74f, 0.33f, 0.22f),   // red brick block
+        [CellMaterial.Crate] = new Color(0.58f, 0.41f, 0.22f),   // wood
+        [CellMaterial.Steel] = new Color(0.38f, 0.42f, 0.50f),   // dark steel-blue (was washing out white)
+        [CellMaterial.Mountain] = new Color(0.46f, 0.44f, 0.40f), // rock
     };
 
     private readonly Dictionary<CellMaterial, PackedScene> _cache = new();
@@ -99,7 +100,10 @@ public partial class Terrain3DView : Node3D
                 Place(cell.Material, centre, BridgeFootprint, $"Bridge_{x}_{y}");
                 return;
             case CellMaterial.Mountain:
-                Place(cell.Material, centre, MountainFootprint, $"Mountain_{x}_{y}");
+                // Each mountain cell is one enlarged rock spun to a per-cell angle, so adjacent cells'
+                // rocks overlap and vary into one cohesive rocky mass instead of separate tidy lumps.
+                var rock = Place(cell.Material, centre, MountainFootprint, $"Mountain_{x}_{y}");
+                rock.RotateY(Mathf.DegToRad(((x * 71) + (y * 137)) % 360));
                 return;
             default:
                 var node = Place(cell.Material, centre, WallFootprint, $"Wall_{x}_{y}");
@@ -195,7 +199,12 @@ public partial class Terrain3DView : Node3D
                     Name = $"Sandbag_{x}_{y}",
                     Mesh = mesh,
                     Position = new Vector3(centre.X, 8f, centre.Y),
-                    MaterialOverride = new StandardMaterial3D { AlbedoColor = new Color(0.72f, 0.64f, 0.42f), Roughness = 1f },
+                    MaterialOverride = new StandardMaterial3D
+                    {
+                        AlbedoColor = new Color(0.40f, 0.44f, 0.30f), // olive-khaki, distinct from the sand
+                        Roughness = 1f,
+                        SpecularMode = BaseMaterial3D.SpecularModeEnum.Disabled,
+                    },
                 };
                 bag.AddChild(DebugLabel.Make("Sandbag", 40f));
                 AddChild(bag);
