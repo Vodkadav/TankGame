@@ -15,6 +15,8 @@ public class AirstrikeViewTests : TestClass
         public Guid Id { get; }
         public NVector2 Position { get; }
         public float Radius { get; }
+        public System.Collections.Generic.IReadOnlyList<AirstrikeZone> Zones { get; } =
+            System.Array.Empty<AirstrikeZone>();
         public bool IsAlive => true;
         public void Step(float deltaSeconds) { }
     }
