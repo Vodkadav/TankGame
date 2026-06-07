@@ -24,14 +24,17 @@ public static class ModelFit
         model.Position = new Vector3(-centre.X * scale, y, -centre.Z * scale);
     }
 
-    // Union of the model's MeshInstance3D bounding boxes in the model's own space (it sits at the origin
-    // while measured, so each instance's global transform is its transform relative to the model).
+    // Union of the model's MeshInstance3D bounding boxes in the MODEL's own local space — each mesh's
+    // global transform is taken relative to the model root, so the measurement is independent of where
+    // the model sits in the world (it may be parented at a cell's world position). The model must be in
+    // the tree for the transforms to be valid.
     private static Aabb Measure(Node3D model)
     {
+        var toModel = model.GlobalTransform.AffineInverse();
         Aabb? box = null;
         foreach (var mi in MeshInstances(model))
         {
-            var local = TransformAabb(mi.GlobalTransform, mi.GetAabb());
+            var local = TransformAabb(toModel * mi.GlobalTransform, mi.GetAabb());
             box = box is null ? local : box.Value.Merge(local);
         }
 

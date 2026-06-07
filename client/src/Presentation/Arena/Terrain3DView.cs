@@ -110,6 +110,7 @@ public partial class Terrain3DView : Node3D
         var model = Model(material).Instantiate<Node3D>();
         holder.AddChild(model); // add first so global transforms are valid for the fit measure
         ModelFit.Apply(model, _tileSize * footprint, seatOnGround: true);
+        holder.AddChild(DebugLabel.Make(material.ToString(), 75f));
         return holder;
     }
 
@@ -124,14 +125,18 @@ public partial class Terrain3DView : Node3D
         return scene;
     }
 
-    private void AddWater(NVector2 centre, string name) =>
-        AddChild(new MeshInstance3D
+    private void AddWater(NVector2 centre, string name)
+    {
+        var water = new MeshInstance3D
         {
             Name = name,
             Mesh = new PlaneMesh { Size = new Vector2(_tileSize, _tileSize) },
             Position = new Vector3(centre.X, WaterY, centre.Y),
             MaterialOverride = new StandardMaterial3D { AlbedoColor = new Color(0.20f, 0.42f, 0.66f), Roughness = 0.3f },
-        });
+        };
+        water.AddChild(DebugLabel.Make("Water", 30f));
+        AddChild(water);
+    }
 
     private void BuildBushes(bool[,] bushes)
     {
@@ -151,6 +156,7 @@ public partial class Terrain3DView : Node3D
                 var model = scene.Instantiate<Node3D>();
                 holder.AddChild(model);
                 ModelFit.Apply(model, _tileSize * BushFootprint, seatOnGround: true);
+                holder.AddChild(DebugLabel.Make("Bush", 55f));
             }
         }
     }
@@ -168,13 +174,15 @@ public partial class Terrain3DView : Node3D
                 }
 
                 var centre = CellCentre(x, y);
-                AddChild(new MeshInstance3D
+                var bag = new MeshInstance3D
                 {
                     Name = $"Sandbag_{x}_{y}",
                     Mesh = mesh,
                     Position = new Vector3(centre.X, 8f, centre.Y),
                     MaterialOverride = new StandardMaterial3D { AlbedoColor = new Color(0.72f, 0.64f, 0.42f), Roughness = 1f },
-                });
+                };
+                bag.AddChild(DebugLabel.Make("Sandbag", 40f));
+                AddChild(bag);
             }
         }
     }
