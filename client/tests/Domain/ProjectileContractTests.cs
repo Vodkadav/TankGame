@@ -29,6 +29,7 @@ public class ProjectileContractTests
         public int Team => 0;
         public Vector2 Position { get; private set; }
         public Vector2 Direction => _direction;
+        public ProjectileStyle Style => ProjectileStyle.Normal;
         public bool IsAlive { get; private set; }
 
         public void Step(float deltaSeconds)

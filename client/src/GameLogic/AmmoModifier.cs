@@ -1,3 +1,5 @@
+using TankGame.Domain;
+
 namespace TankGame.GameLogic;
 
 /// <summary>An ammo pickup's effect on a tank's <see cref="AmmoLoadout"/> — it sets ONE axis, leaving
@@ -40,6 +42,7 @@ public sealed class BouncingAmmo : AmmoModifier
     {
         loadout.BehaviourFactory = () => new BouncingBehaviour(_bounces);
         loadout.Pierce = 0;
+        loadout.Style = ProjectileStyle.Normal;
     }
 }
 
@@ -60,6 +63,7 @@ public sealed class PiercingAmmo : AmmoModifier
     {
         loadout.BehaviourFactory = () => new PiercingBehaviour(_tileSize);
         loadout.Pierce = _pierces;
+        loadout.Style = ProjectileStyle.Normal;
     }
 }
 
@@ -82,5 +86,6 @@ public sealed class MissileAmmo : AmmoModifier
         loadout.SpreadRadians = 0f;
         loadout.BehaviourFactory = () => new PiercingBehaviour(_tileSize);
         loadout.Pierce = Pierce;
+        loadout.Style = ProjectileStyle.Missile;
     }
 }

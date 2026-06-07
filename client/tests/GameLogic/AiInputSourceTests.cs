@@ -65,6 +65,7 @@ public class AiInputSourceTests
         public Vector2 Position { get; }
         public int Team { get; }
         public Vector2 Direction => Vector2.UnitX;
+        public ProjectileStyle Style => ProjectileStyle.Normal;
         public bool IsAlive => true;
         public void Step(float deltaSeconds) { }
     }

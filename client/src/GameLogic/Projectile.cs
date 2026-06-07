@@ -26,7 +26,8 @@ public sealed class Projectile : IProjectile
     /// <param name="pierce">How many targets the shot passes through before stopping; 0 (default)
     /// is an ordinary shot spent on its first hit.</param>
     public Projectile(IArena arena, Vector2 spawn, Vector2 direction, float speed, int damage = 1,
-        int team = 0, IProjectileBehaviour? behaviour = null, int pierce = 0, Guid owner = default)
+        int team = 0, IProjectileBehaviour? behaviour = null, int pierce = 0, Guid owner = default,
+        ProjectileStyle style = ProjectileStyle.Normal)
     {
         Id = Guid.NewGuid();
         _arena = arena;
@@ -39,6 +40,7 @@ public sealed class Projectile : IProjectile
             Team = team,
             Pierce = pierce,
             Owner = owner,
+            Style = style,
         };
         _behaviour = behaviour ?? StraightBehaviour.Instance;
     }
@@ -50,6 +52,7 @@ public sealed class Projectile : IProjectile
     public Guid Id { get; }
     public Vector2 Position => _state.Position;
     public Vector2 Direction => _state.Direction;
+    public ProjectileStyle Style => _state.Style;
     public bool IsAlive => _state.IsAlive;
 
     /// <summary>Damage this shot deals to a tank on impact.</summary>
