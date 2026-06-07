@@ -16,11 +16,18 @@ public partial class Tank3DView : Node3D
     private const float ModelYOffset = 0f;
     private const float HeadingOffsetDeg = 0f;
 
+    private const float BarWidth = 46f;
+    private const float BarHeight = 6f;
+    private const float HealthBarY = 84f;
+    private const float ShieldBarY = HealthBarY + BarHeight + 2f;
+
     private ITank? _tank;
     private Node3D _hull = null!;
     private Node3D _turret = null!;
     private StandardMaterial3D _bodyMaterial = null!;
     private int _team;
+    private MeshInstance3D _healthBar = null!;
+    private MeshInstance3D _shieldBar = null!;
 
     public override void _Ready()
     {
@@ -36,6 +43,8 @@ public partial class Tank3DView : Node3D
         {
             _bodyMaterial.AlbedoColor = TeamPalette.TintFor(_team); // apply any tint set before the tree entry
         }
+
+        BuildBars();
     }
 
     public void Bind(ITank tank) => _tank = tank;
@@ -73,6 +82,50 @@ public partial class Tank3DView : Node3D
         var turretYaw = offset - _tank.TurretRotation;
         _hull.Rotation = new Vector3(0f, hullYaw, 0f);
         _turret.Rotation = new Vector3(0f, turretYaw - hullYaw, 0f); // child of the hull → world yaw = turretYaw
+
+        UpdateBars();
+    }
+
+    // Billboarded health (and over-shield) bars floating above the tank, always facing the camera.
+    private void BuildBars()
+    {
+        AddChild(Bar("BarBacking", new Color(0.1f, 0.1f, 0.1f, 0.7f), HealthBarY, BarWidth));
+        _healthBar = Bar("HealthBar", new Color(0.2f, 0.8f, 0.2f), HealthBarY, BarWidth);
+        AddChild(_healthBar);
+        _shieldBar = Bar("ShieldBar", new Color(0.3f, 0.9f, 0.95f), ShieldBarY, BarWidth);
+        _shieldBar.Visible = false;
+        AddChild(_shieldBar);
+    }
+
+    private static MeshInstance3D Bar(string name, Color colour, float y, float width) => new()
+    {
+        Name = name,
+        Mesh = new QuadMesh { Size = new Vector2(width, BarHeight) },
+        Position = new Vector3(0f, y, 0f),
+        MaterialOverride = new StandardMaterial3D
+        {
+            AlbedoColor = colour,
+            ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded,
+            BillboardMode = BaseMaterial3D.BillboardModeEnum.Enabled,
+            Transparency = BaseMaterial3D.TransparencyEnum.Alpha,
+            NoDepthTest = true,
+        },
+    };
+
+    private void UpdateBars()
+    {
+        var hpRatio = _tank!.MaxHp > 0 ? Mathf.Clamp((float)_tank.Hp / _tank.MaxHp, 0f, 1f) : 0f;
+        _healthBar.Scale = new Vector3(hpRatio, 1f, 1f);
+        ((StandardMaterial3D)_healthBar.MaterialOverride).AlbedoColor = hpRatio > 0.5f ? new Color(0.2f, 0.8f, 0.2f)
+            : hpRatio > 0.25f ? new Color(0.9f, 0.8f, 0.1f)
+            : new Color(0.9f, 0.2f, 0.2f);
+
+        _shieldBar.Visible = _tank.Shield > 0;
+        if (_shieldBar.Visible)
+        {
+            var sRatio = _tank.MaxHp > 0 ? Mathf.Clamp((float)_tank.Shield / _tank.MaxHp, 0f, 1f) : 1f;
+            _shieldBar.Scale = new Vector3(sRatio, 1f, 1f);
+        }
     }
 
     private static Node3D? FindPart(Node node, string contains)
