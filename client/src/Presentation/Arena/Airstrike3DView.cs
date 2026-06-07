@@ -18,15 +18,27 @@ public partial class Airstrike3DView : Node3D
     {
         _material = new StandardMaterial3D
         {
-            AlbedoColor = new Color(0.95f, 0.2f, 0.15f, 0.4f),
+            AlbedoColor = new Color(0.95f, 0.2f, 0.15f, 0.45f),
             Transparency = BaseMaterial3D.TransparencyEnum.Alpha,
             ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded,
         };
+        var at = strike.Position;
+
+        // A flat blast ring on the ground...
         AddChild(new MeshInstance3D
         {
             Name = "BlastMarker",
             Mesh = new CylinderMesh { TopRadius = strike.Radius, BottomRadius = strike.Radius, Height = 1f },
-            Position = GroundProjection.ToWorld(strike.Position, DiscY),
+            Position = GroundProjection.ToWorld(at, DiscY),
+            MaterialOverride = _material,
+        });
+
+        // ...plus a tall translucent column so the incoming strike is unmistakable from any zoom.
+        AddChild(new MeshInstance3D
+        {
+            Name = "BlastColumn",
+            Mesh = new CylinderMesh { TopRadius = strike.Radius * 0.55f, BottomRadius = strike.Radius * 0.55f, Height = 320f },
+            Position = GroundProjection.ToWorld(at, 160f),
             MaterialOverride = _material,
         });
     }

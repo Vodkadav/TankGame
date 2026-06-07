@@ -16,7 +16,6 @@ public partial class Terrain3DView : Node3D
     private const float WallFootprint = 0.98f;     // walls fill the cell
     private const float MountainFootprint = 1.7f;  // rocks overlap their neighbours into one mass
     private const float BushFootprint = 0.85f;
-    private const float BridgeFootprint = 1.0f;
     private const float WaterY = 1.5f;
 
     private static readonly Dictionary<CellMaterial, string> ModelPaths = new()
@@ -26,7 +25,6 @@ public partial class Terrain3DView : Node3D
         [CellMaterial.Steel] = "res://src/Presentation/Arena/models/TerrainSteel.glb",
         [CellMaterial.Mountain] = "res://src/Presentation/Arena/models/TerrainMountain.glb",
         [CellMaterial.Building] = "res://src/Presentation/Arena/models/TerrainBuilding.glb",
-        [CellMaterial.Bridge] = "res://src/Presentation/Arena/models/TerrainBridge.glb",
     };
 
     // The bare Kenney .glb ship without their shared colormap texture, so these models render white — give
@@ -41,7 +39,7 @@ public partial class Terrain3DView : Node3D
         [CellMaterial.Mountain] = new Color(0.46f, 0.44f, 0.40f), // rock
     };
 
-    private static readonly Color BuildingColour = new(0.74f, 0.62f, 0.50f); // warm concrete
+    private static readonly Color BuildingColour = new(0.64f, 0.48f, 0.36f); // warm brick-brown (clearly not white)
 
     private readonly Dictionary<CellMaterial, PackedScene> _cache = new();
     private readonly Dictionary<(int X, int Y), Node3D> _destructibles = new();
@@ -101,7 +99,7 @@ public partial class Terrain3DView : Node3D
                 AddWater(centre, $"Water_{x}_{y}");
                 return;
             case CellMaterial.Bridge:
-                Place(cell.Material, centre, BridgeFootprint, $"Bridge_{x}_{y}");
+                AddRoad(centre, $"Bridge_{x}_{y}"); // a flat road tile, flush with the ground (no raised deck)
                 return;
             case CellMaterial.Mountain:
                 // Each mountain cell is one enlarged rock spun to a per-cell angle, so adjacent cells'
@@ -134,7 +132,6 @@ public partial class Terrain3DView : Node3D
             ModelFit.Tint(model, colour);
         }
 
-        holder.AddChild(DebugLabel.Make(material.ToString(), 75f));
         return holder;
     }
 
@@ -149,19 +146,32 @@ public partial class Terrain3DView : Node3D
         return scene;
     }
 
-    private void AddWater(NVector2 centre, string name)
-    {
-        var water = new MeshInstance3D
+    private void AddWater(NVector2 centre, string name) =>
+        AddChild(new MeshInstance3D
         {
             Name = name,
             Mesh = new PlaneMesh { Size = new Vector2(_tileSize, _tileSize) },
             Position = new Vector3(centre.X, WaterY, centre.Y),
             MaterialOverride = new StandardMaterial3D { AlbedoColor = new Color(0.20f, 0.42f, 0.66f), Roughness = 0.3f },
-        };
-        water.AddChild(DebugLabel.Make("Water", 30f));
-        AddChild(water);
-    }
+        });
 
+    // A flat road tile flush with the ground (the bridge crossing over water).
+    private void AddRoad(NVector2 centre, string name) =>
+        AddChild(new MeshInstance3D
+        {
+            Name = name,
+            Mesh = new PlaneMesh { Size = new Vector2(_tileSize, _tileSize) },
+            Position = new Vector3(centre.X, WaterY + 0.5f, centre.Y),
+            MaterialOverride = new StandardMaterial3D
+            {
+                AlbedoColor = new Color(0.34f, 0.32f, 0.30f), // asphalt
+                Roughness = 1f,
+                SpecularMode = BaseMaterial3D.SpecularModeEnum.Disabled,
+            },
+        });
+
+    // A bush cell is a dense clump: a 3×4 grid of grass tufts filling the cell, each at its own angle and
+    // stretched taller (~1.5 cells) so it reads as one big, tall, dense bush rather than a single sprig.
     private void BuildBushes(bool[,] bushes)
     {
         var scene = GD.Load<PackedScene>("res://src/Presentation/Arena/models/TerrainBush.glb");
@@ -175,12 +185,25 @@ public partial class Terrain3DView : Node3D
                 }
 
                 var centre = CellCentre(x, y);
-                var holder = new Node3D { Name = $"Bush_{x}_{y}", Position = new Vector3(centre.X, 0f, centre.Y) };
-                AddChild(holder);
-                var model = scene.Instantiate<Node3D>();
-                holder.AddChild(model);
-                ModelFit.Apply(model, _tileSize * BushFootprint, seatOnGround: true);
-                holder.AddChild(DebugLabel.Make("Bush", 55f));
+                for (var col = 0; col < 3; col++)
+                {
+                    for (var row = 0; row < 4; row++)
+                    {
+                        var ox = (col - 1) * (_tileSize * 0.30f);
+                        var oz = (row - 1.5f) * (_tileSize * 0.24f);
+                        var holder = new Node3D
+                        {
+                            Name = $"Bush_{x}_{y}_{col}_{row}",
+                            Position = new Vector3(centre.X + ox, 0f, centre.Y + oz),
+                        };
+                        AddChild(holder);
+                        var model = scene.Instantiate<Node3D>();
+                        holder.AddChild(model);
+                        ModelFit.Apply(model, _tileSize * 0.42f, seatOnGround: true);
+                        holder.Scale = new Vector3(1.05f, 1.9f, 1.05f); // taller than a block, ~1.5 cells
+                        holder.RotateY(Mathf.DegToRad(((col * 53) + (row * 97) + (x * 29) + (y * 41)) % 360));
+                    }
+                }
             }
         }
     }
@@ -209,7 +232,6 @@ public partial class Terrain3DView : Node3D
                 AddChild(holder);
                 holder.AddChild(Blob(slick, 22f, new Vector3(-7f, 0f, -4f)));  // larger lobe
                 holder.AddChild(Blob(slick, 15f, new Vector3(13f, 0f, 7f)));   // smaller lobe → a filled "8"
-                holder.AddChild(DebugLabel.Make("Oil", 30f));
             }
         }
     }
@@ -273,7 +295,6 @@ public partial class Terrain3DView : Node3D
         holder.AddChild(model);
         ModelFit.ApplyBox(model, spanX * 0.98f, spanZ * 0.98f, seatOnGround: true);
         ModelFit.Tint(model, BuildingColour);
-        holder.AddChild(DebugLabel.Make("Building", 90f));
     }
 
     private NVector2 CellCentre(int x, int y) => new((x + 0.5f) * _tileSize, (y + 0.5f) * _tileSize);
