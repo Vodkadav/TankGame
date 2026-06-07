@@ -31,8 +31,11 @@ public partial class Tank3DView : Node3D
 
         _hull = FindPart(model, "Base") ?? model;
         _turret = FindPart(model, "Turret") ?? _hull;
-        BuildMaterials(model);
-        _bodyMaterial.AlbedoColor = TeamPalette.TintFor(_team); // apply any tint set before the tree entry
+        BuildBodyMaterial(model);
+        if (_bodyMaterial is not null)
+        {
+            _bodyMaterial.AlbedoColor = TeamPalette.TintFor(_team); // apply any tint set before the tree entry
+        }
     }
 
     public void Bind(ITank tank) => _tank = tank;
@@ -90,51 +93,24 @@ public partial class Tank3DView : Node3D
         return null;
     }
 
-    // Override every surface by its source colour, each carrying the shared black outline next-pass; the
-    // body ('Green' in the source) shares one recolourable material set per team.
-    private void BuildMaterials(Node model)
+    // Keep the model's own imported materials (the look the owner approved) and recolour ONLY the body
+    // ('Green' in the source) per team. The recolour uses a per-instance duplicate of the imported
+    // material, because GLB materials are shared between instances — without the copy, colouring one
+    // tank would recolour every tank. The tracks/cannon/lights keep their original materials.
+    private void BuildBodyMaterial(Node model)
     {
-        var black = Cartoon(new Color(0.05f, 0.05f, 0.07f));
-        var lights = Cartoon(new Color(0.98f, 0.82f, 0.20f));
-        var white = Cartoon(new Color(0.85f, 0.85f, 0.88f));
-        _bodyMaterial = Cartoon(TeamPalette.TintFor(0));
-        var outline = new StandardMaterial3D
-        {
-            AlbedoColor = new Color(0.06f, 0.05f, 0.08f),
-            ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded,
-            CullMode = BaseMaterial3D.CullModeEnum.Front,
-            Grow = true,
-            GrowAmount = 0.6f, // in model-local units; the model is scaled up ~32x
-        };
-        foreach (var mat in new[] { black, lights, white, _bodyMaterial })
-        {
-            mat.NextPass = outline;
-        }
-
         foreach (var mi in MeshInstances(model))
         {
             for (var s = 0; s < mi.Mesh.GetSurfaceCount(); s++)
             {
-                var srcName = mi.Mesh.SurfaceGetMaterial(s)?.ResourceName ?? string.Empty;
-                StandardMaterial3D chosen = srcName switch
+                if (mi.Mesh.SurfaceGetMaterial(s) is { ResourceName: "Green" } body)
                 {
-                    "Green" => _bodyMaterial,
-                    "Lights" => lights,
-                    "White" => white,
-                    _ => black,
-                };
-                mi.SetSurfaceOverrideMaterial(s, chosen);
+                    _bodyMaterial ??= body.Duplicate() as StandardMaterial3D ?? new StandardMaterial3D();
+                    mi.SetSurfaceOverrideMaterial(s, _bodyMaterial);
+                }
             }
         }
     }
-
-    private static StandardMaterial3D Cartoon(Color albedo) => new()
-    {
-        AlbedoColor = albedo,
-        Roughness = 1f,
-        Metallic = 0f,
-        SpecularMode = BaseMaterial3D.SpecularModeEnum.Disabled,
-    };
 
     private static System.Collections.Generic.IEnumerable<MeshInstance3D> MeshInstances(Node node)
     {
