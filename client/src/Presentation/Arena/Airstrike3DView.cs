@@ -15,6 +15,7 @@ public partial class Airstrike3DView : Node3D
     private MeshInstance3D[] _discs = null!;
     private StandardMaterial3D[] _mats = null!;
     private Label3D[] _counts = null!;
+    private bool[] _blown = null!;
     private float _time;
 
     public void Bind(IAirstrike strike) => _strike = strike;
@@ -25,6 +26,7 @@ public partial class Airstrike3DView : Node3D
         _discs = new MeshInstance3D[zones.Count];
         _mats = new StandardMaterial3D[zones.Count];
         _counts = new Label3D[zones.Count];
+        _blown = new bool[zones.Count];
         for (var i = 0; i < zones.Count; i++)
         {
             var z = zones[i];
@@ -84,6 +86,15 @@ public partial class Airstrike3DView : Node3D
                     _discs[i].Visible = true;
                     _mats[i].AlbedoColor = new Color(1f, 0.65f, 0.2f, 0.7f); // bright blast flash
                     _counts[i].Visible = false;
+                    if (!_blown[i])
+                    {
+                        _blown[i] = true;
+                        var boom = new Explosion3D();
+                        boom.Init(z.Radius);
+                        boom.Position = GroundProjection.ToWorld(z.Position, 4f);
+                        GetParent()?.AddChild(boom);
+                    }
+
                     break;
             }
         }
