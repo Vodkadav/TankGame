@@ -13,22 +13,30 @@ namespace TankGame.Infrastructure;
 /// <param name="fireOnClick">Whether left-click also fires (off in two-player, where it is Player 2's).</param>
 public sealed class KeyboardMouse3DInputSource(Camera3D camera, bool fireOnClick = true) : IInputSource
 {
-    // Rotates WASD into the world so the controls read relative to the angled camera. Eyeball-tunable.
-    private const float MoveYawDeg = 45f;
-
     public TankInput Read()
     {
-        var raw = KeyboardMouseInputSource.ReadMove(
-            up: Input.IsPhysicalKeyPressed(Key.W),
-            down: Input.IsPhysicalKeyPressed(Key.S),
-            left: Input.IsPhysicalKeyPressed(Key.A),
-            right: Input.IsPhysicalKeyPressed(Key.D));
-        var move = Rotate(raw, Mathf.DegToRad(MoveYawDeg));
+        // Camera-relative movement: W drives along the camera's forward-on-ground, D along its right, so
+        // the controls always read with the screen regardless of the camera yaw (no magic offset).
+        var basis = camera.GlobalTransform.Basis;
+        var forward = Flatten(-basis.Z);
+        var right = Flatten(basis.X);
+        var dir = Vector3.Zero;
+        if (Input.IsPhysicalKeyPressed(Key.W)) { dir += forward; }
+        if (Input.IsPhysicalKeyPressed(Key.S)) { dir -= forward; }
+        if (Input.IsPhysicalKeyPressed(Key.D)) { dir += right; }
+        if (Input.IsPhysicalKeyPressed(Key.A)) { dir -= right; }
+        var move = new NVector2(dir.X, dir.Z); // game (x,y) lives on the world (x,z) ground plane
 
         var fire = Input.IsPhysicalKeyPressed(Key.Space)
             || (fireOnClick && Input.IsMouseButtonPressed(MouseButton.Left));
 
         return new TankInput(move, ComputeAim(), fire);
+    }
+
+    private static Vector3 Flatten(Vector3 v)
+    {
+        v.Y = 0f;
+        return v.LengthSquared() > 1e-6f ? v.Normalized() : Vector3.Zero;
     }
 
     // The aim angle (game radians) toward the ground point under the cursor, relative to the ground point
@@ -60,11 +68,5 @@ public sealed class KeyboardMouse3DInputSource(Camera3D camera, bool fireOnClick
 
         var t = -origin.Y / normal.Y;
         return origin + (normal * t);
-    }
-
-    private static NVector2 Rotate(NVector2 v, float radians)
-    {
-        var (s, c) = (MathF.Sin(radians), MathF.Cos(radians));
-        return new NVector2((v.X * c) - (v.Y * s), (v.X * s) + (v.Y * c));
     }
 }
