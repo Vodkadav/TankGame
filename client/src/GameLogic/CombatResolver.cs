@@ -60,6 +60,11 @@ public sealed class CombatResolver : ICombatResolver
                     continue; // never hit the shooter; skip the downed and the already-pierced
                 }
 
+                if (tank.Layer != shot.Layer)
+                {
+                    continue; // elevated zones (ADR-0018): a shot only hits tanks on its own layer
+                }
+
                 if (tank.Team == shot.Team && tank.Team == _alliedTeam)
                 {
                     continue; // allies on the player team do not friendly-fire each other

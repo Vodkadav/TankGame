@@ -281,6 +281,21 @@ public class CombatResolverTests
     }
 
     [Fact]
+    public void AShot_OnlyHitsTanksOnItsOwnLayer()
+    {
+        var ground = TankAt(Vector2.Zero, team: 0); // layer 0 (default)
+        var raised = new Tank(new NoInput(), new World(), new OpenArena(), Vector2.Zero,
+            speed: 100f, fireInterval: 0.3f, projectileSpeed: 600f, maxHp: 3, team: 0, layer: 1);
+        var groundShot = ShotAt(Vector2.Zero, team: 1); // a layer-0 shot, overlapping both tanks
+
+        new CombatResolver(HitRadius).Resolve(new List<IEntity> { ground, raised, groundShot });
+
+        Assert.Equal(ground.MaxHp - 1, ground.Hp); // the tank on the shot's layer is hit
+        Assert.Equal(raised.MaxHp, raised.Hp);      // the tank a layer up is untouched
+        Assert.False(groundShot.IsAlive);           // spent on the same-layer tank
+    }
+
+    [Fact]
     public void ADownedTank_AwaitingRespawn_IsIntangibleToShots()
     {
         var tank = TankAt(Vector2.Zero, team: 0, lives: 2);
