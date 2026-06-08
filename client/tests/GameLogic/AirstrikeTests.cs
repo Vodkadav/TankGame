@@ -24,17 +24,18 @@ public class AirstrikeTests
         new(new NoInput(), world, new OpenArena(), pos, speed: 100f, fireInterval: 0.3f,
             projectileSpeed: 600f, maxHp: 3, team: team);
 
-    // One zone: it detonates at (count·step) + 0·step = 1·0.5 = 0.5s.
+    // One zone: it arms immediately (arm time 0) and detonates after the delay (0.5s).
     [Fact]
     public void Airstrike_DetonatesAZone_DamagingEnemiesInItsBlast()
     {
         var world = new World();
         var enemy = TankAt(world, new Vector2(40f, 0f), team: 0);
         world.Spawn(enemy);
-        var strike = new Airstrike(world, new[] { new Vector2(40f, 0f) }, callerTeam: 1, zoneRadius: 100f, step: 0.5f, damage: 2);
+        var strike = new Airstrike(world, new[] { new Vector2(40f, 0f) }, callerTeam: 1, zoneRadius: 100f,
+            armWindow: 0.5f, delay: 0.5f, damage: 2);
         world.Spawn(strike);
 
-        world.Step(0.3f); // still arming
+        world.Step(0.3f); // still in the highlight delay
         Assert.Equal(enemy.MaxHp, enemy.Hp);
         Assert.Contains(strike, world.Entities);
 
@@ -49,7 +50,8 @@ public class AirstrikeTests
         var world = new World();
         var ally = TankAt(world, Vector2.Zero, team: 1);
         world.Spawn(ally);
-        world.Spawn(new Airstrike(world, new[] { Vector2.Zero }, callerTeam: 1, zoneRadius: 100f, step: 0.1f, damage: 2));
+        world.Spawn(new Airstrike(world, new[] { Vector2.Zero }, callerTeam: 1, zoneRadius: 100f,
+            armWindow: 0.1f, delay: 0.1f, damage: 2));
 
         world.Step(0.3f);
 
@@ -62,14 +64,16 @@ public class AirstrikeTests
         var world = new World();
         var enemy = TankAt(world, new Vector2(500f, 0f), team: 0);
         world.Spawn(enemy);
-        world.Spawn(new Airstrike(world, new[] { Vector2.Zero }, callerTeam: 1, zoneRadius: 100f, step: 0.1f, damage: 2));
+        world.Spawn(new Airstrike(world, new[] { Vector2.Zero }, callerTeam: 1, zoneRadius: 100f,
+            armWindow: 0.1f, delay: 0.1f, damage: 2));
 
         world.Step(0.3f);
 
         Assert.Equal(enemy.MaxHp, enemy.Hp);
     }
 
-    // Two zones detonate in order: zone0 at 2·0.5=1.0s, zone1 at 1.0+0.5=1.5s.
+    // Two zones over a 0.5s arm window with a 0.5s delay: zone0 lights at 0 → booms at 0.5;
+    // zone1 lights at 0.5 (the last of two) → booms at 1.0. The blasts sweep in the same order.
     [Fact]
     public void Airstrike_DetonatesZonesInOrder_Staggered()
     {
@@ -79,24 +83,25 @@ public class AirstrikeTests
         world.Spawn(first);
         world.Spawn(second);
         var zones = new[] { Vector2.Zero, new Vector2(1000f, 0f) };
-        world.Spawn(new Airstrike(world, zones, callerTeam: 1, zoneRadius: 100f, step: 0.5f, damage: 2));
+        world.Spawn(new Airstrike(world, zones, callerTeam: 1, zoneRadius: 100f,
+            armWindow: 0.5f, delay: 0.5f, damage: 2));
 
-        world.Step(1.1f); // zone0 has gone (≥1.0), zone1 not yet (<1.5)
+        world.Step(0.6f); // zone0 has gone (≥0.5), zone1 not yet (<1.0)
         Assert.Equal(first.MaxHp - 2, first.Hp);
         Assert.Equal(second.MaxHp, second.Hp);
 
-        world.Step(0.5f); // zone1 detonates (1.6 ≥ 1.5)
+        world.Step(0.5f); // zone1 detonates (1.1 ≥ 1.0)
         Assert.Equal(second.MaxHp - 2, second.Hp);
     }
 
     [Fact]
-    public void Airstrike_ArmsZonesBeforeDetonating_ForTheTelegraph()
+    public void Airstrike_ArmsZonesInAnExpandingSweep_BeforeDetonating()
     {
         var world = new World();
         var strike = new Airstrike(world, new[] { Vector2.Zero, new Vector2(100f, 0f) },
-            callerTeam: 1, zoneRadius: 80f, step: 0.5f, damage: 1);
+            callerTeam: 1, zoneRadius: 80f, armWindow: 0.5f, delay: 0.5f, damage: 1);
 
-        var zones = strike.Zones; // before any step: zone0 armed (arm time 0), zone1 still pending (0.5)
+        var zones = strike.Zones; // before any step: zone0 lights at 0, zone1 lights later (0.5)
         Assert.Equal(AirstrikeZonePhase.Armed, zones[0].Phase);
         Assert.Equal(AirstrikeZonePhase.Pending, zones[1].Phase);
     }
@@ -110,7 +115,8 @@ public class AirstrikeTests
         world.Spawn(caller);
         world.Spawn(foe);
 
-        new AirstrikePickup(Vector2.Zero, new Vector2(640f, 640f), zoneRadius: 80f, step: 0.4f, damage: 3)
+        new AirstrikePickup(Vector2.Zero, new Vector2(640f, 640f), zoneRadius: 80f,
+            armWindow: 3f, delay: 3f, damage: 3)
             .ApplyTo(caller, world);
 
         var strike = Assert.Single(world.Entities.OfType<Airstrike>());
