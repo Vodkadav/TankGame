@@ -3,10 +3,10 @@ using TankGame.Domain;
 
 namespace TankGame.Presentation;
 
-/// <summary>Draws a carpet-bombing <see cref="IAirstrike"/> in 3D (ADR-0017): each zone shows a red
-/// ground disc once it arms, a big cartoon countdown (3·2·1) in its last seconds, and a bright flash when
-/// it detonates — all driven from the strike's live <see cref="IAirstrike.Zones"/>. A pure mirror; the
-/// scene frees it when the whole run has detonated.</summary>
+/// <summary>Draws a carpet-bombing <see cref="IAirstrike"/> in 3D (ADR-0017): each zone shows a pulsing
+/// red ground disc once it arms (the expanding telegraph), and a bright flash plus an explosion when it
+/// detonates — all driven from the strike's live <see cref="IAirstrike.Zones"/>. A pure mirror; the scene
+/// frees it when the whole run has detonated.</summary>
 public partial class Airstrike3DView : Node3D
 {
     private const float DiscY = 2f;
@@ -14,7 +14,6 @@ public partial class Airstrike3DView : Node3D
     private IAirstrike _strike = null!;
     private MeshInstance3D[] _discs = null!;
     private StandardMaterial3D[] _mats = null!;
-    private Label3D[] _counts = null!;
     private bool[] _blown = null!;
     private float _time;
 
@@ -25,7 +24,6 @@ public partial class Airstrike3DView : Node3D
         var zones = _strike.Zones;
         _discs = new MeshInstance3D[zones.Count];
         _mats = new StandardMaterial3D[zones.Count];
-        _counts = new Label3D[zones.Count];
         _blown = new bool[zones.Count];
         for (var i = 0; i < zones.Count; i++)
         {
@@ -44,20 +42,6 @@ public partial class Airstrike3DView : Node3D
                 Visible = false,
             };
             AddChild(_discs[i]);
-
-            _counts[i] = new Label3D
-            {
-                Billboard = BaseMaterial3D.BillboardModeEnum.Enabled,
-                NoDepthTest = true,
-                FontSize = 110,
-                PixelSize = 0.5f,
-                OutlineSize = 36,
-                OutlineModulate = Colors.Black,
-                Modulate = new Color(1f, 0.9f, 0.3f),
-                Position = GroundProjection.ToWorld(z.Position, 36f),
-                Visible = false,
-            };
-            AddChild(_counts[i]);
         }
     }
 
@@ -73,19 +57,14 @@ public partial class Airstrike3DView : Node3D
             {
                 case AirstrikeZonePhase.Pending:
                     _discs[i].Visible = false;
-                    _counts[i].Visible = false;
                     break;
                 case AirstrikeZonePhase.Armed:
                     _discs[i].Visible = true;
                     _mats[i].AlbedoColor = new Color(0.95f, 0.2f, 0.15f, pulse);
-                    var secs = Mathf.CeilToInt(z.Countdown);
-                    _counts[i].Visible = secs is >= 1 and <= 3;
-                    _counts[i].Text = secs.ToString();
                     break;
                 case AirstrikeZonePhase.Detonated:
                     _discs[i].Visible = true;
                     _mats[i].AlbedoColor = new Color(1f, 0.65f, 0.2f, 0.7f); // bright blast flash
-                    _counts[i].Visible = false;
                     if (!_blown[i])
                     {
                         _blown[i] = true;

@@ -66,25 +66,28 @@ public sealed class AmmoPickup : IPickupEffect
 public sealed class AirstrikePickup : IPickupEffect
 {
     /// <summary>Fraction of the field the carpet bomb blankets.</summary>
-    public const float CoverFraction = 0.4f;
+    public const float CoverFraction = 0.55f;
 
     private readonly Vector2 _min;
     private readonly Vector2 _max;
     private readonly float _zoneRadius;
-    private readonly float _step;
+    private readonly float _armWindow;
+    private readonly float _delay;
     private readonly int _damage;
 
     /// <param name="min">Field minimum corner (world units).</param>
     /// <param name="max">Field maximum corner.</param>
     /// <param name="zoneRadius">Blast radius of each zone.</param>
-    /// <param name="step">Seconds between each zone lighting up (and each detonation).</param>
+    /// <param name="armWindow">Seconds over which all zones light up (the expanding telegraph).</param>
+    /// <param name="delay">Seconds between a zone lighting up and that zone detonating.</param>
     /// <param name="damage">Damage each zone deals to a caught tank.</param>
-    public AirstrikePickup(Vector2 min, Vector2 max, float zoneRadius, float step, int damage)
+    public AirstrikePickup(Vector2 min, Vector2 max, float zoneRadius, float armWindow, float delay, int damage)
     {
         _min = min;
         _max = max;
         _zoneRadius = zoneRadius;
-        _step = step;
+        _armWindow = armWindow;
+        _delay = delay;
         _damage = damage;
     }
 
@@ -93,7 +96,7 @@ public sealed class AirstrikePickup : IPickupEffect
         var zones = BuildSwathe(NearestFoe(tank, world)?.Position ?? Centre());
         if (zones.Count > 0)
         {
-            world.Spawn(new Airstrike(world, zones, tank.Team, _zoneRadius, _step, _damage));
+            world.Spawn(new Airstrike(world, zones, tank.Team, _zoneRadius, _armWindow, _delay, _damage));
         }
     }
 

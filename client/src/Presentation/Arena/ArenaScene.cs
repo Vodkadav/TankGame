@@ -59,7 +59,8 @@ public partial class ArenaScene : Node2D
     // can scramble out. Tunable balance knobs.
     private const int PowerupCount = 9;
     private const float AirstrikeZoneRadius = 70f;
-    private const float AirstrikeStep = 0.09f; // 5x faster — a rapid sweep
+    private const float AirstrikeArmWindow = 3f; // all zones light up within 3s, expanding outward
+    private const float AirstrikeDelay = 3f;     // each zone detonates 3s after it lit
     private const int AirstrikeDamage = 3;
     private const float AirstrikeCooldown = 120f; // the airstrike station refills every 2 minutes
 
@@ -77,7 +78,7 @@ public partial class ArenaScene : Node2D
         (PowerupKind.Shield, new ShieldPickup(ShieldAmount)),
         (PowerupKind.PiercingAmmo, new AmmoPickup(new PiercingAmmo(pierces: 1, TileSize))),
         (PowerupKind.Missile, new AmmoPickup(new MissileAmmo(TileSize))),
-        (PowerupKind.Telephone, new AirstrikePickup(GridOrigin, fieldMax, AirstrikeZoneRadius, AirstrikeStep, AirstrikeDamage)),
+        (PowerupKind.Telephone, new AirstrikePickup(GridOrigin, fieldMax, AirstrikeZoneRadius, AirstrikeArmWindow, AirstrikeDelay, AirstrikeDamage)),
     };
 
     // Two-player frames the whole field; the zoom is computed per map so any size fits on screen.

@@ -7,17 +7,18 @@ using TankGame.Domain;
 namespace TankGame.GameLogic;
 
 /// <summary>A carpet-bombing airstrike (called in by a telephone pickup): an ordered run of blast zones
-/// that arm one after another — zone <c>i</c> lights up at <c>i·step</c> — and then detonate in the same
-/// order, the first detonating as the last is still lighting up (zone <c>i</c> booms at
-/// <c>(count·step) + i·step</c>). Each detonation damages every tank not on the caller's team within the
-/// zone radius, once. Pure C# — the Presentation layer draws the zones and the countdown.</summary>
+/// that light up (arm) in an expanding sweep spread across <c>armWindow</c> seconds — zone <c>i</c> lights
+/// at <c>armWindow · i/(count-1)</c> — and each then detonates <c>delay</c> seconds after it lit, so the
+/// blasts sweep outward in the same order the highlights did. Each detonation damages every tank not on
+/// the caller's team within the zone radius, once. Pure C# — the Presentation layer draws the zones.</summary>
 public sealed class Airstrike : IAirstrike
 {
     private readonly IWorld _world;
     private readonly int _callerTeam;
     private readonly int _damage;
     private readonly Vector2[] _centres;
-    private readonly float _step;
+    private readonly float _armWindow;
+    private readonly float _delay;
     private readonly bool[] _detonated;
     private float _elapsed;
 
@@ -25,9 +26,11 @@ public sealed class Airstrike : IAirstrike
     /// <param name="zones">Ordered zone centres (light-up and detonation order).</param>
     /// <param name="callerTeam">The calling tank's team — its side is spared.</param>
     /// <param name="zoneRadius">Blast radius of each zone.</param>
-    /// <param name="step">Seconds between each zone lighting up (and between each detonation).</param>
+    /// <param name="armWindow">Seconds over which all zones light up, from the first to the last.</param>
+    /// <param name="delay">Seconds between a zone lighting up and that zone detonating.</param>
     /// <param name="damage">Damage dealt to each tank caught in a zone's blast.</param>
-    public Airstrike(IWorld world, IReadOnlyList<Vector2> zones, int callerTeam, float zoneRadius, float step, int damage)
+    public Airstrike(IWorld world, IReadOnlyList<Vector2> zones, int callerTeam, float zoneRadius,
+        float armWindow, float delay, int damage)
     {
         Id = Guid.NewGuid();
         _world = world;
@@ -35,7 +38,8 @@ public sealed class Airstrike : IAirstrike
         _damage = damage;
         _centres = zones.ToArray();
         Radius = zoneRadius;
-        _step = step;
+        _armWindow = armWindow;
+        _delay = delay;
         _detonated = new bool[_centres.Length];
         IsAlive = _centres.Length > 0;
         Position = _centres.Length > 0 ? _centres[0] : Vector2.Zero;
@@ -46,8 +50,10 @@ public sealed class Airstrike : IAirstrike
     public float Radius { get; }
     public bool IsAlive { get; private set; }
 
-    private float ExplodeTime(int i) => (_centres.Length * _step) + (i * _step);
-    private float ArmTime(int i) => i * _step;
+    // Highlights are spread evenly across the arm window (a single zone lights immediately); each zone
+    // booms a fixed delay after it lit, so the explosions sweep in the same expanding order.
+    private float ArmTime(int i) => _centres.Length <= 1 ? 0f : _armWindow * i / (_centres.Length - 1);
+    private float ExplodeTime(int i) => ArmTime(i) + _delay;
 
     public void Step(float deltaSeconds)
     {

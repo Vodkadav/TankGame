@@ -33,7 +33,8 @@ public partial class Arena3DScene : Node3D
     private const int ShieldAmount = 3;
     private const int PowerupCount = 9;
     private const float AirstrikeZoneRadius = 70f;
-    private const float AirstrikeStep = 0.09f; // 5x faster than before — a rapid sweep
+    private const float AirstrikeArmWindow = 3f; // all zones light up within 3s, expanding outward
+    private const float AirstrikeDelay = 3f;     // each zone detonates 3s after it lit
     private const int AirstrikeDamage = 3;
     private const float AirstrikeCooldown = 120f; // the airstrike station refills every 2 minutes
 
@@ -52,7 +53,7 @@ public partial class Arena3DScene : Node3D
         (PowerupKind.Shield, new ShieldPickup(ShieldAmount)),
         (PowerupKind.PiercingAmmo, new AmmoPickup(new PiercingAmmo(pierces: 1, TileSize))),
         (PowerupKind.Missile, new AmmoPickup(new MissileAmmo(TileSize))),
-        (PowerupKind.Telephone, new AirstrikePickup(GridOrigin, fieldMax, AirstrikeZoneRadius, AirstrikeStep, AirstrikeDamage)),
+        (PowerupKind.Telephone, new AirstrikePickup(GridOrigin, fieldMax, AirstrikeZoneRadius, AirstrikeArmWindow, AirstrikeDelay, AirstrikeDamage)),
     };
 
     // Orthographic ¾ camera. Eyeball-gated on playtest.
@@ -175,6 +176,10 @@ public partial class Arena3DScene : Node3D
             Size = CamOrthoSize,
             Far = 12000f,
             Near = 1f,
+            // The scene steps and re-aims the camera from _Process, not _PhysicsProcess; opting it out of
+            // physics interpolation avoids Godot's "Interpolated Camera3D triggered from outside physics
+            // process" warning (the move is already smooth at frame rate).
+            PhysicsInterpolationMode = PhysicsInterpolationModeEnum.Off,
         };
         AddChild(_camera);
 
