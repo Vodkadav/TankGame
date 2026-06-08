@@ -53,7 +53,6 @@ public partial class ArenaScene : Node2D
     // chooses where each lands; this catalogue is just what to lay (kind + effect). Magnitudes,
     // shot counts, and the pickup radius are tunable balance knobs.
     private const float PickupRadius = 28f;
-    private const int AmmoShots = 5;
     private const int RepairAmount = 2;
     private const int ShieldAmount = 3;
     // Telephone airstrike: a wide blast on the caller's nearest foe after a short telegraph, so tanks
@@ -62,19 +61,22 @@ public partial class ArenaScene : Node2D
     private const float AirstrikeZoneRadius = 70f;
     private const float AirstrikeStep = 0.09f; // 5x faster — a rapid sweep
     private const int AirstrikeDamage = 3;
+    private const float AirstrikeCooldown = 120f; // the airstrike station refills every 2 minutes
 
     private (PowerupKind Kind, IPickupEffect Effect)[] _powerups = null!;
 
+    // Field pickups grant their effect for as long as the collector lives (unlimited use), shed on
+    // death — so the stat boosts are permanent (infinite duration), not the old 6-second timer.
     private (PowerupKind Kind, IPickupEffect Effect)[] PowerupCatalogue(NVector2 fieldMax) => new[]
     {
-        (PowerupKind.SpeedBoost, (IPickupEffect)new StatusEffectPickup(new StatusEffect(StatKind.Speed, Mult: 1.6f, AddFlat: 0f, Seconds: 6f))),
-        (PowerupKind.RapidFire, new StatusEffectPickup(new StatusEffect(StatKind.FireInterval, Mult: 0.5f, AddFlat: 0f, Seconds: 6f))),
-        (PowerupKind.BouncingAmmo, new AmmoPickup(new BouncingAmmo(bounces: 3), AmmoShots)),
-        (PowerupKind.SpreadAmmo, new AmmoPickup(new SpreadAmmo(count: 3, radians: 0.18f), AmmoShots)),
+        (PowerupKind.SpeedBoost, (IPickupEffect)new StatusEffectPickup(new StatusEffect(StatKind.Speed, Mult: 1.6f, AddFlat: 0f, Seconds: float.PositiveInfinity))),
+        (PowerupKind.RapidFire, new StatusEffectPickup(new StatusEffect(StatKind.FireInterval, Mult: 0.5f, AddFlat: 0f, Seconds: float.PositiveInfinity))),
+        (PowerupKind.BouncingAmmo, new AmmoPickup(new BouncingAmmo(bounces: 3))),
+        (PowerupKind.SpreadAmmo, new AmmoPickup(new SpreadAmmo(count: 3, radians: 0.18f))),
         (PowerupKind.Repair, new RepairPickup(RepairAmount)),
         (PowerupKind.Shield, new ShieldPickup(ShieldAmount)),
-        (PowerupKind.PiercingAmmo, new AmmoPickup(new PiercingAmmo(pierces: 1, TileSize), AmmoShots)),
-        (PowerupKind.Missile, new AmmoPickup(new MissileAmmo(TileSize), shots: 1)),
+        (PowerupKind.PiercingAmmo, new AmmoPickup(new PiercingAmmo(pierces: 1, TileSize))),
+        (PowerupKind.Missile, new AmmoPickup(new MissileAmmo(TileSize))),
         (PowerupKind.Telephone, new AirstrikePickup(GridOrigin, fieldMax, AirstrikeZoneRadius, AirstrikeStep, AirstrikeDamage)),
     };
 
@@ -186,7 +188,13 @@ public partial class ArenaScene : Node2D
         {
             var (kind, effect) = _powerups[i];
             var (x, y) = _layout.PickupCells[i];
-            _world.Spawn(new Powerup(_world, CellCentre(x, y), kind, effect, PickupRadius, dropOnCarrierDeath: true));
+
+            // Every pickup is carried until its holder dies and drops it where it fell — except the
+            // airstrike, a fixed station that stays at its spot and refills on a 2-minute cooldown.
+            var powerup = kind == PowerupKind.Telephone
+                ? new Powerup(_world, CellCentre(x, y), kind, effect, PickupRadius, respawnCooldown: AirstrikeCooldown)
+                : new Powerup(_world, CellCentre(x, y), kind, effect, PickupRadius, dropOnCarrierDeath: true);
+            _world.Spawn(powerup);
         }
     }
 

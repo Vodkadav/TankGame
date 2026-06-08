@@ -204,17 +204,35 @@ public class TankTests
     }
 
     [Fact]
-    public void LoadAmmo_MakesTheNextShotsUseTheSpecialAmmo_ThenRevertsToDefault()
+    public void LoadAmmo_KeepsFiringTheSpecialShot_ForEveryShotWhileTheTankLives()
     {
         var world = new World();
         var tank = NewTank(new ScriptedInput(new TankInput(Vector2.Zero, Aim: 0f, Fire: true)), world);
-        tank.LoadAmmo(new SpreadAmmo(count: 3, radians: 0.2f), shots: 1);
+        tank.LoadAmmo(new SpreadAmmo(count: 3, radians: 0.2f));
 
-        tank.Step(0.05f); // fires the spread → 3 pellets
-        Assert.Equal(3, world.Entities.OfType<Projectile>().Count());
+        tank.Step(0.05f); // 3
+        tank.Step(0.4f);  // +3 — no shot limit, still the spread
+        tank.Step(0.4f);  // +3
 
-        tank.Step(0.4f); // special ammo spent → back to the default single shot
-        Assert.Equal(4, world.Entities.OfType<Projectile>().Count());
+        Assert.Equal(9, world.Entities.OfType<Projectile>().Count()); // never reverts while alive
+    }
+
+    [Fact]
+    public void Death_ShedsHeldAmmoAndBuffs_SoTheRespawnedTankIsBareAgain()
+    {
+        var world = new World();
+        var tank = new Tank(
+            new ScriptedInput(new TankInput(Vector2.Zero, Aim: 0f, Fire: true)),
+            world, new OpenArena(), Vector2.Zero, Speed, FireInterval, ProjectileSpeed, maxHp: 1, lives: 2);
+        world.Spawn(tank);
+        tank.LoadAmmo(new SpreadAmmo(count: 3, radians: 0.2f)); // held special ammo
+
+        tank.TakeDamage(1);                 // killed; a life remains, so it will respawn
+        world.Step(Tank.RespawnDelay + 0.1f); // revive at full health (no fire on the revive step)
+
+        var before = world.Entities.OfType<Projectile>().Count();
+        world.Step(0.05f);                  // first shot after respawn
+        Assert.Equal(1, world.Entities.OfType<Projectile>().Count() - before); // the plain shot, not a spread
     }
 
     [Fact]
@@ -222,8 +240,8 @@ public class TankTests
     {
         var world = new World();
         var tank = NewTank(new ScriptedInput(new TankInput(Vector2.Zero, Aim: 0f, Fire: true)), world);
-        tank.LoadAmmo(new BouncingAmmo(bounces: 3), shots: 5);
-        tank.LoadAmmo(new SpreadAmmo(count: 3, radians: 0.18f), shots: 5); // stacks onto the bouncing
+        tank.LoadAmmo(new BouncingAmmo(bounces: 3));
+        tank.LoadAmmo(new SpreadAmmo(count: 3, radians: 0.18f)); // stacks onto the bouncing
 
         tank.Step(0.05f);
 

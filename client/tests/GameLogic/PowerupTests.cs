@@ -143,7 +143,7 @@ public class PowerupTests
         var world = new World();
         var tank = TankAt(world, Vector2.Zero, new HoldFire());
         var crate = new Powerup(world, Vector2.Zero, PowerupKind.SpreadAmmo,
-            new AmmoPickup(new SpreadAmmo(count: 3, radians: 0.2f), shots: 1), PickupRadius);
+            new AmmoPickup(new SpreadAmmo(count: 3, radians: 0.2f)), PickupRadius);
         world.Spawn(tank);
         world.Spawn(crate);
 
@@ -221,6 +221,29 @@ public class PowerupTests
         world.Step(0.016f); // the new tank collects the dropped pickup
 
         Assert.Equal(2, taker.Shield);
+    }
+
+    [Fact]
+    public void AStationPickup_GoesDormantOnCollection_ThenRefillsAtTheSameSpotAfterItsCooldown()
+    {
+        var world = new World();
+        var spot = new Vector2(0f, 0f);
+        var tank = TankAt(world, spot, new NoInput());
+        var station = new Powerup(world, spot, PowerupKind.Telephone,
+            new ShieldPickup(1), PickupRadius, respawnCooldown: 2f);
+        world.Spawn(tank);
+        world.Spawn(station);
+
+        world.Step(0.016f); // collected → dormant, but stays on the field at its fixed spot
+        Assert.Contains(station, world.Entities);
+        Assert.False(station.IsAvailable);
+
+        world.Step(1.0f);
+        Assert.False(station.IsAvailable); // still cooling down
+
+        world.Step(1.1f);                  // cooldown elapsed
+        Assert.True(station.IsAvailable);  // collectable again…
+        Assert.Equal(spot, station.Position); // …right where it started, not carried off
     }
 
     private static float TravelWithPowerup(bool withPowerup)

@@ -58,6 +58,9 @@ public sealed class Stats
     /// <summary>Adds an effect, live for its <see cref="StatusEffect.Seconds"/>.</summary>
     public void Apply(StatusEffect effect) => _active.Add(new ActiveEffect(effect, effect.Seconds));
 
+    /// <summary>Drops every active effect at once — a tank sheds all its pickup buffs when it dies.</summary>
+    public void Clear() => _active.Clear();
+
     /// <summary>Ages every live effect by <paramref name="deltaSeconds"/> and removes any that
     /// have run out.</summary>
     public void Step(float deltaSeconds)
