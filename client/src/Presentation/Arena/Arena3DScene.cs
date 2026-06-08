@@ -104,6 +104,52 @@ public partial class Arena3DScene : Node3D
         SpawnPowerups();
         SpawnTanks();
         BuildPreviewHud();
+        BuildPauseMenu();
+    }
+
+    private CanvasLayer _pauseLayer = null!;
+    private bool _paused;
+
+    /// <summary>Whether the game is paused (the Escape menu is up). Exposed for tests.</summary>
+    public bool IsPaused => _paused;
+
+    // Escape opens a pause menu (single-player, so freezing the world is fair): the world stops stepping
+    // and an overlay offers Resume, Main Menu, or Exit. Public so a test can drive it.
+    public void TogglePause()
+    {
+        _paused = !_paused;
+        _pauseLayer.Visible = _paused;
+    }
+
+    private void BuildPauseMenu()
+    {
+        _pauseLayer = new CanvasLayer { Name = "PauseMenu", Visible = false };
+
+        var dim = new ColorRect { Name = "Dim", Color = new Color(0f, 0f, 0f, 0.55f) };
+        dim.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect);
+        _pauseLayer.AddChild(dim);
+
+        var menu = new VBoxContainer { Name = "PauseBox" };
+        menu.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.Center);
+        menu.GrowHorizontal = Control.GrowDirection.Both;
+        menu.GrowVertical = Control.GrowDirection.Both;
+        menu.AddThemeConstantOverride("separation", 12);
+        menu.AddChild(new Label { Text = "pause.heading", HorizontalAlignment = HorizontalAlignment.Center });
+
+        var resume = new Button { Name = "Resume", Text = "pause.resume" };
+        resume.Pressed += TogglePause;
+        menu.AddChild(resume);
+
+        var mainMenu = new Button { Name = "MainMenu", Text = "pause.main_menu" };
+        mainMenu.Pressed += () => GetTree().ChangeSceneToFile("res://src/Presentation/Title.tscn");
+        menu.AddChild(mainMenu);
+
+        var exit = new Button { Name = "ExitGame", Text = "pause.exit" };
+        exit.Pressed += () => GetTree().Quit();
+        menu.AddChild(exit);
+
+        _pauseLayer.AddChild(menu);
+        AddChild(_pauseLayer);
     }
 
     private bool _labelsShown = true;
@@ -122,6 +168,10 @@ public partial class Arena3DScene : Node3D
             {
                 _camera.Size = Mathf.Clamp(_camera.Size * ZoomStep, MinOrthoSize, MaxOrthoSize);
             }
+        }
+        else if (@event is InputEventKey { Pressed: true, Keycode: Key.Escape })
+        {
+            TogglePause();
         }
         else if (@event is InputEventKey { Pressed: true, Keycode: Key.L })
         {
@@ -151,6 +201,11 @@ public partial class Arena3DScene : Node3D
 
     public override void _Process(double delta)
     {
+        if (_paused)
+        {
+            return; // the Escape menu is up — freeze the match
+        }
+
         _world.Step((float)delta);
         if (_player.Hp > 0)
         {

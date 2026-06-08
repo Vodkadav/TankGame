@@ -16,6 +16,17 @@ public enum GameMode
     TwoPlayerVersus,
 }
 
+/// <summary>A selectable battle arena (the map pool). The current procedural arena is "Desert War";
+/// "Cliffs &amp; Valleys" is the upcoming multi-layer map (ADR-0018) and is not playable yet.</summary>
+public enum ArenaId
+{
+    /// <summary>The dusty procedural square arena — the game's first map.</summary>
+    DesertWar,
+
+    /// <summary>The elevated multi-layer map (ADR-0018); not yet built.</summary>
+    CliffsAndValleys,
+}
+
 /// <summary>Carries match-level state from the title screen into the play scene, which is loaded
 /// fresh each round (so it cannot be passed by constructor). The <see cref="Series"/> persists
 /// across the per-round scene reloads that drive a best-of-N match; <see cref="StartNewMatch"/>
@@ -26,6 +37,10 @@ public static class GameSetup
     public const int RoundsToWin = 2;
 
     public static GameMode Mode { get; set; } = GameMode.OnePlayer;
+
+    /// <summary>The chosen battle arena (the Select Map screen sets it). Only <see cref="ArenaId.DesertWar"/>
+    /// is playable today; it is the map the 3D play scene builds.</summary>
+    public static ArenaId Arena { get; set; } = ArenaId.DesertWar;
 
     /// <summary>The arena's visual palette (S8 theming): ground colour + wall tint. A title control
     /// can later set it; defaults to the sandy reference look.</summary>

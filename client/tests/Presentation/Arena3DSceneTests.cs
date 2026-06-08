@@ -71,6 +71,43 @@ public class Arena3DSceneTests : TestClass
     }
 
     [Test]
+    public void Arena3D_EscapeMenu_PausesAndFreezesTheMatch()
+    {
+        var scene = (Arena3DScene)_arena;
+        if (scene.IsPaused)
+        {
+            throw new System.Exception("The match should start unpaused.");
+        }
+
+        scene.TogglePause();
+        if (!scene.IsPaused)
+        {
+            throw new System.Exception("Opening the Escape menu should pause the match.");
+        }
+
+        var pauseLayer = _arena.FindChild("PauseMenu", recursive: true, owned: false) as CanvasLayer
+            ?? throw new System.Exception("3D arena must build a PauseMenu overlay.");
+        if (!pauseLayer.Visible)
+        {
+            throw new System.Exception("The pause overlay should be visible while paused.");
+        }
+
+        foreach (var name in new[] { "Resume", "MainMenu", "ExitGame" })
+        {
+            if (pauseLayer.FindChild(name, recursive: true, owned: false) is not Button)
+            {
+                throw new System.Exception($"The pause menu must offer a '{name}' button.");
+            }
+        }
+
+        scene.TogglePause();
+        if (scene.IsPaused || pauseLayer.Visible)
+        {
+            throw new System.Exception("Resuming should unpause and hide the overlay.");
+        }
+    }
+
+    [Test]
     public void Arena3D_SpawnsThePickups_AsPowerupViews()
     {
         var powerups = 0;
