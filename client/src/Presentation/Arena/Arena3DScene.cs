@@ -27,6 +27,7 @@ public partial class Arena3DScene : Node3D
     private const int EnemyTeam = 1;
     private const int EnemyCount = 3;
     private const int StartingLives = 3;
+    private const int TankMaxHp = 8; // beefier tanks so fights last longer (below 40% HP a tank limps + smokes)
 
     private const float PickupRadius = 28f;
     private const int RepairAmount = 2;
@@ -272,7 +273,7 @@ public partial class Arena3DScene : Node3D
     {
         var p1Input = new KeyboardMouse3DInputSource(_camera, fireOnClick: true);
         var player = new Tank(p1Input, _world, _arena, CellCentre(_layout.PlayerSpawn.X, _layout.PlayerSpawn.Y),
-            TankSpeed, FireInterval, ProjectileSpeed, maxHp: 3, team: PlayerTeam, lives: StartingLives, terrain: _sandbags);
+            TankSpeed, FireInterval, ProjectileSpeed, maxHp: TankMaxHp, team: PlayerTeam, lives: StartingLives, terrain: _sandbags);
         _player = player;
         SpawnTank(player);
 
@@ -282,7 +283,7 @@ public partial class Arena3DScene : Node3D
             var ambusher = enemyIndex % 2 == 1;
             var ai = new AiInputSource(_world, _arena, _bushes, ambusher);
             var enemy = new Tank(ai, _world, _arena, CellCentre(ex, ey),
-                EnemySpeed, FireInterval, ProjectileSpeed, maxHp: 3, team: EnemyTeam, lives: StartingLives, terrain: _sandbags);
+                EnemySpeed, FireInterval, ProjectileSpeed, maxHp: TankMaxHp, team: EnemyTeam, lives: StartingLives, terrain: _sandbags);
             ai.Bind(enemy);
             SpawnTank(enemy);
             enemyIndex++;

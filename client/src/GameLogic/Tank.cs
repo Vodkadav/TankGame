@@ -97,6 +97,11 @@ public sealed class Tank : ITank
     /// (only while it still has lives left).</summary>
     public const float RespawnDelay = 2f;
 
+    /// <summary>At or below this fraction of <see cref="MaxHp"/> a tank is badly wounded: it crawls
+    /// (its speed scales by <see cref="LowHealthSpeedFactor"/>) and the view trails dark smoke.</summary>
+    public const float LowHealthFraction = 0.4f;
+    private const float LowHealthSpeedFactor = 0.6f;
+
     public Guid Id { get; }
     public Vector2 Position { get; private set; }
     public float Rotation { get; private set; }
@@ -206,6 +211,11 @@ public sealed class Tank : ITank
 
         // Terrain underfoot scales the speed — sandbags slow a tank crossing them.
         var speed = _stats.Current(StatKind.Speed) * (_terrain?.SpeedFactorAt(Position) ?? 1f);
+        if (Hp <= LowHealthFraction * MaxHp)
+        {
+            speed *= LowHealthSpeedFactor; // a badly-wounded tank limps
+        }
+
         var desired = Position + (move * speed * deltaSeconds);
 
         // Resolve each axis independently so the tank slides along a wall instead of sticking.

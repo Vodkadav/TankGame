@@ -41,6 +41,7 @@ public partial class ArenaScene : Node2D
     // Total lives per tank: a fallen tank revives at its spawn after Tank.RespawnDelay until its
     // lives run out, then it stays dead. Tunable balance knob; uniform across modes for now.
     private const int StartingLives = 3;
+    private const int TankMaxHp = 8; // beefier tanks so fights last longer (below 40% HP a tank limps + smokes)
 
     private static readonly NVector2 GridOrigin = NVector2.Zero;
 
@@ -209,7 +210,7 @@ public partial class ArenaScene : Node2D
         // In two-player the left mouse button is Player 2's fire, so Player 1 fires with space.
         var p1Input = new KeyboardMouseInputSource(GetViewport(), fireOnClick: !twoPlayer);
         var player = new Tank(p1Input, _world, _arena, CellCentre(_layout.PlayerSpawn.X, _layout.PlayerSpawn.Y),
-            TankSpeed, FireInterval, ProjectileSpeed, maxHp: 3, team: PlayerTeam, lives: StartingLives, terrain: _sandbags);
+            TankSpeed, FireInterval, ProjectileSpeed, maxHp: TankMaxHp, team: PlayerTeam, lives: StartingLives, terrain: _sandbags);
         _player = player;
         SpawnTank(player);
 
@@ -218,7 +219,7 @@ public partial class ArenaScene : Node2D
         {
             var p2Team = _mode == GameMode.TwoPlayerVersus ? EnemyTeam : PlayerTeam;
             var p2 = new Tank(new Player2InputSource(), _world, _arena, CellCentre(_layout.Player2Spawn.X, _layout.Player2Spawn.Y),
-                TankSpeed, FireInterval, ProjectileSpeed, maxHp: 3, team: p2Team, lives: StartingLives, terrain: _sandbags);
+                TankSpeed, FireInterval, ProjectileSpeed, maxHp: TankMaxHp, team: p2Team, lives: StartingLives, terrain: _sandbags);
             SpawnTank(p2);
             if (p2Team == PlayerTeam)
             {
@@ -234,7 +235,7 @@ public partial class ArenaScene : Node2D
                 var ambusher = enemyIndex % 2 == 1; // every other enemy lies in wait in the grass
                 var ai = new AiInputSource(_world, _arena, _bushes, ambusher);
                 var enemy = new Tank(ai, _world, _arena, CellCentre(ex, ey),
-                    EnemySpeed, FireInterval, ProjectileSpeed, maxHp: 3, team: EnemyTeam, lives: StartingLives, terrain: _sandbags);
+                    EnemySpeed, FireInterval, ProjectileSpeed, maxHp: TankMaxHp, team: EnemyTeam, lives: StartingLives, terrain: _sandbags);
                 ai.Bind(enemy); // resolve the input-source ↔ tank construction cycle
                 SpawnTank(enemy);
                 enemyIndex++;

@@ -269,6 +269,22 @@ public class TankTests
     }
 
     [Fact]
+    public void Step_MovesSlower_WhenBadlyWounded()
+    {
+        var input = new ScriptedInput(new TankInput(new Vector2(1f, 0f), Aim: 0f, Fire: false));
+        var healthy = new Tank(input, new World(), new OpenArena(), Vector2.Zero, Speed, FireInterval,
+            ProjectileSpeed, maxHp: 10);
+        var wounded = new Tank(input, new World(), new OpenArena(), Vector2.Zero, Speed, FireInterval,
+            ProjectileSpeed, maxHp: 10);
+        wounded.TakeDamage(7); // 3/10 = 30% ≤ 40% → wounded
+
+        healthy.Step(0.1f);
+        wounded.Step(0.1f);
+
+        Assert.True(wounded.Position.X < healthy.Position.X, "a badly-wounded tank crawls");
+    }
+
+    [Fact]
     public void Step_MovesSlower_OverSlowingTerrain()
     {
         var input = new ScriptedInput(new TankInput(new Vector2(1f, 0f), Aim: 0f, Fire: false));
