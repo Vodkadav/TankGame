@@ -38,6 +38,17 @@ public class StatsTests
     }
 
     [Fact]
+    public void Clear_DropsEveryEffect_BackToTheBaseValue()
+    {
+        var stats = SpeedStats(100f);
+        stats.Apply(new StatusEffect(StatKind.Speed, Mult: 2f, AddFlat: 0f, Seconds: float.PositiveInfinity));
+
+        stats.Clear();
+
+        Assert.Equal(100f, stats.Current(StatKind.Speed)); // a permanent boost is gone after a clear
+    }
+
+    [Fact]
     public void FlatAndMultiplier_Compose_AsFlatThenScale()
     {
         var stats = SpeedStats(100f);

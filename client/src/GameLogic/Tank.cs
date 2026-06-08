@@ -24,7 +24,6 @@ public sealed class Tank : ITank
     private int _livesRemaining;
     private float _respawnTimer;
     private readonly AmmoLoadout _ammo = new();
-    private int _specialShots;
 
     /// <param name="input">Per-frame intent source.</param>
     /// <param name="world">The world the tank spawns its shots into.</param>
@@ -75,14 +74,10 @@ public sealed class Tank : ITank
     public void ApplyEffect(StatusEffect effect) => _stats.Apply(effect);
 
     /// <summary>Applies an ammo crate: the modifier sets its axis of the loadout (spread or
-    /// behaviour) — leaving the others, so pickups stack — and refreshes the special-shot count.
-    /// Once spent, the loadout resets to the default straight shot. See
-    /// <c>docs/adr/0016-composable-ammo.md</c>.</summary>
-    public void LoadAmmo(AmmoModifier modifier, int shots)
-    {
-        modifier.ApplyTo(_ammo);
-        _specialShots = shots;
-    }
+    /// behaviour) — leaving the others, so pickups stack. The loadout then fires that special shot
+    /// for every shot, with no shot limit, until the tank dies and sheds it (a death resets the
+    /// loadout to the default straight shot). See <c>docs/adr/0016-composable-ammo.md</c>.</summary>
+    public void LoadAmmo(AmmoModifier modifier) => modifier.ApplyTo(_ammo);
 
     /// <summary>Half-extent of the tank used for wall collision: its leading edge, not its
     /// centre, is what must clear a wall.</summary>
@@ -156,6 +151,10 @@ public sealed class Tank : ITank
         Hp = Math.Max(0, Hp - amount);
         if (Hp == 0)
         {
+            // Death sheds every pickup: the held ammo reverts to the plain shot and all buffs drop,
+            // so the tank respawns bare. The pickups themselves fall back onto the field where it died.
+            _ammo.Reset();
+            _stats.Clear();
             _livesRemaining--; // spend the life just lost; respawn if any remain
             if (_livesRemaining > 0)
             {
@@ -251,13 +250,9 @@ public sealed class Tank : ITank
             _fireCooldown = _stats.Current(StatKind.FireInterval);
             var direction = new Vector2(MathF.Cos(TurretRotation), MathF.Sin(TurretRotation));
 
-            // The loadout fires its current shot (special ammo while it lasts, else the default
-            // straight shot — the loadout is in its default state whenever no special ammo is loaded).
+            // The loadout fires its current shot — the special ammo for as long as it is held (until
+            // the tank dies and resets the loadout), else the default straight shot.
             _ammo.Fire(_world, _arena, Position, direction, _projectileSpeed, Team, Id);
-            if (_specialShots > 0 && --_specialShots == 0)
-            {
-                _ammo.Reset();
-            }
         }
     }
 

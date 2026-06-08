@@ -46,20 +46,16 @@ public sealed class ShieldPickup : IPickupEffect
     public void ApplyTo(Tank tank, IWorld world) => tank.AddShield(_amount);
 }
 
-/// <summary>An ammo crate: applies an <see cref="AmmoModifier"/> to the tank's loadout for its next
-/// <c>shots</c> shots. Because the modifier sets only its own axis, crates stack (spread + bouncing).</summary>
+/// <summary>An ammo crate: applies an <see cref="AmmoModifier"/> to the tank's loadout, which then
+/// fires that special shot for every shot until the tank dies (unlimited while alive). Because the
+/// modifier sets only its own axis, crates stack (spread + bouncing).</summary>
 public sealed class AmmoPickup : IPickupEffect
 {
     private readonly AmmoModifier _modifier;
-    private readonly int _shots;
 
-    public AmmoPickup(AmmoModifier modifier, int shots)
-    {
-        _modifier = modifier;
-        _shots = shots;
-    }
+    public AmmoPickup(AmmoModifier modifier) => _modifier = modifier;
 
-    public void ApplyTo(Tank tank, IWorld world) => tank.LoadAmmo(_modifier, _shots);
+    public void ApplyTo(Tank tank, IWorld world) => tank.LoadAmmo(_modifier);
 }
 
 /// <summary>A telephone: on pickup it calls in a carpet-bombing <see cref="Airstrike"/> that covers a
