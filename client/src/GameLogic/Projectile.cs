@@ -25,11 +25,15 @@ public sealed class Projectile : IProjectile
     /// <param name="behaviour">How the shot moves and hits; defaults to a straight shot.</param>
     /// <param name="pierce">How many targets the shot passes through before stopping; 0 (default)
     /// is an ordinary shot spent on its first hit.</param>
+    /// <param name="layer">The elevation layer the shot travels on — it inherits the firing tank's
+    /// layer and keeps it for its whole flight, so it only hits tanks on that same layer (ADR-0018).
+    /// Defaults to 0, the ground layer (a flat arena is single-layer).</param>
     public Projectile(IArena arena, Vector2 spawn, Vector2 direction, float speed, int damage = 1,
         int team = 0, IProjectileBehaviour? behaviour = null, int pierce = 0, Guid owner = default,
-        ProjectileStyle style = ProjectileStyle.Normal)
+        ProjectileStyle style = ProjectileStyle.Normal, int layer = 0)
     {
         Id = Guid.NewGuid();
+        Layer = layer;
         _arena = arena;
         _state = new ProjectileState
         {
@@ -50,6 +54,11 @@ public sealed class Projectile : IProjectile
     /// <summary>The id of the tank that fired this shot — combat never hits the shooter itself.</summary>
     public Guid Owner => _state.Owner;
     public Guid Id { get; }
+
+    /// <summary>The elevation layer this shot travels on (ADR-0018); combat only lets it hit tanks on
+    /// the same layer. 0 is the ground layer.</summary>
+    public int Layer { get; }
+
     public Vector2 Position => _state.Position;
     public Vector2 Direction => _state.Direction;
     public ProjectileStyle Style => _state.Style;

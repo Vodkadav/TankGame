@@ -42,9 +42,10 @@ public sealed class AmmoLoadout
     }
 
     /// <summary>Spawns this shot — <see cref="SpreadCount"/> pellets fanned symmetrically about the
-    /// aim, each its own behaviour and pierce budget.</summary>
+    /// aim, each its own behaviour and pierce budget. <paramref name="layer"/> is the firing tank's
+    /// elevation layer, stamped on every pellet so the shot stays on that level (ADR-0018).</summary>
     public void Fire(IWorld world, IArena arena, Vector2 muzzle, Vector2 direction, float speed, int team,
-        Guid owner = default)
+        Guid owner = default, int layer = 0)
     {
         var baseAngle = MathF.Atan2(direction.Y, direction.X);
         var firstOffset = -SpreadRadians * (SpreadCount - 1) / 2f; // centre the fan on the aim
@@ -54,7 +55,7 @@ public sealed class AmmoLoadout
             var angle = baseAngle + firstOffset + (SpreadRadians * i);
             var pelletDir = new Vector2(MathF.Cos(angle), MathF.Sin(angle));
             world.Spawn(new Projectile(arena, muzzle, pelletDir, speed, team: team,
-                behaviour: BehaviourFactory(), pierce: Pierce, owner: owner, style: Style));
+                behaviour: BehaviourFactory(), pierce: Pierce, owner: owner, style: Style, layer: layer));
         }
     }
 }

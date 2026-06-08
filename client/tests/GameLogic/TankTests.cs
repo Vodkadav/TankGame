@@ -204,6 +204,21 @@ public class TankTests
     }
 
     [Fact]
+    public void Step_FiresProjectilesOnTheTanksOwnLayer()
+    {
+        var world = new World();
+        var tank = new Tank(
+            new ScriptedInput(new TankInput(Vector2.Zero, Aim: 0f, Fire: true)),
+            world, new OpenArena(), Vector2.Zero, Speed, FireInterval, ProjectileSpeed, layer: 2);
+        world.Spawn(tank);
+
+        tank.Step(0.05f);
+
+        var shot = Assert.Single(world.Entities.OfType<Projectile>());
+        Assert.Equal(2, shot.Layer); // the shot stays on the shooter's elevation
+    }
+
+    [Fact]
     public void LoadAmmo_KeepsFiringTheSpecialShot_ForEveryShotWhileTheTankLives()
     {
         var world = new World();

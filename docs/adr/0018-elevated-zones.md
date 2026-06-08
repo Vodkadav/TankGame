@@ -1,7 +1,8 @@
 # ADR-0018: Elevated zones (multi-layer arena)
 
 **Date:** 2026-06-08
-**Status:** Proposed — awaiting owner review before implementation
+**Status:** Accepted (2026-06-08) — elevation ships as a *separate themed map*, not by changing the
+current arena (see Decision → Map pool).
 **Deciders:** Solo developer + Claude Code
 
 Numbered 0018, the next free number after 0017.
@@ -28,6 +29,17 @@ Model elevation as **discrete integer layers**, not a continuous height field.
 Every cell sits on a layer (0 = ground, 1 = first plateau, …). Every entity carries the layer it
 currently occupies. Combat and collision are filtered to act **only within a single layer**; a tank
 changes layer **only** by crossing a ramp cell that connects two adjacent layers.
+
+### Map pool (owner decision)
+
+Elevation is delivered as a **new, separately themed map** — not by adding heights to the current
+arena. The owner is growing the game toward a **pool of ~8–10 named, themed battle arenas**; the
+existing procedural arena is kept as one of them, **"Desert War"** (flat), untouched by this work.
+The layer feature is developed behaviour-preserving (a flat arena is the single-layer case), and once
+ready it is applied to a new map — a **"Cliffs & Valleys"** theme designed around the elevation. This
+needs a **map seam** (a way to select which arena to build) alongside the layer mechanics; the seam +
+the first elevated map ship together, the remaining themed arenas are future content. See the
+`map-pool-direction` memory.
 
 ### Domain
 
@@ -94,6 +106,14 @@ protocol change is not a surprise later.
 - **Unchanged:** team rules, pierce/bounce/missile ammo, powerups, game modes, the spawn→view loop,
   the HUD. A flat arena is just the single-layer (all layer 0, no ramps) case, so existing maps and
   the net `Battlefield01` keep working with no elevation.
-- **Rollout:** Domain contract + a layer-aware `GridArena` and a `Layer`-carrying `Tank`/`Projectile`
-  first (all flat, layer 0 everywhere — behaviour-preserving, every current test stays green), then
-  ramps + multi-layer generation, then the raised Presentation meshes. Each step is a squash-PR.
+- **Rollout** (each step a squash-PR, every step behaviour-preserving until the elevated map exists):
+  1. **Layer on the fighters + combat filter** — `Layer` on `Tank` and `Projectile` (a shot inherits
+     its shooter's layer), `CombatResolver` adds `tank.Layer == shot.Layer`. All entities default to
+     layer 0, so Desert War and every current map/test are unaffected. *(done — first PR)*
+  2. **Layer-aware arena + ramps** — lift `Layer` onto the `IEntity`/`ITank`/`IProjectile` contracts
+     (so views can read height), make `IArena` (`IsBlocked`/`RaycastFirstHit`/`DamageAt`) layer-aware,
+     and add ramp cells + per-cell layers to the arena model. This is where the wider `IArena`
+     call-site/fake ripple lands — justified because the elevated map needs it.
+  3. **The "Cliffs & Valleys" map + raised meshes + the map seam** — a new themed map that uses
+     multiple layers and ramps, rendered at `y = Layer × LayerHeight`, reached through a map-selection
+     seam that also offers "Desert War". The other themed arenas are later content.

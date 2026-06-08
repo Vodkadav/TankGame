@@ -36,6 +36,9 @@ public sealed class Tank : ITank
     /// <param name="team">The side this tank fights for (its shots spare the same team).</param>
     /// <param name="lives">Total lives, including the current one: a tank revives at its spawn
     /// after each death until its lives run out, then the world reaps it. Default 1 = no respawn.</param>
+    /// <param name="layer">The elevation layer the tank fights on (ADR-0018): it only hits and is hit
+    /// by tanks on the same layer, and changes layer only by crossing a ramp. Default 0 = the ground
+    /// layer (a flat, single-layer arena).</param>
     public Tank(
         IInputSource input,
         IWorld world,
@@ -47,12 +50,14 @@ public sealed class Tank : ITank
         int maxHp = 3,
         int team = 0,
         int lives = 1,
-        ITerrain? terrain = null)
+        ITerrain? terrain = null,
+        int layer = 0)
     {
         Id = Guid.NewGuid();
         MaxHp = maxHp;
         Hp = maxHp;
         Team = team;
+        Layer = layer;
         _livesRemaining = lives;
         _input = input;
         _world = world;
@@ -101,6 +106,10 @@ public sealed class Tank : ITank
     public int MaxHp { get; }
     public int Team { get; }
     public int Shield { get; private set; }
+
+    /// <summary>The elevation layer this tank fights on (ADR-0018): combat and (later) collision act
+    /// only within a layer, and it changes only by crossing a ramp. 0 is the ground layer.</summary>
+    public int Layer { get; private set; }
 
     // "In the match": a tank with positive hit points is fighting; one at zero hit points is
     // down but still in the match while it has a life left to respawn. Only once both are gone
@@ -252,7 +261,7 @@ public sealed class Tank : ITank
 
             // The loadout fires its current shot — the special ammo for as long as it is held (until
             // the tank dies and resets the loadout), else the default straight shot.
-            _ammo.Fire(_world, _arena, Position, direction, _projectileSpeed, Team, Id);
+            _ammo.Fire(_world, _arena, Position, direction, _projectileSpeed, Team, Id, Layer);
         }
     }
 
