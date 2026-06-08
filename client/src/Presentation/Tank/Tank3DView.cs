@@ -30,6 +30,7 @@ public partial class Tank3DView : Node3D
     private MeshInstance3D _shieldBar = null!;
     private ShaderMaterial _healthFill = null!;
     private ShaderMaterial _shieldFill = null!;
+    private CpuParticles3D _smoke = null!;
     private bool _wasAlive = true;
 
     public override void _Ready()
@@ -48,9 +49,46 @@ public partial class Tank3DView : Node3D
         }
 
         BuildBars();
+        BuildSmoke();
     }
 
     public void Bind(ITank tank) => _tank = tank;
+
+    // Dark smoke that trails a badly-wounded tank (below Tank.LowHealthFraction of max HP). Off until the
+    // tank drops under the threshold; a clear "this tank is nearly dead" tell to match the crawl speed.
+    private void BuildSmoke()
+    {
+        var mat = new StandardMaterial3D
+        {
+            Transparency = BaseMaterial3D.TransparencyEnum.Alpha,
+            ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded,
+            VertexColorUseAsAlbedo = true,
+        };
+        var puff = new SphereMesh { Radius = 7f, Height = 14f, RadialSegments = 6, Rings = 3, Material = mat };
+        var ramp = new Gradient
+        {
+            Offsets = new[] { 0f, 1f },
+            Colors = new[] { new Color(0.18f, 0.18f, 0.18f, 0.8f), new Color(0.06f, 0.06f, 0.06f, 0f) },
+        };
+        _smoke = new CpuParticles3D
+        {
+            Name = "DamageSmoke",
+            Emitting = false,
+            Amount = 14,
+            Lifetime = 0.9,
+            Position = new Vector3(0f, 18f, 0f),
+            Mesh = puff,
+            Direction = new Vector3(0f, 1f, 0f),
+            Spread = 28f,
+            Gravity = new Vector3(0f, 22f, 0f),
+            InitialVelocityMin = 16f,
+            InitialVelocityMax = 40f,
+            ScaleAmountMin = 0.6f,
+            ScaleAmountMax = 1.5f,
+            ColorRamp = ramp,
+        };
+        AddChild(_smoke);
+    }
 
     /// <summary>Paints the body to its team colour; safe to call before the node enters the tree.</summary>
     public void ApplyTeamTint(int team)
@@ -82,8 +120,11 @@ public partial class Tank3DView : Node3D
         Visible = alive; // downed/awaiting respawn → hidden
         if (!alive)
         {
+            _smoke.Emitting = false;
             return;
         }
+
+        _smoke.Emitting = _tank.Hp <= GameLogic.Tank.LowHealthFraction * _tank.MaxHp; // wounded → trails smoke
 
         Position = GroundProjection.ToWorld(_tank.Position);
 
