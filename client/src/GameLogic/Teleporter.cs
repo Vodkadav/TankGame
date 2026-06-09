@@ -45,6 +45,31 @@ public sealed class Teleporter : ITeleporter
         _cooldownSeconds = cooldownSeconds;
     }
 
+    /// <summary>A pad's current state for the view: where it is, and whether it is ready to fire or how
+    /// far through its cooldown it is (1 = just fired, 0 = ready). Lets the pad ring pulse when ready and
+    /// dim while dormant without the view reaching into the cooldown internals.</summary>
+    public readonly record struct PadStatus(System.Numerics.Vector2 Position, int Layer, bool Ready, float CooldownFraction);
+
+    /// <summary>Every pad's current state, in link order (each link's A then B) — so a view built in the
+    /// same order can mirror them by index.</summary>
+    public IReadOnlyList<PadStatus> PadStatuses()
+    {
+        var statuses = new List<PadStatus>(_links.Count * 2);
+        foreach (var link in _links)
+        {
+            statuses.Add(StatusOf(link.A, link.CooldownA));
+            statuses.Add(StatusOf(link.B, link.CooldownB));
+        }
+
+        return statuses;
+    }
+
+    private PadStatus StatusOf(TeleportPad pad, float cooldown) => new(
+        pad.Position,
+        pad.Layer,
+        cooldown <= 0f,
+        _cooldownSeconds <= 0f ? 0f : System.Math.Clamp(cooldown / _cooldownSeconds, 0f, 1f));
+
     /// <summary>Ages every pad's cooldown by <paramref name="deltaSeconds"/>. Called once per fixed
     /// tick by the owner, independent of how many tanks consult the pads.</summary>
     public void Step(float deltaSeconds)
