@@ -94,8 +94,6 @@ public partial class Arena3DScene : Node3D
     private IReadOnlyList<(int X, int Y)> _enemySpawns = Array.Empty<(int, int)>();
     private Camera3D _camera = null!;
     private ITank _player = null!;
-    private DirectionalLight3D _sun = null!;
-    private Godot.Environment _environment = null!;
 
     // The fog spotlight rides the player and lights roughly a vision-radius circle on the ground; the
     // viewers are the tanks whose sight reveals the field (just the player today; co-op allies would join
@@ -307,32 +305,38 @@ public partial class Arena3DScene : Node3D
         };
         AddChild(_camera);
 
-        _sun = new DirectionalLight3D
+        // Fog of war bakes the world dark at creation (single-player is always fogged): the sun is dimmed
+        // to a faint dusk and the ambient/sky are near-black, so only the player's fog spotlight relights a
+        // circle. Built as locals — holding the Environment resource in a field leaks an unsafe reference
+        // at engine shutdown (Godot .NET fatal); the WorldEnvironment node owns it and frees it cleanly.
+        var sun = new DirectionalLight3D
         {
             Name = "Sun",
             RotationDegrees = new Vector3(-55f, -40f, 0f),
-            LightEnergy = 1.4f,
+            LightEnergy = FogSunEnergy,
             ShadowEnabled = true,
         };
-        AddChild(_sun);
+        AddChild(sun);
 
-        _environment = new Godot.Environment
+        AddChild(new WorldEnvironment
         {
-            BackgroundMode = Godot.Environment.BGMode.Color,
-            BackgroundColor = new Color(0.45f, 0.62f, 0.78f), // sky
-            AmbientLightSource = Godot.Environment.AmbientSource.Color,
-            AmbientLightColor = new Color(0.7f, 0.72f, 0.78f),
-            AmbientLightEnergy = 0.9f,
-            TonemapMode = Godot.Environment.ToneMapper.Aces, // compress highlights so light colours don't blow out to white
-        };
-        AddChild(new WorldEnvironment { Environment = _environment });
+            Environment = new Godot.Environment
+            {
+                BackgroundMode = Godot.Environment.BGMode.Color,
+                BackgroundColor = FogAmbient, // a dark horizon, not a bright sky
+                AmbientLightSource = Godot.Environment.AmbientSource.Color,
+                AmbientLightColor = FogAmbient,
+                AmbientLightEnergy = 1f,
+                TonemapMode = Godot.Environment.ToneMapper.Aces, // compress highlights so light colours don't blow out to white
+            },
+        });
     }
 
-    // Fog of war: a dark world (the sun dimmed to near-dusk, a near-black ambient and sky) that the
-    // player's spotlight cuts a lit circle into. The spotlight hangs high over the player and points
-    // straight down, its cone sized so the lit ground disc is about a vision-radius across — so "lit"
-    // reads as "visible", matching the iso fog. Structured so co-op could add an ally light later
-    // (one per viewer); single-player needs just the one. Versus (shared screen) gets no fog at all.
+    // Fog of war: a dark world (the sun dimmed to near-dusk, a near-black ambient and sky, baked in
+    // BuildEnvironment) that the player's spotlight cuts a lit circle into. The spotlight hangs high over
+    // the player and points straight down, its cone sized so the lit ground disc is about a vision-radius
+    // across — so "lit" reads as "visible", matching the iso fog. Structured so co-op could add an ally
+    // light later (one per viewer); single-player needs just the one. Versus would get no fog at all.
     private static readonly Color FogAmbient = new(0.10f, 0.10f, 0.14f);
     private const float FogLightHeight = 1400f;   // how high over the player the spotlight hangs
     private const float FogLightEnergy = 6f;
@@ -340,11 +344,6 @@ public partial class Arena3DScene : Node3D
 
     private void SetUpFog()
     {
-        _sun.LightEnergy = FogSunEnergy;
-        _environment.AmbientLightColor = FogAmbient;
-        _environment.AmbientLightEnergy = 1f;
-        _environment.BackgroundColor = FogAmbient; // a dark horizon, not a bright sky
-
         // The cone half-angle whose lit ground disc (at FogLightHeight) is ~PlayerVisionRadius across.
         var coneDeg = Mathf.RadToDeg(Mathf.Atan2(PlayerVisionRadius, FogLightHeight));
         _fogLight = new SpotLight3D
