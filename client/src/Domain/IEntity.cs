@@ -15,6 +15,12 @@ public interface IEntity
     /// <summary>Current world-space position.</summary>
     Vector2 Position { get; }
 
+    /// <summary>Which discrete elevation layer the entity occupies (0 = ground, 1 = first plateau, …),
+    /// per ADR-0018. Combat and collision act only within a single layer. Defaults to ground so a flat
+    /// arena — and every entity/test fake that predates elevation — stays layer 0 with no change; tanks
+    /// and projectiles override it (a shot keeps its shooter's layer for its whole flight).</summary>
+    int Layer => 0;
+
     /// <summary>False once the entity has expired; the world removes it on the next
     /// <see cref="Step"/> and raises <see cref="IWorld.EntityDespawned"/>.</summary>
     bool IsAlive { get; }

@@ -226,7 +226,7 @@ public sealed class Tank : ITank
         var nextX = Position.X;
         if (move.X != 0f)
         {
-            var hitWall = _arena.IsBlocked(new Vector2(desired.X + (MathF.Sign(move.X) * CollisionRadius), Position.Y));
+            var hitWall = _arena.IsBlocked(new Vector2(desired.X + (MathF.Sign(move.X) * CollisionRadius), Position.Y), Layer);
             if (!hitWall && !OverlapsAnotherTank(new Vector2(desired.X, Position.Y)))
             {
                 nextX = desired.X;
@@ -241,7 +241,7 @@ public sealed class Tank : ITank
         var nextY = Position.Y;
         if (move.Y != 0f)
         {
-            var hitWall = _arena.IsBlocked(new Vector2(nextX, desired.Y + (MathF.Sign(move.Y) * CollisionRadius)));
+            var hitWall = _arena.IsBlocked(new Vector2(nextX, desired.Y + (MathF.Sign(move.Y) * CollisionRadius)), Layer);
             if (!hitWall && !OverlapsAnotherTank(new Vector2(nextX, desired.Y)))
             {
                 nextY = desired.Y;
@@ -301,7 +301,7 @@ public sealed class Tank : ITank
             : (new Vector2(Position.X, Position.Y + (MathF.Sign(move.Y) * CollisionRadius)),
                 new Vector2(0f, MathF.Sign(move.Y)));
 
-        _arena.DamageAt(point, direction, PushDamage);
+        _arena.DamageAt(point, direction, PushDamage, Layer);
     }
 
     // A tank is a circle of CollisionRadius; two tanks may not overlap. Scans the world for any
