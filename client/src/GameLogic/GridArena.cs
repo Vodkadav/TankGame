@@ -25,7 +25,20 @@ public sealed class GridArena : IArena
         _origin = origin;
     }
 
-    public RaycastHit? RaycastFirstHit(Vector2 origin, Vector2 direction, float maxDistance)
+    public RaycastHit? RaycastFirstHit(Vector2 origin, Vector2 direction, float maxDistance) =>
+        Raycast(origin, direction, maxDistance, OnAnyLayer);
+
+    public RaycastHit? RaycastFirstHit(Vector2 origin, Vector2 direction, float maxDistance, int layer) =>
+        Raycast(origin, direction, maxDistance, layer);
+
+    // Walks the ray cell by cell (Amanatides–Woo DDA). A cell stops the shot if it blocks shots OR
+    // sits on a different elevation layer than the shooter (its cliff face); a flat shooter
+    // (OnAnyLayer) is stopped only by shot-blocking walls, reproducing the pre-elevation behaviour.
+    // The struck cell is destructible only when it is breakable AND on the shooter's own layer — a
+    // cliff is permanent regardless of what material happens to sit on it.
+    private const int OnAnyLayer = int.MinValue;
+
+    private RaycastHit? Raycast(Vector2 origin, Vector2 direction, float maxDistance, int layer)
     {
         if (direction == Vector2.Zero)
         {
@@ -38,10 +51,10 @@ public sealed class GridArena : IArena
         var cellX = FloorDiv(local.X);
         var cellY = FloorDiv(local.Y);
 
-        if (_grid.BlocksShots(cellX, cellY))
+        if (StopsShot(cellX, cellY, layer))
         {
             // already inside a shot-blocking wall — face back along the ray
-            return new RaycastHit(origin, 0f, -dir, IsDestructible(cellX, cellY));
+            return new RaycastHit(origin, 0f, -dir, IsDestructible(cellX, cellY, layer));
         }
 
         var (stepX, tMaxX, tDeltaX) = SetupAxis(local.X, dir.X, cellX);
@@ -71,20 +84,33 @@ public sealed class GridArena : IArena
                 return null;
             }
 
-            if (_grid.BlocksShots(cellX, cellY))
+            if (StopsShot(cellX, cellY, layer))
             {
-                return new RaycastHit(origin + (dir * t), t, normal, IsDestructible(cellX, cellY));
+                return new RaycastHit(origin + (dir * t), t, normal, IsDestructible(cellX, cellY, layer));
             }
         }
     }
 
+    private bool StopsShot(int cellX, int cellY, int layer) =>
+        _grid.BlocksShots(cellX, cellY) || OnAnotherLayer(cellX, cellY, layer);
+
+    // A cell is on "another layer" only for a layer-aware query (layer != OnAnyLayer) whose layer
+    // differs from the cell's. A flat query ignores layers entirely.
+    private bool OnAnotherLayer(int cellX, int cellY, int layer) =>
+        layer != OnAnyLayer && _grid.LayerAt(cellX, cellY) != layer;
+
     // Brick and crates are destructible; steel and the implicit out-of-bounds border are permanent.
     // A piercing shot uses this to decide whether it can punch through. (Water never blocks a shot,
-    // so it is never the struck cell.)
-    private bool IsDestructible(int cellX, int cellY) =>
+    // so it is never the struck cell.) A breakable cell on another layer reads as permanent — the
+    // shot meets its cliff face, not the wall itself.
+    private bool IsDestructible(int cellX, int cellY, int layer) =>
+        !OnAnotherLayer(cellX, cellY, layer) &&
         _grid.GetCell(cellX, cellY).Material is CellMaterial.Brick or CellMaterial.Crate;
 
-    public void DamageAt(Vector2 point, Vector2 direction, int amount)
+    public void DamageAt(Vector2 point, Vector2 direction, int amount) =>
+        DamageAt(point, direction, amount, OnAnyLayer);
+
+    public void DamageAt(Vector2 point, Vector2 direction, int amount, int layer)
     {
         if (direction == Vector2.Zero)
         {
@@ -92,16 +118,28 @@ public sealed class GridArena : IArena
         }
 
         // The contact point sits on the struck cell's near face; nudge half a tile along the
-        // ray to land squarely inside that cell, then damage it.
+        // ray to land squarely inside that cell, then damage it — unless that cell is on another
+        // layer (a cliff the shot merely grazed), which is permanent.
         var inside = point + (Vector2.Normalize(direction) * (_tileSize * 0.5f));
         var local = inside - _origin;
-        _grid.DamageCell(FloorDiv(local.X), FloorDiv(local.Y), amount);
+        var cellX = FloorDiv(local.X);
+        var cellY = FloorDiv(local.Y);
+        if (OnAnotherLayer(cellX, cellY, layer))
+        {
+            return;
+        }
+
+        _grid.DamageCell(cellX, cellY, amount);
     }
 
-    public bool IsBlocked(Vector2 point)
+    public bool IsBlocked(Vector2 point) => IsBlocked(point, OnAnyLayer);
+
+    public bool IsBlocked(Vector2 point, int layer)
     {
         var local = point - _origin;
-        return _grid.IsBlocked(FloorDiv(local.X), FloorDiv(local.Y));
+        var cellX = FloorDiv(local.X);
+        var cellY = FloorDiv(local.Y);
+        return _grid.IsBlocked(cellX, cellY) || OnAnotherLayer(cellX, cellY, layer);
     }
 
     private int FloorDiv(float worldComponent) => (int)MathF.Floor(worldComponent / _tileSize);

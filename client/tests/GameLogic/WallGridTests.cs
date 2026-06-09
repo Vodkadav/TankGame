@@ -34,6 +34,31 @@ public class WallGridTests
     }
 
     [Fact]
+    public void LayerAt_DefaultsToGround_WhenNoLayerMapIsSupplied()
+    {
+        var grid = Grid();
+
+        Assert.Equal(0, grid.LayerAt(0, 0));
+        Assert.Equal(0, grid.LayerAt(1, 1));
+        Assert.Equal(0, grid.LayerAt(-5, 99)); // out of bounds reads as ground too
+    }
+
+    [Fact]
+    public void LayerAt_ReportsTheSuppliedLayer_ForARaisedCell()
+    {
+        var grid = WallGrid.FromMaterials(
+            new[,]
+            {
+                { CellMaterial.Floor, CellMaterial.Floor },
+                { CellMaterial.Floor, CellMaterial.Floor },
+            },
+            layers: new[,] { { 0, 0 }, { 0, 2 } });
+
+        Assert.Equal(0, grid.LayerAt(0, 0));
+        Assert.Equal(2, grid.LayerAt(1, 1));
+    }
+
+    [Fact]
     public void GetCell_OutOfBounds_ReadsAsBlockingSteel()
     {
         var grid = Grid();

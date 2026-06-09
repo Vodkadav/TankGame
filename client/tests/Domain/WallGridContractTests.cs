@@ -113,6 +113,18 @@ public class WallGridContractTests
     }
 
     [Fact]
+    public void LayerAt_DefaultsToTheGroundLayer_ForAGridThatDoesNotDeclareLayers()
+    {
+        // StubWallGrid implements no LayerAt — it inherits the IWallGrid default (ground = 0), so a
+        // flat grid and every existing implementation stay single-layer with no edit (ADR-0018).
+        // The default member is reached through the interface, where it is declared.
+        IWallGrid grid = Grid();
+
+        Assert.Equal(0, grid.LayerAt(0, 0));
+        Assert.Equal(0, grid.LayerAt(1, 1));
+    }
+
+    [Fact]
     public void DamageCell_LeavesSteelUntouched_AndRaisesNoEvent()
     {
         var grid = Grid();
