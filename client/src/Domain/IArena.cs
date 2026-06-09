@@ -31,4 +31,22 @@ public interface IArena
     /// <summary>Whether <paramref name="point"/> lies inside a solid wall (or outside the
     /// playable space). Used to stop a tank from driving through walls.</summary>
     bool IsBlocked(Vector2 point);
+
+    // ── Layer-aware overloads (ADR-0018 step 2) ──
+    // Walls, the boundary, and destructible cells are resolved for the querying entity's elevation
+    // layer: the edge of a plateau is a wall to a tank on it and empty space to a tank below. These are
+    // default members that ignore the layer and fall back to the flat query, so a flat arena and every
+    // existing IArena fake keep working untouched; a layered GridArena overrides them to use per-cell
+    // layers.
+
+    /// <summary>First obstacle hit on the querying entity's <paramref name="layer"/>.</summary>
+    RaycastHit? RaycastFirstHit(Vector2 origin, Vector2 direction, float maxDistance, int layer) =>
+        RaycastFirstHit(origin, direction, maxDistance);
+
+    /// <summary>Damages whatever a shot on <paramref name="layer"/> struck at <paramref name="point"/>.</summary>
+    void DamageAt(Vector2 point, Vector2 direction, int amount, int layer) =>
+        DamageAt(point, direction, amount);
+
+    /// <summary>Whether <paramref name="point"/> is blocked for an entity on <paramref name="layer"/>.</summary>
+    bool IsBlocked(Vector2 point, int layer) => IsBlocked(point);
 }

@@ -71,4 +71,31 @@ public class EntityContractTests
 
         Assert.False(entity.IsAlive);
     }
+
+    [Fact]
+    public void Layer_DefaultsToGround_ForAnEntityThatDoesNotDeclareOne()
+    {
+        // StubEntity declares no Layer — it inherits the IEntity default (ground = 0), so a flat arena
+        // and every existing fake stay layer-0 with no edit (ADR-0018 step 2).
+        IEntity entity = new StubEntity(Vector2.Zero, Vector2.Zero);
+
+        Assert.Equal(0, entity.Layer);
+    }
+
+    [Fact]
+    public void Layer_ReflectsAnEntityThatSitsOnARaisedLayer()
+    {
+        IEntity entity = new LayeredEntity(layer: 3);
+
+        Assert.Equal(3, entity.Layer);
+    }
+
+    private sealed class LayeredEntity(int layer) : IEntity
+    {
+        public Guid Id { get; } = Guid.NewGuid();
+        public Vector2 Position => Vector2.Zero;
+        public bool IsAlive => true;
+        public int Layer { get; } = layer;
+        public void Step(float deltaSeconds) { }
+    }
 }
