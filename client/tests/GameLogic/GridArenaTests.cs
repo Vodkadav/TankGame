@@ -140,4 +140,90 @@ public class GridArenaTests
         Assert.False(grid.GetCell(0, 0).Material == CellMaterial.Brick);
         Assert.True(arena.RaycastFirstHit(new Vector2(5f, 5f), new Vector2(1f, 0f), 100f).HasValue);
     }
+
+    // ── Elevation layers (ADR-0018 step 2b) ──
+    // Columns 0-1 are ground (layer 0); columns 2-4 are a raised plateau (layer 1). The cells are
+    // all floor — the only thing separating the two halves is their layer.
+    private static GridArena GroundThenPlateau()
+    {
+        var grid = WallGrid.FromMaterials(
+            new[,]
+            {
+                { CellMaterial.Floor },
+                { CellMaterial.Floor },
+                { CellMaterial.Floor },
+                { CellMaterial.Floor },
+                { CellMaterial.Floor },
+            },
+            layers: new[,] { { 0 }, { 0 }, { 1 }, { 1 }, { 1 } });
+        return new GridArena(grid, Tile, Vector2.Zero);
+    }
+
+    [Fact]
+    public void IsBlocked_ARaisedCellIsAWall_ToATankOnTheGround_AndFloor_ToATankOnTheLevel()
+    {
+        var arena = GroundThenPlateau();
+        var onThePlateau = new Vector2(25f, 5f); // column 2, layer 1
+        var onTheGround = new Vector2(5f, 5f);    // column 0, layer 0
+
+        Assert.True(arena.IsBlocked(onThePlateau, layer: 0));   // a ground tank can't drive up the cliff
+        Assert.False(arena.IsBlocked(onThePlateau, layer: 1));  // a tank already up there stands on it
+        Assert.True(arena.IsBlocked(onTheGround, layer: 1));    // and can't step off the edge to the ground
+        Assert.False(arena.IsBlocked(onTheGround, layer: 0));   // a ground tank stands on the ground
+    }
+
+    [Fact]
+    public void RaycastFirstHit_AShotOnTheGround_StopsAtTheCliffFace_Permanently()
+    {
+        var arena = GroundThenPlateau();
+
+        // Fired along the ground (+X, layer 0) from column 0; the plateau's west face is x=20.
+        var hit = arena.RaycastFirstHit(new Vector2(5f, 5f), new Vector2(1f, 0f), 100f, layer: 0);
+
+        Assert.NotNull(hit);
+        Assert.Equal(20f, hit!.Value.Point.X, precision: 3);
+        Assert.False(hit.Value.Destructible); // a cliff face is permanent, not a brick
+    }
+
+    [Fact]
+    public void RaycastFirstHit_AShotOnThePlateau_TravelsAcrossItsOwnLevel()
+    {
+        var arena = GroundThenPlateau();
+
+        // Fired across the plateau (+X, layer 1) from column 2; nothing on layer 1 stops it until
+        // the steel border at x=50.
+        var hit = arena.RaycastFirstHit(new Vector2(25f, 5f), new Vector2(1f, 0f), 100f, layer: 1);
+
+        Assert.NotNull(hit);
+        Assert.Equal(50f, hit!.Value.Point.X, precision: 3);
+    }
+
+    [Fact]
+    public void DamageAt_IgnoresGeometryOnAnotherLayer()
+    {
+        // Column 2 is a brick that sits on the raised layer 1; a shot travelling on the ground must
+        // not chip it (it is hitting the cliff face, not the brick).
+        var grid = WallGrid.FromMaterials(
+            new[,] { { CellMaterial.Floor }, { CellMaterial.Floor }, { CellMaterial.Brick } },
+            layers: new[,] { { 0 }, { 0 }, { 1 } });
+        var arena = new GridArena(grid, Tile, Vector2.Zero);
+
+        arena.DamageAt(new Vector2(20f, 5f), new Vector2(1f, 0f), 1, layer: 0);
+        Assert.Equal(WallGrid.DefaultBrickHp, grid.GetCell(2, 0).Hp); // untouched from below
+
+        arena.DamageAt(new Vector2(20f, 5f), new Vector2(1f, 0f), 1, layer: 1);
+        Assert.Equal(WallGrid.DefaultBrickHp - 1, grid.GetCell(2, 0).Hp); // a same-layer shot chips it
+    }
+
+    [Fact]
+    public void LayerAwareQueries_OnAFlatGrid_MatchTheFlatQuery()
+    {
+        var (arena, _) = RowWithBrickAtColumn3(); // every cell defaults to layer 0
+
+        for (var x = 0; x < 5; x++)
+        {
+            var point = new Vector2((x * Tile) + 5f, 5f);
+            Assert.Equal(arena.IsBlocked(point), arena.IsBlocked(point, layer: 0));
+        }
+    }
 }

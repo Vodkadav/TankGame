@@ -77,6 +77,12 @@ public interface IWallGrid
     /// cells read as a blocking steel border so the maze is implicitly enclosed.</summary>
     WallCell GetCell(int x, int y);
 
+    /// <summary>The elevation layer of the cell at (<paramref name="x"/>, <paramref name="y"/>)
+    /// (ADR-0018): a raised plateau is a higher layer, so its edge is a wall to a tank below and
+    /// floor to a tank on it. Defaults to the ground layer (0) for a flat grid and every existing
+    /// implementation; a layered grid overrides it.</summary>
+    int LayerAt(int x, int y) => 0;
+
     /// <summary>Whether the cell at (<paramref name="x"/>, <paramref name="y"/>) blocks tank
     /// movement (out-of-bounds reads as a blocking steel border). Water and walls block movement;
     /// floor and bridges do not.</summary>
