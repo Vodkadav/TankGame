@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using Godot;
 using TankGame.Domain;
 using TankGame.GameLogic;
@@ -39,7 +40,16 @@ public partial class Arena3DScene : Node3D
     private const int AirstrikeDamage = 3;
     private const float AirstrikeCooldown = 120f; // the airstrike station refills every 2 minutes
 
-    private (PowerupKind Kind, IPickupEffect Effect)[] _powerups = null!;
+    private IReadOnlyDictionary<PowerupKind, IPickupEffect> _powerupEffects = null!;
+    private IReadOnlyList<(PowerupKind Kind, int X, int Y)> _powerupPlacements = Array.Empty<(PowerupKind, int, int)>();
+
+    // The catalogue's kind order — the generator's PickupCells line up with it one-for-one. Keep in sync
+    // with PowerupCatalogue below.
+    private static readonly PowerupKind[] PowerupOrder =
+    {
+        PowerupKind.SpeedBoost, PowerupKind.RapidFire, PowerupKind.BouncingAmmo, PowerupKind.SpreadAmmo,
+        PowerupKind.Repair, PowerupKind.Shield, PowerupKind.PiercingAmmo, PowerupKind.Missile, PowerupKind.Telephone,
+    };
 
     // Field pickups grant their effect for as long as the collector lives (unlimited use), shed on
     // death — so the stat boosts are permanent (infinite duration), not the old 6-second timer. Built
@@ -73,21 +83,44 @@ public partial class Arena3DScene : Node3D
     private GridArena _arena = null!;
     private BushField _bushes = null!;
     private SandbagField _sandbags = null!;
-    private GeneratedArena _layout = null!;
+    private (int X, int Y) _playerSpawn;
+    private IReadOnlyList<(int X, int Y)> _enemySpawns = Array.Empty<(int, int)>();
     private Camera3D _camera = null!;
     private ITank _player = null!;
 
     public override void _Ready()
     {
-        var dim = Mathf.Max(GameSetup.ArenaWidth, GameSetup.ArenaHeight); // a square arena, not oblong
-        _layout = new ArenaGenerator().Generate(
-            new ArenaGenParams(dim, dim, GameSetup.ArenaSeed, EnemyCount, PowerupCount));
-        var level = _layout.Map;
-        _powerups = PowerupCatalogue(new NVector2(level.Width * TileSize, level.Height * TileSize));
+        LevelMap level;
+        bool[,] sandbags;
+
+        // Build from a user-made map when one is chosen ("My Maps"), otherwise generate a Desert War.
+        if (GameSetup.CustomMap is { } custom)
+        {
+            level = MapLoader.ToLevel(custom);
+            sandbags = custom.Sandbags;
+            _playerSpawn = custom.PlayerSpawn;
+            _enemySpawns = custom.EnemySpawns;
+            _powerupPlacements = custom.PowerupSpawns.Select(s => (s.Kind, s.X, s.Y)).ToList();
+        }
+        else
+        {
+            var dim = Mathf.Max(GameSetup.ArenaWidth, GameSetup.ArenaHeight); // a square arena, not oblong
+            var layout = new ArenaGenerator().Generate(
+                new ArenaGenParams(dim, dim, GameSetup.ArenaSeed, EnemyCount, PowerupCount));
+            level = layout.Map;
+            sandbags = layout.Sandbags;
+            _playerSpawn = layout.PlayerSpawn;
+            _enemySpawns = layout.EnemySpawns;
+            _powerupPlacements = ZipCatalogue(layout.PickupCells);
+        }
+
+        var fieldMax = new NVector2(level.Width * TileSize, level.Height * TileSize);
+        _powerupEffects = PowerupCatalogue(fieldMax).ToDictionary(p => p.Kind, p => p.Effect);
+
         var grid = level.BuildGrid();
         _arena = new GridArena(grid, TileSize, GridOrigin);
         _bushes = new BushField(level.Bushes, TileSize, GridOrigin);
-        _sandbags = new SandbagField(_layout.Sandbags, TileSize, GridOrigin);
+        _sandbags = new SandbagField(sandbags, TileSize, GridOrigin);
 
         var combat = new CombatResolver(CombatHitRadius, alliedTeam: PlayerTeam);
         _world = new World(combat);
@@ -99,12 +132,24 @@ public partial class Arena3DScene : Node3D
 
         var terrain = new Terrain3DView { Name = "Terrain3DView" };
         AddChild(terrain);
-        terrain.Bind(grid, level.Bushes, _layout.Sandbags, TileSize);
+        terrain.Bind(grid, level.Bushes, sandbags, TileSize);
 
         SpawnPowerups();
         SpawnTanks();
         BuildPreviewHud();
         BuildPauseMenu();
+    }
+
+    // Pairs each catalogue kind with the cell the generator chose for it (one pickup per kind, in order).
+    private static IReadOnlyList<(PowerupKind Kind, int X, int Y)> ZipCatalogue(IReadOnlyList<(int X, int Y)> cells)
+    {
+        var placements = new List<(PowerupKind, int, int)>();
+        for (var i = 0; i < PowerupOrder.Length && i < cells.Count; i++)
+        {
+            placements.Add((PowerupOrder[i], cells[i].X, cells[i].Y));
+        }
+
+        return placements;
     }
 
     private CanvasLayer _pauseLayer = null!;
@@ -327,13 +372,13 @@ public partial class Arena3DScene : Node3D
     private void SpawnTanks()
     {
         var p1Input = new KeyboardMouse3DInputSource(_camera, fireOnClick: true);
-        var player = new Tank(p1Input, _world, _arena, CellCentre(_layout.PlayerSpawn.X, _layout.PlayerSpawn.Y),
+        var player = new Tank(p1Input, _world, _arena, CellCentre(_playerSpawn.X, _playerSpawn.Y),
             TankSpeed, FireInterval, ProjectileSpeed, maxHp: TankMaxHp, team: PlayerTeam, lives: StartingLives, terrain: _sandbags);
         _player = player;
         SpawnTank(player);
 
         var enemyIndex = 0;
-        foreach (var (ex, ey) in _layout.EnemySpawns)
+        foreach (var (ex, ey) in _enemySpawns)
         {
             var ambusher = enemyIndex % 2 == 1;
             var ai = new AiInputSource(_world, _arena, _bushes, ambusher);
@@ -351,14 +396,16 @@ public partial class Arena3DScene : Node3D
         _world.Spawn(tank);
     }
 
-    // Lay each catalogue pickup at the cell the generator chose for it, spawned through the world so it
-    // reaches the scene by the same spawn-event path as every other entity.
+    // Lay each placed pickup (from the generator or the chosen custom map) at its cell, spawned through
+    // the world so it reaches the scene by the same spawn-event path as every other entity.
     private void SpawnPowerups()
     {
-        for (var i = 0; i < _powerups.Length; i++)
+        foreach (var (kind, x, y) in _powerupPlacements)
         {
-            var (kind, effect) = _powerups[i];
-            var (x, y) = _layout.PickupCells[i];
+            if (!_powerupEffects.TryGetValue(kind, out var effect))
+            {
+                continue;
+            }
 
             // Every pickup is carried until its holder dies and drops it where it fell — except the
             // airstrike, a fixed station that stays at its spot and refills on a 2-minute cooldown.

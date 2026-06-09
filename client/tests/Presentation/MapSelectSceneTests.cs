@@ -1,6 +1,7 @@
 using Godot;
 using Chickensoft.GoDotTest;
 using TankGame.Infrastructure;
+using TankGame.Presentation;
 
 namespace TankGame.Tests.Presentation;
 
@@ -19,7 +20,11 @@ public class MapSelectSceneTests : TestClass
     }
 
     [Cleanup]
-    public void Cleanup() => _scene.QueueFree();
+    public void Cleanup()
+    {
+        GameSetup.CustomMap = null; // don't leak a custom map into other scenes' tests
+        _scene.QueueFree();
+    }
 
     [Test]
     public void MapSelect_ListsTheArenas_PlusPlayAndBack()
@@ -63,6 +68,22 @@ public class MapSelectSceneTests : TestClass
         if (Play().Disabled || ComingSoon().Visible)
         {
             throw new System.Exception("Re-selecting Desert War should re-enable Play and hide coming-soon.");
+        }
+    }
+
+    [Test]
+    public void MyMaps_OffersTheBundledSample_AndPlayingItLoadsACustomMap()
+    {
+        GameSetup.CustomMap = null;
+        if (_scene.FindChild("Map_sample-skirmish", recursive: true, owned: false) is not Button)
+        {
+            throw new System.Exception("My Maps should list the bundled sample arena as a Play button.");
+        }
+
+        Press("Map_sample-skirmish");
+        if (GameSetup.CustomMap is null)
+        {
+            throw new System.Exception("Playing a saved map should load it as the custom map.");
         }
     }
 
