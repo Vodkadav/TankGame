@@ -2,16 +2,19 @@ import { SELF } from "cloudflare:test";
 import { describe, it, expect } from "vitest";
 import {
   encodeInput,
+  encodeSnapshotMessage,
+  decodeInput,
   decodeSnapshot,
   MSG_WELCOME,
   MSG_SNAPSHOT,
+  type InputFrame,
   type SnapshotFrame,
 } from "./protocol/codec";
 
-// A joined connection that buffers every inbound message from accept time. The room runs a 20 Hz
-// tick the moment the host connects, so a second joiner's welcome can be immediately chased by a
-// snapshot; buffering from accept (synchronously, before any await) means no message is missed or
-// reordered, and reads drain in arrival order.
+// A joined connection that buffers every inbound message from accept time. In relay mode the DO
+// only ever sends a client (a) its welcome on connect and (b) bytes a peer relays to it, so a read
+// may have to wait for a peer to act. Buffering from accept (synchronously, before any await) keeps
+// arrival order and means no relayed frame is missed.
 interface Conn {
   ws: WebSocket;
   next(): Promise<Uint8Array>;
@@ -47,56 +50,89 @@ async function joinRoom(code: string): Promise<Conn> {
   };
 }
 
-// The first server→client message is the welcome (the slot assignment); snapshots follow, tagged.
-async function nextSnapshot(conn: Conn): Promise<SnapshotFrame> {
+// The first server→client message is always the welcome (the slot assignment).
+async function welcomeOf(conn: Conn): Promise<number> {
   const message = await conn.next();
-  expect(message[0]).toBe(MSG_SNAPSHOT);
-  return decodeSnapshot(message.subarray(1));
+  expect(message[0]).toBe(MSG_WELCOME);
+  return message[1];
 }
 
-describe("MatchRoom", () => {
+describe("MatchRoom (relay)", () => {
   it("welcomes the host as slot 0 and the guest as slot 1", async () => {
     const host = await joinRoom("WEL001");
-    const hostWelcome = await host.next();
-    expect(hostWelcome[0]).toBe(MSG_WELCOME);
-    expect(hostWelcome[1]).toBe(0);
+    expect(await welcomeOf(host)).toBe(0);
 
     const guest = await joinRoom("WEL001");
-    const guestWelcome = await guest.next();
-    expect(guestWelcome[0]).toBe(MSG_WELCOME);
-    expect(guestWelcome[1]).toBe(1);
+    expect(await welcomeOf(guest)).toBe(1);
 
     host.ws.close();
     guest.ws.close();
   });
 
-  it("runs the sim and broadcasts snapshots that reflect a player's input", async () => {
-    const host = await joinRoom("SIM001");
-    const guest = await joinRoom("SIM001");
+  it("forwards a guest InputFrame to the host (slot 0)", async () => {
+    const host = await joinRoom("REL001");
+    const guest = await joinRoom("REL001");
+    expect(await welcomeOf(host)).toBe(0);
+    expect(await welcomeOf(guest)).toBe(1);
 
-    const welcome = await host.next(); // first message is the slot assignment
-    expect(welcome[0]).toBe(MSG_WELCOME);
+    const frame: InputFrame = { seq: 7, moveX: 1, moveY: 0, aim: 0.5, buttons: 1 };
+    guest.ws.send(encodeInput(frame));
 
-    // One input frame sets a persistent move intent (the sim keeps applying it each tick).
-    host.ws.send(encodeInput({ seq: 1, moveX: 1, moveY: 0, aim: 0, buttons: 0 }));
+    const received = await host.next();
+    expect(decodeInput(received)).toEqual(frame);
 
-    let last: SnapshotFrame | null = null;
-    for (let i = 0; i < 16; i++) {
-      last = await nextSnapshot(host);
-      if (last.tanks.length > 0 && last.tanks[0].x > 170) break;
-    }
+    host.ws.close();
+    guest.ws.close();
+  });
 
-    expect(last).not.toBeNull();
-    expect(last!.tick).toBeGreaterThan(0);
-    expect(last!.tanks[0].slot).toBe(0);
-    expect(last!.tanks[0].x).toBeGreaterThan(170); // moved east from the spawn (x≈160)
+  it("forwards a host SnapshotFrame to the guests", async () => {
+    const host = await joinRoom("REL002");
+    const guest = await joinRoom("REL002");
+    expect(await welcomeOf(host)).toBe(0);
+    expect(await welcomeOf(guest)).toBe(1);
+
+    const snapshot: SnapshotFrame = {
+      tick: 3,
+      ackSeq: 2,
+      tanks: [{ slot: 0, x: 64, y: 128, rotation: 0, turretRotation: 0.5, hp: 8, team: 0 }],
+      wallDeltas: [],
+    };
+    host.ws.send(encodeSnapshotMessage(snapshot));
+
+    const received = await guest.next();
+    expect(received[0]).toBe(MSG_SNAPSHOT);
+    expect(decodeSnapshot(received.subarray(1))).toEqual(snapshot);
+
+    host.ws.close();
+    guest.ws.close();
+  });
+
+  it("does not relay a guest's bytes back to that guest (host-only relay)", async () => {
+    const host = await joinRoom("REL003");
+    const guest = await joinRoom("REL003");
+    expect(await welcomeOf(host)).toBe(0);
+    expect(await welcomeOf(guest)).toBe(1);
+
+    guest.ws.send(encodeInput({ seq: 1, moveX: 1, moveY: 0, aim: 0, buttons: 0 }));
+
+    // The host receives the input; the guest must NOT receive its own frame echoed back. Race the
+    // guest's next read against the host's: the host's relayed input must arrive first.
+    const firstToHost = host.next();
+    const sentinel = Symbol("no-echo");
+    const guestEcho = guest.next().then(() => "echo");
+    const winner = await Promise.race([
+      firstToHost.then(() => "host"),
+      guestEcho,
+      new Promise<typeof sentinel>((resolve) => setTimeout(() => resolve(sentinel), 100)),
+    ]);
+    expect(winner).toBe("host");
 
     host.ws.close();
     guest.ws.close();
   });
 
   it("rejects a non-WebSocket request to a room", async () => {
-    const response = await SELF.fetch("http://room.test/room/SIM002");
+    const response = await SELF.fetch("http://room.test/room/REL004");
     expect(response.status).toBe(426);
   });
 

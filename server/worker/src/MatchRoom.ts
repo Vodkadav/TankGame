@@ -1,13 +1,15 @@
-// MatchRoom — the authoritative match for one lobby, as a Durable Object (one DO per lobby code).
-// Holds a MatchSim, assigns each of the (up to two) players a slot, applies their decoded inputs,
-// and runs a 20 Hz tick loop that steps the sim and broadcasts a per-client snapshot. The loop runs
-// only while players are connected; an empty room drops the sim and lets the DO hibernate. See
-// ADR-0005.
+// MatchRoom — one lobby's match, as a Durable Object (one DO per lobby code). Per ADR-0019 the DO is
+// a PURE RELAY + lobby directory: it assigns each connecting client a slot (host = 0, guests = 1+),
+// tells the client its slot with a WelcomeFrame, and forwards bytes between peers. It does NOT
+// simulate — authority is the host client running the real C# World. Routing is by sender slot:
+//   • the host (slot 0) broadcasts SnapshotFrames → every guest;
+//   • a guest (slot 1+) sends InputFrames → the host.
+// The WebSocket hibernation API keeps an idle room free; the slot survives hibernation via the
+// socket's serialized attachment. The lobby-code routes and the request-budget alarm live elsewhere.
 
-import { MatchSim } from "./sim/matchSim";
-import { decodeInput, encodeSnapshotMessage, encodeWelcome } from "./protocol/codec";
+import { encodeWelcome } from "./protocol/codec";
 
-const TICK_MS = 50; // 20 Hz
+const HOST_SLOT = 0;
 const MAX_PLAYERS = 2;
 
 interface Attachment {
@@ -16,8 +18,6 @@ interface Attachment {
 
 export class MatchRoom implements DurableObject {
   private readonly state: DurableObjectState;
-  private sim: MatchSim | null = null;
-  private loop: ReturnType<typeof setInterval> | null = null;
 
   constructor(state: DurableObjectState, _env: unknown) {
     this.state = state;
@@ -38,17 +38,22 @@ export class MatchRoom implements DurableObject {
 
     this.state.acceptWebSocket(server); // hibernation API
     server.serializeAttachment({ slot } satisfies Attachment); // survives hibernation
-    server.send(encodeWelcome(slot)); // first message: tell the client which tank it drives
-    this.ensureRunning();
+    server.send(encodeWelcome(slot)); // first message: tell the client which slot it drives
 
     return new Response(null, { status: 101, webSocket: client });
   }
 
   webSocketMessage(sender: WebSocket, message: ArrayBuffer | string): void {
-    if (this.sim === null || typeof message === "string") {
+    if (typeof message === "string") {
       return; // the protocol is binary; ignore anything else
     }
-    this.sim.applyInput(slotOf(sender), decodeInput(new Uint8Array(message)));
+    for (const target of this.relayTargets(slotOf(sender))) {
+      try {
+        target.send(message);
+      } catch {
+        // target socket closing mid-relay — its close handler will clean it up
+      }
+    }
   }
 
   webSocketClose(ws: WebSocket, code: number, _reason: string, _wasClean: boolean): void {
@@ -57,38 +62,17 @@ export class MatchRoom implements DurableObject {
     } catch {
       // already closing
     }
-    // Once the last player leaves, stop ticking and drop the sim so the DO can hibernate.
-    const remaining = this.state.getWebSockets().filter((s) => s !== ws);
-    if (remaining.length === 0) {
-      this.stop();
-    }
+    // No sim to stop; an empty room simply hibernates until the next joiner.
   }
 
-  private ensureRunning(): void {
-    this.sim ??= new MatchSim();
-    this.loop ??= setInterval(() => this.tick(), TICK_MS);
-  }
-
-  private stop(): void {
-    if (this.loop !== null) {
-      clearInterval(this.loop);
-      this.loop = null;
+  // Where bytes from a given sender slot go: the host (slot 0) broadcasts to all guests; a guest
+  // sends to the host. Returns the live peer sockets (the sender itself is always excluded).
+  private relayTargets(senderSlot: number): WebSocket[] {
+    const peers = this.state.getWebSockets().filter((ws) => slotOf(ws) !== senderSlot);
+    if (senderSlot === HOST_SLOT) {
+      return peers; // host → every guest
     }
-    this.sim = null;
-  }
-
-  private tick(): void {
-    if (this.sim === null) {
-      return;
-    }
-    this.sim.step();
-    for (const ws of this.state.getWebSockets()) {
-      try {
-        ws.send(encodeSnapshotMessage(this.sim.snapshotFor(slotOf(ws))));
-      } catch {
-        // socket closing mid-tick — the close handler will clean it up
-      }
-    }
+    return peers.filter((ws) => slotOf(ws) === HOST_SLOT); // guest → host only
   }
 }
 
