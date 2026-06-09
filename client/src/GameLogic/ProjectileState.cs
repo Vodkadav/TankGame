@@ -45,4 +45,8 @@ public sealed class ProjectileState
 
     /// <summary>How the view should draw this shot (ordinary bullet vs missile). Cosmetic only.</summary>
     public ProjectileStyle Style;
+
+    /// <summary>The elevation layer this shot travels on (ADR-0018): the behaviour resolves walls
+    /// against this layer, so a shot only meets obstacles on its own plateau. 0 is the ground layer.</summary>
+    public int Layer;
 }
