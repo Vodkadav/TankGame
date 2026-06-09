@@ -94,10 +94,24 @@ public sealed class GridArena : IArena
     private bool StopsShot(int cellX, int cellY, int layer) =>
         _grid.BlocksShots(cellX, cellY) || OnAnotherLayer(cellX, cellY, layer);
 
-    // A cell is on "another layer" only for a layer-aware query (layer != OnAnyLayer) whose layer
-    // differs from the cell's. A flat query ignores layers entirely.
+    // A cell is on "another layer" only for a layer-aware query (layer != OnAnyLayer) whose layer the
+    // cell does not connect. A flat query ignores layers entirely.
     private bool OnAnotherLayer(int cellX, int cellY, int layer) =>
-        layer != OnAnyLayer && _grid.LayerAt(cellX, cellY) != layer;
+        layer != OnAnyLayer && !ConnectsLayer(cellX, cellY, layer);
+
+    // A cell connects a layer when it sits on it — or, for a ramp, when it is either of the two
+    // adjacent layers the ramp joins (LayerAt and LayerAt+1), so a tank or shot on either level
+    // crosses the ramp freely.
+    private bool ConnectsLayer(int cellX, int cellY, int layer)
+    {
+        var cellLayer = _grid.LayerAt(cellX, cellY);
+        if (layer == cellLayer)
+        {
+            return true;
+        }
+
+        return _grid.IsRamp(cellX, cellY) && layer == cellLayer + 1;
+    }
 
     // Brick and crates are destructible; steel and the implicit out-of-bounds border are permanent.
     // A piercing shot uses this to decide whether it can punch through. (Water never blocks a shot,
@@ -140,6 +154,29 @@ public sealed class GridArena : IArena
         var cellX = FloorDiv(local.X);
         var cellY = FloorDiv(local.Y);
         return _grid.IsBlocked(cellX, cellY) || OnAnotherLayer(cellX, cellY, layer);
+    }
+
+    public int LayerAfterMove(Vector2 from, Vector2 to, int currentLayer)
+    {
+        var toLocal = to - _origin;
+        var toX = FloorDiv(toLocal.X);
+        var toY = FloorDiv(toLocal.Y);
+
+        if (!_grid.IsRamp(toX, toY))
+        {
+            return currentLayer; // only a ramp changes a tank's layer
+        }
+
+        var fromLocal = from - _origin;
+        if (FloorDiv(fromLocal.X) == toX && FloorDiv(fromLocal.Y) == toY)
+        {
+            return currentLayer; // already parked on this ramp — don't toggle every tick
+        }
+
+        // Just drove onto the ramp: cross to the connected layer it leads to — up from the low side,
+        // down from the high side.
+        var rampLow = _grid.LayerAt(toX, toY);
+        return currentLayer == rampLow ? rampLow + 1 : rampLow;
     }
 
     private int FloorDiv(float worldComponent) => (int)MathF.Floor(worldComponent / _tileSize);

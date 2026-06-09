@@ -49,4 +49,10 @@ public interface IArena
 
     /// <summary>Whether <paramref name="point"/> is blocked for an entity on <paramref name="layer"/>.</summary>
     bool IsBlocked(Vector2 point, int layer) => IsBlocked(point);
+
+    /// <summary>The elevation layer a tank ends up on after sliding from <paramref name="from"/> to
+    /// <paramref name="to"/> while currently on <paramref name="currentLayer"/> (ADR-0018). A tank
+    /// changes layer only by driving onto a ramp, which connects two adjacent layers; on a flat arena
+    /// (the default) the layer never changes.</summary>
+    int LayerAfterMove(Vector2 from, Vector2 to, int currentLayer) => currentLayer;
 }

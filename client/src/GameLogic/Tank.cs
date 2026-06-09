@@ -252,7 +252,11 @@ public sealed class Tank : ITank
             }
         }
 
+        var previousPosition = Position;
         Position = new Vector2(nextX, nextY);
+
+        // Driving onto a ramp carries the tank up or down to the layer it connects.
+        Layer = _arena.LayerAfterMove(previousPosition, Position, Layer);
 
         PushAgainstWall(wallX, wallY, move, deltaSeconds);
 

@@ -22,19 +22,23 @@ public sealed class WallGrid : IWallGrid
     // layer (0) — the common case, kept allocation-free.
     private readonly int[,]? _layers;
 
-    public WallGrid(WallCell[,] cells, int[,]? layers = null)
+    // Cells that are ramps (connecting LayerAt and LayerAt+1), or null for a flat grid.
+    private readonly bool[,]? _ramps;
+
+    public WallGrid(WallCell[,] cells, int[,]? layers = null, bool[,]? ramps = null)
     {
         _cells = cells;
         Width = cells.GetLength(0);
         Height = cells.GetLength(1);
         _layers = layers;
+        _ramps = ramps;
     }
 
     /// <summary>Builds a grid from a material map, filling each brick cell with
     /// <see cref="DefaultBrickHp"/> and leaving floor/steel at 0 hp. An optional
     /// <paramref name="layers"/> map (same shape) raises cells onto elevation layers; omit it for a
     /// flat, single-layer grid (ADR-0018).</summary>
-    public static WallGrid FromMaterials(CellMaterial[,] materials, int[,]? layers = null)
+    public static WallGrid FromMaterials(CellMaterial[,] materials, int[,]? layers = null, bool[,]? ramps = null)
     {
         var width = materials.GetLength(0);
         var height = materials.GetLength(1);
@@ -55,7 +59,7 @@ public sealed class WallGrid : IWallGrid
             }
         }
 
-        return new WallGrid(cells, layers);
+        return new WallGrid(cells, layers, ramps);
     }
 
     public int Width { get; }
@@ -67,6 +71,8 @@ public sealed class WallGrid : IWallGrid
         InBounds(x, y) ? _cells[x, y] : new WallCell(CellMaterial.Steel, 0);
 
     public int LayerAt(int x, int y) => _layers is not null && InBounds(x, y) ? _layers[x, y] : 0;
+
+    public bool IsRamp(int x, int y) => _ramps is not null && InBounds(x, y) && _ramps[x, y];
 
     public bool IsBlocked(int x, int y) => CellMaterials.BlocksMovement(GetCell(x, y).Material);
 

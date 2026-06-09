@@ -226,4 +226,76 @@ public class GridArenaTests
             Assert.Equal(arena.IsBlocked(point), arena.IsBlocked(point, layer: 0));
         }
     }
+
+    // ── Ramps (ADR-0018 step 2b) ──
+    // Column 0 ground (layer 0), column 1 a ramp (joins 0 and 1), columns 2-3 plateau (layer 1).
+    private static GridArena GroundRampPlateau()
+    {
+        var grid = WallGrid.FromMaterials(
+            new[,]
+            {
+                { CellMaterial.Floor },
+                { CellMaterial.Floor },
+                { CellMaterial.Floor },
+                { CellMaterial.Floor },
+            },
+            layers: new[,] { { 0 }, { 0 }, { 1 }, { 1 } },
+            ramps: new[,] { { false }, { true }, { false }, { false } });
+        return new GridArena(grid, Tile, Vector2.Zero);
+    }
+
+    [Fact]
+    public void IsBlocked_ARamp_IsPassableFromBothConnectedLayers_ButNotAThird()
+    {
+        var arena = GroundRampPlateau();
+        var onTheRamp = new Vector2(15f, 5f); // column 1
+
+        Assert.False(arena.IsBlocked(onTheRamp, layer: 0)); // approached from the ground
+        Assert.False(arena.IsBlocked(onTheRamp, layer: 1)); // approached from the plateau
+        Assert.True(arena.IsBlocked(onTheRamp, layer: 2));  // a tank from a higher level can't reach it
+    }
+
+    [Fact]
+    public void LayerAfterMove_DrivingOntoTheRamp_CarriesTheTankUpThenDown()
+    {
+        var arena = GroundRampPlateau();
+        var onGround = new Vector2(5f, 5f);  // column 0
+        var onRamp = new Vector2(15f, 5f);   // column 1
+
+        Assert.Equal(1, arena.LayerAfterMove(onGround, onRamp, currentLayer: 0)); // climbed
+        Assert.Equal(0, arena.LayerAfterMove(new Vector2(25f, 5f), onRamp, currentLayer: 1)); // descended
+    }
+
+    [Fact]
+    public void LayerAfterMove_ParkedOnTheRamp_DoesNotToggleEveryTick()
+    {
+        var arena = GroundRampPlateau();
+        var onRamp = new Vector2(15f, 5f);
+        var stillOnRamp = new Vector2(16f, 5f); // same cell
+
+        Assert.Equal(1, arena.LayerAfterMove(onRamp, stillOnRamp, currentLayer: 1));
+    }
+
+    [Fact]
+    public void LayerAfterMove_MovingBetweenNormalCells_KeepsTheLayer()
+    {
+        var arena = GroundRampPlateau();
+
+        Assert.Equal(1, arena.LayerAfterMove(new Vector2(25f, 5f), new Vector2(35f, 5f), currentLayer: 1));
+    }
+
+    [Fact]
+    public void RaycastFirstHit_AShotOnEitherConnectedLayer_PassesOverTheRamp()
+    {
+        var arena = GroundRampPlateau();
+
+        // A ground shot (layer 0) crosses the ramp (col 1) and stops at the plateau cliff (col 2, x=20).
+        var ground = arena.RaycastFirstHit(new Vector2(5f, 5f), new Vector2(1f, 0f), 100f, layer: 0);
+        Assert.Equal(20f, ground!.Value.Point.X, precision: 3);
+
+        // A plateau shot (layer 1) fired back toward the ground crosses the ramp and stops at the
+        // ground cliff (col 0 face, x=10).
+        var plateau = arena.RaycastFirstHit(new Vector2(25f, 5f), new Vector2(-1f, 0f), 100f, layer: 1);
+        Assert.Equal(10f, plateau!.Value.Point.X, precision: 3);
+    }
 }
