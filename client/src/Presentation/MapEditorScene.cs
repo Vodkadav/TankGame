@@ -205,6 +205,18 @@ public partial class MapEditorScene : Node3D
         {
             AddMarker(spawn.X, spawn.Y, "★", new Color(1f, 0.9f, 0.3f));
         }
+
+        var padColour = new Color(0.3f, 0.85f, 1f); // teleport cyan, mirrors TeleportPad3DView
+        foreach (var pad in _editor.TeleportPads)
+        {
+            AddMarker(pad.AX, pad.AY, "T", padColour);
+            AddMarker(pad.BX, pad.BY, "T", padColour);
+        }
+
+        if (_editor.PendingTeleportPad is { } pending)
+        {
+            AddMarker(pending.X, pending.Y, "T?", padColour); // a half-placed pad awaiting its partner
+        }
     }
 
     private void AddMarker(int x, int y, string glyph, Color colour)
@@ -300,6 +312,7 @@ public partial class MapEditorScene : Node3D
         palette.AddChild(ToolButton("Sandbag", "editor.sandbag", () => SelectAction(EditorAction.ToggleSandbag)));
         palette.AddChild(ToolButton("Player", "editor.player", () => SelectAction(EditorAction.SetPlayerSpawn)));
         palette.AddChild(ToolButton("Enemy", "editor.enemy", () => SelectAction(EditorAction.ToggleEnemySpawn)));
+        palette.AddChild(ToolButton("TeleportPad", "editor.teleport", () => SelectAction(EditorAction.PlaceTeleportPad)));
         palette.AddChild(ToolButton("Erase", "editor.erase", () => SelectAction(EditorAction.Erase)));
 
         var powerups = new OptionButton { Name = "PowerupKind" };

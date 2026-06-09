@@ -1,5 +1,6 @@
 using Godot;
 using Chickensoft.GoDotTest;
+using TankGame.GameLogic;
 using TankGame.Presentation;
 
 namespace TankGame.Tests.Presentation;
@@ -91,6 +92,53 @@ public class Arena3DSceneTests : TestClass
         if (teleportPads != 2)
         {
             throw new System.Exception($"3D arena must place a linked pair of teleport pad rings; saw {teleportPads}.");
+        }
+
+        // A custom map with authored pads overrides the auto-placement (teleport pads T2): two authored
+        // links must yield four rings. Folded into this test (not a new one) to keep the leak-prone scene
+        // instantiations to a minimum; the extra scene is freed here and the class's Cleanup GCs.
+        AssertAuthoredPadsOverrideAutoPlacement();
+    }
+
+    private void AssertAuthoredPadsOverrideAutoPlacement()
+    {
+        var map = MapDefinition.CreateBlank("Authored Pads", 12, 12);
+        var custom = new MapDefinition(
+            map.Name, map.Materials, map.Bushes, map.Sandbags,
+            (1, 1),
+            new (int X, int Y)[] { (10, 10) },
+            System.Array.Empty<PowerupSpawn>(),
+            new[] { new TeleportPadLink(2, 2, 9, 9), new TeleportPadLink(2, 9, 9, 2) });
+
+        Node custscene = default!;
+        try
+        {
+            GameSetup.StartNewMatch(GameMode.OnePlayer);
+            GameSetup.CustomMap = custom;
+            custscene = GD.Load<PackedScene>("res://src/Presentation/Arena/Arena3D.tscn").Instantiate();
+            TestScene.AddChild(custscene); // runs _Ready with the authored pads
+
+            var rings = 0;
+            foreach (var child in custscene.GetChildren())
+            {
+                if (child is TeleportPad3DView)
+                {
+                    rings++;
+                }
+            }
+
+            if (rings != 4)
+            {
+                throw new System.Exception($"Two authored pad links must place four rings; saw {rings}.");
+            }
+        }
+        finally
+        {
+            GameSetup.CustomMap = null;
+            if (GodotObject.IsInstanceValid(custscene))
+            {
+                custscene.Free();
+            }
         }
     }
 

@@ -14,6 +14,9 @@ public enum MapValidationCode
     PowerupSpawnNotFloor,
     SpawnUnreachable,
     NoEnemySpawns,
+    TeleportPadOutOfBounds,
+    TeleportPadNotFloor,
+    TeleportPadEndpointsCoincide,
 }
 
 /// <summary>One validation problem, with the cell it concerns (or (-1, -1) when it is not about a
@@ -66,6 +69,16 @@ public static class MapValidator
         foreach (var spawn in map.PowerupSpawns)
         {
             CheckSpawnCell(map, spawn.X, spawn.Y, errors, MapValidationCode.PowerupSpawnOutOfBounds, MapValidationCode.PowerupSpawnNotFloor);
+        }
+
+        foreach (var pad in map.TeleportPads)
+        {
+            CheckSpawnCell(map, pad.AX, pad.AY, errors, MapValidationCode.TeleportPadOutOfBounds, MapValidationCode.TeleportPadNotFloor);
+            CheckSpawnCell(map, pad.BX, pad.BY, errors, MapValidationCode.TeleportPadOutOfBounds, MapValidationCode.TeleportPadNotFloor);
+            if (pad.AX == pad.BX && pad.AY == pad.BY)
+            {
+                errors.Add(new MapValidationError(MapValidationCode.TeleportPadEndpointsCoincide, pad.AX, pad.AY));
+            }
         }
 
         // Reachability only makes sense from a real standing-room player start.

@@ -69,4 +69,30 @@ public class MapDefinitionTests
     {
         Assert.Throws<ArgumentOutOfRangeException>(() => MapDefinition.CreateBlank("tiny", 2, 5));
     }
+
+    [Fact]
+    public void TeleportPads_DefaultToEmpty_WhenOmitted()
+    {
+        var map = MapDefinition.CreateBlank("Blank", 6, 5);
+
+        Assert.Empty(map.TeleportPads);
+    }
+
+    [Fact]
+    public void Constructor_ExposesTeleportPadLinks()
+    {
+        var materials = new CellMaterial[6, 5];
+        var map = new MapDefinition(
+            "Pads",
+            materials,
+            new bool[6, 5],
+            new bool[6, 5],
+            (1, 1),
+            new (int X, int Y)[] { (4, 3) },
+            Array.Empty<PowerupSpawn>(),
+            new[] { new TeleportPadLink(1, 2, 4, 2) });
+
+        Assert.Single(map.TeleportPads);
+        Assert.Equal(new TeleportPadLink(1, 2, 4, 2), map.TeleportPads[0]);
+    }
 }
