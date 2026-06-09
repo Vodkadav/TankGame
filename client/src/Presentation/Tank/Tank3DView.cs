@@ -32,6 +32,7 @@ public partial class Tank3DView : Node3D
     private ShaderMaterial _shieldFill = null!;
     private CpuParticles3D _smoke = null!;
     private bool _wasAlive = true;
+    private bool _stealthed;
 
     public override void _Ready()
     {
@@ -43,16 +44,41 @@ public partial class Tank3DView : Node3D
         _hull = FindPart(model, "Base") ?? model;
         _turret = FindPart(model, "Turret") ?? _hull;
         BuildBodyMaterial(model);
-        if (_bodyMaterial is not null)
-        {
-            _bodyMaterial.AlbedoColor = TeamPalette.TintFor(_team); // apply any tint set before the tree entry
-        }
+        ApplyStealthTint(); // apply any team/stealth tint set before the tree entry
 
         BuildBars();
         BuildSmoke();
     }
 
     public void Bind(ITank tank) => _tank = tank;
+
+    /// <summary>When true the tank is hidden from view entirely — an enemy outside the player team's
+    /// circle of vision, or lurking in grass with no player near (mirrors the AI's blindness so cover
+    /// genuinely hides it). The fog rule in <see cref="Arena3DScene"/> sets it each frame.</summary>
+    public bool Concealed { get; set; }
+
+    /// <summary>When true the tank sits in a bush — darken the body to signal stealth cover (keeps the
+    /// team colour underneath). Set each frame by the scene for the player's own tank.</summary>
+    public bool Stealthed
+    {
+        get => _stealthed;
+        set
+        {
+            _stealthed = value;
+            ApplyStealthTint();
+        }
+    }
+
+    private void ApplyStealthTint()
+    {
+        if (_bodyMaterial is null)
+        {
+            return;
+        }
+
+        var team = TeamPalette.TintFor(_team);
+        _bodyMaterial.AlbedoColor = _stealthed ? team * 0.45f : team;
+    }
 
     // Dark smoke that trails a badly-wounded tank (below Tank.LowHealthFraction of max HP). Off until the
     // tank drops under the threshold; a clear "this tank is nearly dead" tell to match the crawl speed.
@@ -94,10 +120,7 @@ public partial class Tank3DView : Node3D
     public void ApplyTeamTint(int team)
     {
         _team = team;
-        if (_bodyMaterial is not null)
-        {
-            _bodyMaterial.AlbedoColor = TeamPalette.TintFor(team);
-        }
+        ApplyStealthTint();
     }
 
     public override void _Process(double delta) => UpdateFromModel();
@@ -117,7 +140,7 @@ public partial class Tank3DView : Node3D
         }
 
         _wasAlive = alive;
-        Visible = alive; // downed/awaiting respawn → hidden
+        Visible = alive && !Concealed; // downed/awaiting respawn, or unseen in the fog → hidden
         if (!alive)
         {
             _smoke.Emitting = false;

@@ -108,6 +108,44 @@ public class Arena3DSceneTests : TestClass
     }
 
     [Test]
+    public void Arena3D_FogsTheField_WithALightAroundThePlayer()
+    {
+        // Setup() loads the single-player 3D arena. Fog darkens the world (dark ambient) and lights only
+        // a circle around the player via a SpotLight3D that follows the player on the ground plane.
+        var scene = (Arena3DScene)_arena;
+
+        var fogLight = _arena.FindChild("FogLight", recursive: true, owned: false) as SpotLight3D
+            ?? throw new System.Exception("3D fog must add a SpotLight3D 'FogLight' around the player.");
+
+        var player = scene.PlayerWorldPosition;
+        var lit = fogLight.Position;
+        if (Mathf.Abs(lit.X - player.X) > 1f || Mathf.Abs(lit.Z - player.Z) > 1f)
+        {
+            throw new System.Exception(
+                $"The fog light must be centred over the player (light {lit} vs player {player}).");
+        }
+
+        if (lit.Y <= player.Y)
+        {
+            throw new System.Exception("The fog light must hang above the player to light a ground circle.");
+        }
+
+        WorldEnvironment? worldEnv = null;
+        foreach (var child in _arena.GetChildren())
+        {
+            if (child is WorldEnvironment we)
+            {
+                worldEnv = we;
+            }
+        }
+
+        if (worldEnv?.Environment is null || worldEnv.Environment.AmbientLightColor.Luminance > 0.3f)
+        {
+            throw new System.Exception("Fog must darken the world's ambient so only the lit circle reads as visible.");
+        }
+    }
+
+    [Test]
     public void Arena3D_SpawnsThePickups_AsPowerupViews()
     {
         var powerups = 0;
