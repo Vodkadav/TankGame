@@ -10,9 +10,10 @@ namespace TankGame.GameLogic;
 /// within <see cref="VisionRange"/> and with a clear line of sight — aims the turret at it,
 /// drives toward it until within stand-off range, and fires when in firing range. An enemy
 /// hidden behind a wall (or too far off) is not hunted: the AI holds until something comes
-/// into view, so cover and concealment matter. Pure C#: no Godot, no pathfinding yet (it
-/// bulldozes brick walls in the way and is stopped by steel). Bind it to the tank it drives
-/// after construction.</summary>
+/// into view, so cover and concealment matter. When given a wall grid it routes AROUND cover via
+/// A* (<see cref="GridPathfinder"/>) — steering toward the next waypoint of a path to its goal —
+/// rather than bulldozing straight into a wall; without a grid it falls back to direct steering.
+/// Pure C#: no Godot. Bind it to the tank it drives after construction.</summary>
 public sealed class AiInputSource : IInputSource
 {
     private const float FireRange = 420f;
@@ -47,6 +48,15 @@ public sealed class AiInputSource : IInputSource
     private readonly IArena _arena;
     private readonly IConcealment? _concealment;
     private readonly bool _ambusher;
+
+    // Optional pathfinding context: the raw wall grid plus the world↔tile mapping. When present the
+    // AI routes around cover via A* (GridPathfinder) instead of steering straight into it; when null
+    // (e.g. a test arena with no grid) it falls back to driving directly at the target. Built once and
+    // never mutated here — the grid is shared, read-only from the AI's view.
+    private readonly IWallGrid? _grid;
+    private readonly float _tileSize;
+    private readonly Vector2 _origin;
+
     private ITank? _self;
     private Random _rng = new();
     private Vector2 _wanderDirection;
@@ -54,12 +64,28 @@ public sealed class AiInputSource : IInputSource
 
     /// <param name="ambusher">When true (and concealment exists), this tank prefers to slip into grass
     /// and snipe from cover rather than charge — so some enemies lie in wait. Bind it after construction.</param>
-    public AiInputSource(IWorld world, IArena arena, IConcealment? concealment = null, bool ambusher = false)
+    /// <param name="grid">The wall grid to path around. Omit (null) to disable pathfinding and steer
+    /// straight at targets, as before.</param>
+    /// <param name="tileSize">World-space size of one tile, matching the arena's mapping. Used with
+    /// <paramref name="origin"/> to convert world positions to grid cells and waypoints back to world
+    /// centres. Ignored when <paramref name="grid"/> is null.</param>
+    /// <param name="origin">World position of cell (0,0)'s minimum corner, matching the arena.</param>
+    public AiInputSource(
+        IWorld world,
+        IArena arena,
+        IConcealment? concealment = null,
+        bool ambusher = false,
+        IWallGrid? grid = null,
+        float tileSize = 0f,
+        Vector2 origin = default)
     {
         _world = world;
         _arena = arena;
         _concealment = concealment;
         _ambusher = ambusher;
+        _grid = grid;
+        _tileSize = tileSize;
+        _origin = origin;
     }
 
     /// <summary>Links this controller to the tank it drives (resolves the construction cycle:
@@ -108,20 +134,21 @@ public sealed class AiInputSource : IInputSource
         }
 
         // The enemy is seen but out of range: close in, detouring through a nearby pickup if there
-        // is one on the way, while keeping the gun trained on the threat.
+        // is one on the way, while keeping the gun trained on the threat. Routing is path-aware so the
+        // AI rounds cover between it and the goal instead of grinding into a wall.
         var detour = NearestReachablePowerup();
         var move = detour is not null
-            ? DirectionTo(detour.Position)
-            : Vector2.Normalize(delta);
+            ? SteerToward(detour.Position)
+            : SteerToward(target.Position);
         return new TankInput(move, aim, Fire: false);
     }
 
-    // Steer straight at a point (aim along the travel direction); used when chasing a pickup with
-    // no enemy to keep the gun on.
+    // Steer toward a point (aim along the travel direction); used when chasing a pickup or
+    // investigating gunfire with no enemy to keep the gun on.
     private TankInput DriveToward(Vector2 point)
     {
         var delta = point - _self!.Position;
-        return new TankInput(DirectionTo(point), MathF.Atan2(delta.Y, delta.X), Fire: false);
+        return new TankInput(SteerToward(point), MathF.Atan2(delta.Y, delta.X), Fire: false);
     }
 
     // Unit vector toward a point, or zero if we are already on it (avoids a NaN from normalising
@@ -131,6 +158,43 @@ public sealed class AiInputSource : IInputSource
         var delta = point - _self!.Position;
         return delta == Vector2.Zero ? Vector2.Zero : Vector2.Normalize(delta);
     }
+
+    // Path-aware steering toward a world-space goal. With a wall grid, computes an A* route from the
+    // AI's cell to the goal's cell and heads for the next waypoint's centre, so it rounds cover. Falls
+    // back to driving straight at the goal when there is no grid, when start/goal share a cell, or when
+    // the goal is unreachable (e.g. walled off — better to nose toward it than freeze).
+    private Vector2 SteerToward(Vector2 goal)
+    {
+        if (_grid is null || _tileSize <= 0f)
+        {
+            return DirectionTo(goal);
+        }
+
+        var start = ToCell(_self!.Position);
+        var goalCell = ToCell(goal);
+        if (start == goalCell)
+        {
+            return DirectionTo(goal); // same tile — no routing needed, head straight in
+        }
+
+        var path = GridPathfinder.FindPath(_grid, start, goalCell);
+        if (path.Count < 2)
+        {
+            return DirectionTo(goal); // unreachable or trivial — steer straight as a fallback
+        }
+
+        // path[0] is the AI's own cell; aim for the centre of the next waypoint.
+        return DirectionTo(CellCentre(path[1]));
+    }
+
+    private (int X, int Y) ToCell(Vector2 worldPoint)
+    {
+        var local = worldPoint - _origin;
+        return ((int)MathF.Floor(local.X / _tileSize), (int)MathF.Floor(local.Y / _tileSize));
+    }
+
+    private Vector2 CellCentre((int X, int Y) cell) =>
+        _origin + new Vector2((cell.X + 0.5f) * _tileSize, (cell.Y + 0.5f) * _tileSize);
 
     // Ambusher mode: slip into the nearest grass and snipe from cover. While hidden it holds position
     // and fires at any enemy in range; otherwise it moves to the grass. Returns null when no grass is
