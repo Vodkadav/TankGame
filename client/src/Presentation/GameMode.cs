@@ -42,6 +42,12 @@ public static class GameSetup
     /// is playable today; it is the map the 3D play scene builds.</summary>
     public static ArenaId Arena { get; set; } = ArenaId.DesertWar;
 
+    /// <summary>A user-built map to play instead of the procedural arena, set when the player picks one
+    /// from "My Maps". Null means play the built-in <see cref="Arena"/>. Cleared by
+    /// <see cref="StartNewMatch"/>, so any built-in launch resets it; the custom-map launch sets it back
+    /// afterwards. It then persists across the per-round scene reloads of a best-of-N match.</summary>
+    public static MapDefinition? CustomMap { get; set; }
+
     /// <summary>The arena's visual palette (S8 theming): ground colour + wall tint. A title control
     /// can later set it; defaults to the sandy reference look.</summary>
     public static ArenaTheme Theme { get; set; } = ArenaTheme.Default;
@@ -70,5 +76,6 @@ public static class GameSetup
         Mode = mode;
         Series = new SeriesTracker(RoundsToWin);
         ArenaSeed = Guid.NewGuid().GetHashCode();
+        CustomMap = null; // a fresh match defaults to the built-in arena; My Maps sets it back after
     }
 }

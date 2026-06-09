@@ -1,4 +1,6 @@
 using Godot;
+using TankGame.GameLogic;
+using TankGame.Infrastructure;
 
 namespace TankGame.Presentation;
 
@@ -11,6 +13,9 @@ public partial class MapSelectScene : Control
 {
     public const string TitleScenePath = "res://src/Presentation/Title.tscn";
     private const string PreviewDir = "res://src/Presentation/Arena/previews/";
+    private const string MapsDir = "user://maps";
+
+    private MapRepository _maps = null!;
 
     private readonly record struct ArenaEntry(ArenaId Id, string Node, string NameKey, string Preview, bool Available);
 
@@ -46,6 +51,8 @@ public partial class MapSelectScene : Control
             left.AddChild(button);
         }
 
+        BuildMyMaps(left);
+
         var back = new Button { Name = "Back", Text = "map.back" };
         back.Pressed += () => Go(TitleScenePath);
         left.AddChild(back);
@@ -71,6 +78,40 @@ public partial class MapSelectScene : Control
         root.AddChild(detail);
 
         Select(Arenas[0]); // Desert War highlighted by default
+    }
+
+    // Lists the player's saved maps under their own heading, seeding a bundled sample so there is always
+    // one to play (and so the save/list/load round trip is exercised). Each map gets a Play button.
+    private void BuildMyMaps(VBoxContainer left)
+    {
+        _maps = new MapRepository(ProjectSettings.GlobalizePath(MapsDir));
+        _maps.Save(SampleArena.Build()); // keep the bundled sample present (overwrites its own slot)
+
+        left.AddChild(new Label { Name = "MyMapsHeading", Text = "map.my_maps" });
+        foreach (var stored in _maps.List())
+        {
+            var id = stored.Id;
+            var button = new Button { Name = "Map_" + id, Text = stored.Name };
+            button.Pressed += () => PlayCustom(id);
+            left.AddChild(button);
+        }
+    }
+
+    private void PlayCustom(string id)
+    {
+        MapDefinition map;
+        try
+        {
+            map = _maps.Load(id);
+        }
+        catch (MapFormatException)
+        {
+            return; // a corrupt file: ignore the click rather than crash
+        }
+
+        GameSetup.StartNewMatch(GameMode.OnePlayer);
+        GameSetup.CustomMap = map; // after StartNewMatch, which clears it for built-in launches
+        Go(TitleScene.ArenaScenePath);
     }
 
     // Highlights an arena: shows its preview and name, and only enables Play for a playable arena. Driven
