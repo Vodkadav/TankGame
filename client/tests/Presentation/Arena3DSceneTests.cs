@@ -19,8 +19,17 @@ public class Arena3DSceneTests : TestClass
         TestScene.AddChild(_arena); // runs Arena3DScene._Ready
     }
 
+    // Free the scene immediately rather than QueueFree: a deferred free can leave the scene's resources
+    // (Environment, meshes, materials) alive until the engine's C# shutdown, which trips a fatal "Leaked
+    // unsafe reference" teardown crash once the scene holds enough of them. Freeing now tears it down cleanly.
     [Cleanup]
-    public void Cleanup() => _arena.QueueFree();
+    public void Cleanup()
+    {
+        if (GodotObject.IsInstanceValid(_arena))
+        {
+            _arena.Free();
+        }
+    }
 
     [Test]
     public void Arena3D_WiresTanksAndGround_UnderA3DCamera()
