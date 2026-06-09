@@ -13,6 +13,7 @@ public enum EditorAction
     SetPlayerSpawn,
     ToggleEnemySpawn,
     TogglePowerup,
+    PlaceTeleportPad,
     Erase,
 }
 
@@ -28,7 +29,9 @@ public sealed class MapEditor
     private readonly bool[,] _sandbags;
     private readonly List<(int X, int Y)> _enemySpawns = new();
     private readonly List<PowerupSpawn> _powerupSpawns = new();
+    private readonly List<TeleportPadLink> _teleportPads = new();
     private (int X, int Y) _playerSpawn = (1, 1);
+    private (int X, int Y)? _pendingTeleportPad;
 
     public MapEditor(string name, int width, int height)
     {
@@ -58,6 +61,12 @@ public sealed class MapEditor
     public IReadOnlyList<(int X, int Y)> EnemySpawns => _enemySpawns;
 
     public IReadOnlyList<PowerupSpawn> PowerupSpawns => _powerupSpawns;
+
+    public IReadOnlyList<TeleportPadLink> TeleportPads => _teleportPads;
+
+    /// <summary>The first pad of a link the author has placed but not yet partnered (null when none is
+    /// half-placed). The scene shows a marker on it so the author can see they owe a second click.</summary>
+    public (int X, int Y)? PendingTeleportPad => _pendingTeleportPad;
 
     public CellMaterial MaterialAt(int x, int y) => _materials[x, y];
 
@@ -110,12 +119,17 @@ public sealed class MapEditor
                 TogglePowerup(x, y);
                 break;
 
+            case EditorAction.PlaceTeleportPad when IsFloor(x, y):
+                PlaceTeleportPad(x, y);
+                break;
+
             case EditorAction.Erase:
                 _materials[x, y] = CellMaterial.Floor;
                 _bushes[x, y] = false;
                 _sandbags[x, y] = false;
                 _enemySpawns.Remove((x, y));
                 _powerupSpawns.RemoveAll(p => p.X == x && p.Y == y);
+                RemoveTeleportPadAt(x, y);
                 break;
         }
     }
@@ -127,7 +141,8 @@ public sealed class MapEditor
         (bool[,])_sandbags.Clone(),
         _playerSpawn,
         _enemySpawns.ToList(),
-        _powerupSpawns.ToList());
+        _powerupSpawns.ToList(),
+        _teleportPads.ToList());
 
     public MapValidationResult Validate() => MapValidator.Validate(ToMap());
 
@@ -145,6 +160,42 @@ public sealed class MapEditor
         }
 
         _powerupSpawns.Add(new PowerupSpawn(PaintPowerup, x, y));
+    }
+
+    // Two-click placement: the first click parks a pending pad, the second partners it into a link. Clicking
+    // a cell already part of a link removes that whole link; clicking the pending cell again cancels it.
+    private void PlaceTeleportPad(int x, int y)
+    {
+        if (RemoveTeleportPadAt(x, y))
+        {
+            return;
+        }
+
+        if (_pendingTeleportPad is { } pending)
+        {
+            if (pending == (x, y))
+            {
+                _pendingTeleportPad = null; // clicking the pending pad again cancels it
+                return;
+            }
+
+            _teleportPads.Add(new TeleportPadLink(pending.X, pending.Y, x, y));
+            _pendingTeleportPad = null;
+            return;
+        }
+
+        _pendingTeleportPad = (x, y);
+    }
+
+    private bool RemoveTeleportPadAt(int x, int y)
+    {
+        if (_pendingTeleportPad == (x, y))
+        {
+            _pendingTeleportPad = null;
+            return true;
+        }
+
+        return _teleportPads.RemoveAll(p => (p.AX == x && p.AY == y) || (p.BX == x && p.BY == y)) > 0;
     }
 
     private bool IsInterior(int x, int y) => x > 0 && y > 0 && x < Width - 1 && y < Height - 1;

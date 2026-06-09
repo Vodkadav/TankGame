@@ -19,7 +19,8 @@ public class MapCodecTests
             map.Name, map.Materials, map.Bushes, map.Sandbags,
             (1, 1),
             new (int X, int Y)[] { (4, 3) },
-            new[] { new PowerupSpawn(PowerupKind.Shield, 2, 1) });
+            new[] { new PowerupSpawn(PowerupKind.Shield, 2, 1) },
+            new[] { new TeleportPadLink(1, 1, 4, 3) });
     }
 
     [Fact]
@@ -35,6 +36,7 @@ public class MapCodecTests
         Assert.Equal(original.PlayerSpawn, restored.PlayerSpawn);
         Assert.Equal(original.EnemySpawns, restored.EnemySpawns);
         Assert.Equal(original.PowerupSpawns, restored.PowerupSpawns);
+        Assert.Equal(original.TeleportPads, restored.TeleportPads);
 
         for (var y = 0; y < original.Height; y++)
         {
@@ -60,5 +62,19 @@ public class MapCodecTests
     public void Decode_ThrowsOnMalformedJson()
     {
         Assert.Throws<MapFormatException>(() => MapCodec.Decode("not json at all"));
+    }
+
+    [Fact]
+    public void Decode_TreatsAMissingTeleportPadsField_AsNoPads()
+    {
+        // A pre-teleport document has no "teleportPads" key — it must still decode (backward-compatible).
+        var legacy = "{\"name\":\"Legacy\",\"width\":3,\"height\":3," +
+            "\"materials\":[\"###\",\"#.#\",\"###\"],\"bushes\":[\"...\",\"...\",\"...\"]," +
+            "\"sandbags\":[\"...\",\"...\",\"...\"],\"playerSpawn\":[1,1]," +
+            "\"enemySpawns\":[[1,1]],\"powerupSpawns\":[]}";
+
+        var restored = MapCodec.Decode(legacy);
+
+        Assert.Empty(restored.TeleportPads);
     }
 }

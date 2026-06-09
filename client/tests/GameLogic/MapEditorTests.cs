@@ -118,4 +118,71 @@ public class MapEditorTests
         Assert.True(editor.Validate().IsValid);
         Assert.Equal("Test Map", editor.ToMap().Name);
     }
+
+    [Fact]
+    public void PlaceTeleportPad_FirstClickIsPending_SecondClickFormsALink()
+    {
+        var editor = Medium();
+        editor.Action = EditorAction.PlaceTeleportPad;
+
+        editor.ApplyAt(5, 5); // pad A — pending, no link yet
+        Assert.Empty(editor.TeleportPads);
+        Assert.Equal((5, 5), editor.PendingTeleportPad);
+
+        editor.ApplyAt(10, 8); // pad B — completes the link
+        Assert.Single(editor.TeleportPads);
+        Assert.Equal(new TeleportPadLink(5, 5, 10, 8), editor.TeleportPads[0]);
+        Assert.Null(editor.PendingTeleportPad);
+    }
+
+    [Fact]
+    public void PlaceTeleportPad_ClickingAnExistingPad_RemovesItsLink()
+    {
+        var editor = Medium();
+        editor.Action = EditorAction.PlaceTeleportPad;
+        editor.ApplyAt(5, 5);
+        editor.ApplyAt(10, 8);
+        Assert.Single(editor.TeleportPads);
+
+        editor.ApplyAt(10, 8); // clicking a placed pad clears its whole link
+        Assert.Empty(editor.TeleportPads);
+        Assert.Null(editor.PendingTeleportPad);
+    }
+
+    [Fact]
+    public void PlaceTeleportPad_ClickingThePendingPadAgain_CancelsIt()
+    {
+        var editor = Medium();
+        editor.Action = EditorAction.PlaceTeleportPad;
+        editor.ApplyAt(5, 5);
+
+        editor.ApplyAt(5, 5); // same cell again cancels the half-placed link
+        Assert.Empty(editor.TeleportPads);
+        Assert.Null(editor.PendingTeleportPad);
+    }
+
+    [Fact]
+    public void Erase_RemovesATeleportPadLink_AndItsPartner()
+    {
+        var editor = Medium();
+        editor.Action = EditorAction.PlaceTeleportPad;
+        editor.ApplyAt(5, 5);
+        editor.ApplyAt(10, 8);
+
+        editor.Action = EditorAction.Erase;
+        editor.ApplyAt(5, 5);
+
+        Assert.Empty(editor.TeleportPads);
+    }
+
+    [Fact]
+    public void ToMap_CarriesTeleportPads()
+    {
+        var editor = Medium();
+        editor.Action = EditorAction.PlaceTeleportPad;
+        editor.ApplyAt(5, 5);
+        editor.ApplyAt(10, 8);
+
+        Assert.Single(editor.ToMap().TeleportPads);
+    }
 }

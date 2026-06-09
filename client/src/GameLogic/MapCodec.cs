@@ -82,6 +82,19 @@ public static class MapCodec
             }
 
             writer.WriteEndArray();
+
+            writer.WriteStartArray("teleportPads");
+            foreach (var pad in map.TeleportPads)
+            {
+                writer.WriteStartObject();
+                writer.WriteNumber("ax", pad.AX);
+                writer.WriteNumber("ay", pad.AY);
+                writer.WriteNumber("bx", pad.BX);
+                writer.WriteNumber("by", pad.BY);
+                writer.WriteEndObject();
+            }
+
+            writer.WriteEndArray();
             writer.WriteEndObject();
         }
 
@@ -133,7 +146,18 @@ public static class MapCodec
                     powerupSpawns.Add(new PowerupSpawn(kind, spawn.GetProperty("x").GetInt32(), spawn.GetProperty("y").GetInt32()));
                 }
 
-                return new MapDefinition(name, materials, bushes, sandbags, playerSpawn, enemySpawns, powerupSpawns);
+                var teleportPads = new List<TeleportPadLink>();
+                if (root.TryGetProperty("teleportPads", out var padsElement))
+                {
+                    foreach (var pad in padsElement.EnumerateArray())
+                    {
+                        teleportPads.Add(new TeleportPadLink(
+                            pad.GetProperty("ax").GetInt32(), pad.GetProperty("ay").GetInt32(),
+                            pad.GetProperty("bx").GetInt32(), pad.GetProperty("by").GetInt32()));
+                    }
+                }
+
+                return new MapDefinition(name, materials, bushes, sandbags, playerSpawn, enemySpawns, powerupSpawns, teleportPads);
             }
             catch (KeyNotFoundException ex)
             {

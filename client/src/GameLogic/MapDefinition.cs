@@ -10,6 +10,15 @@ namespace TankGame.GameLogic;
 /// <param name="Y">Row.</param>
 public readonly record struct PowerupSpawn(PowerupKind Kind, int X, int Y);
 
+/// <summary>A linked pair of teleport pads on an authored map, given by the two cells they sit on. Driving
+/// onto one pad warps a tank to its partner. Both ends are on the ground layer (0) for now — the fields are
+/// kept cell-based and layer-free so a future Cliffs map can extend this with per-end layers (ADR-0018).</summary>
+/// <param name="AX">Pad A column.</param>
+/// <param name="AY">Pad A row.</param>
+/// <param name="BX">Pad B column.</param>
+/// <param name="BY">Pad B row.</param>
+public readonly record struct TeleportPadLink(int AX, int AY, int BX, int BY);
+
 /// <summary>An authored arena: the full document a map editor writes and the loader reads. It unifies
 /// what is otherwise split across <see cref="LevelMap"/> (materials/bushes/player spawn) and
 /// <see cref="ArenaGenerator"/> output (enemy spawns, pickup cells, sandbags) into one serializable
@@ -26,7 +35,8 @@ public sealed class MapDefinition
         bool[,] sandbags,
         (int X, int Y) playerSpawn,
         IReadOnlyList<(int X, int Y)> enemySpawns,
-        IReadOnlyList<PowerupSpawn> powerupSpawns)
+        IReadOnlyList<PowerupSpawn> powerupSpawns,
+        IReadOnlyList<TeleportPadLink>? teleportPads = null)
     {
         Name = name ?? throw new ArgumentNullException(nameof(name));
         Materials = materials ?? throw new ArgumentNullException(nameof(materials));
@@ -41,6 +51,7 @@ public sealed class MapDefinition
         PlayerSpawn = playerSpawn;
         EnemySpawns = enemySpawns ?? throw new ArgumentNullException(nameof(enemySpawns));
         PowerupSpawns = powerupSpawns ?? throw new ArgumentNullException(nameof(powerupSpawns));
+        TeleportPads = teleportPads ?? Array.Empty<TeleportPadLink>();
     }
 
     /// <summary>The map's display name (shown in the "My Maps" browser).</summary>
@@ -66,6 +77,9 @@ public sealed class MapDefinition
 
     /// <summary>Powerup spawn markers.</summary>
     public IReadOnlyList<PowerupSpawn> PowerupSpawns { get; }
+
+    /// <summary>Authored teleport-pad pairs; empty when the map has none (then play auto-places a pair).</summary>
+    public IReadOnlyList<TeleportPadLink> TeleportPads { get; }
 
     /// <summary>A fresh arena of the given size: a steel-walled border around an all-floor interior,
     /// with the player spawn seated at the top-left interior corner and no enemies or powerups yet.

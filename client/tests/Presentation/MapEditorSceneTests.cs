@@ -31,7 +31,7 @@ public class MapEditorSceneTests : TestClass
     [Test]
     public void Editor_BuildsThePaletteAndTheActionButtons()
     {
-        foreach (var name in new[] { "Steel", "Bush", "Player", "Enemy", "Erase", "SizeMedium", "Validate", "TestPlay", "Save", "Back" })
+        foreach (var name in new[] { "Steel", "Bush", "Player", "Enemy", "TeleportPad", "Erase", "SizeMedium", "Validate", "TestPlay", "Save", "Back" })
         {
             if (_editor.FindChild(name, recursive: true, owned: false) is not Button)
             {
@@ -73,6 +73,31 @@ public class MapEditorSceneTests : TestClass
         if (_editor.Save())
         {
             throw new System.Exception("A map with no enemy spawns is not playable and must not save.");
+        }
+    }
+
+    [Test]
+    public void PlacingATeleportPadPair_CarriesItIntoTheMap_AndIntoTestPlay()
+    {
+        _editor.NewMap(28, 16);
+        _editor.MapName = "Pad Test Map";
+        _editor.SelectAction(EditorAction.ToggleEnemySpawn);
+        _editor.Paint(20, 12); // make the map playable so TestPlay loads it
+
+        _editor.SelectAction(EditorAction.PlaceTeleportPad);
+        _editor.Paint(5, 5);  // pad A
+        _editor.Paint(10, 8); // pad B completes the link
+
+        var pads = _editor.CurrentMap().TeleportPads;
+        if (pads.Count != 1 || pads[0] != new TeleportPadLink(5, 5, 10, 8))
+        {
+            throw new System.Exception("Placing a pad pair should author one teleport link.");
+        }
+
+        _editor.TestPlay();
+        if (GameSetup.CustomMap is null || GameSetup.CustomMap.TeleportPads.Count != 1)
+        {
+            throw new System.Exception("Test Play must carry the authored teleport pads into play.");
         }
     }
 }

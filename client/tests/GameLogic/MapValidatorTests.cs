@@ -78,6 +78,60 @@ public class MapValidatorTests
     }
 
     [Fact]
+    public void Validate_PassesForAReachableTeleportPadPair()
+    {
+        var open = OpenArena();
+        var map = new MapDefinition(
+            open.Name, open.Materials, open.Bushes, open.Sandbags,
+            open.PlayerSpawn, open.EnemySpawns, open.PowerupSpawns,
+            new[] { new TeleportPadLink(1, 1, 4, 3) });
+
+        Assert.True(MapValidator.Validate(map).IsValid);
+    }
+
+    [Fact]
+    public void Validate_FlagsATeleportPadOutOfBounds()
+    {
+        var open = OpenArena();
+        var map = new MapDefinition(
+            open.Name, open.Materials, open.Bushes, open.Sandbags,
+            open.PlayerSpawn, open.EnemySpawns, open.PowerupSpawns,
+            new[] { new TeleportPadLink(1, 1, 99, 99) });
+
+        var result = MapValidator.Validate(map);
+
+        Assert.Contains(result.Errors, e => e.Code == MapValidationCode.TeleportPadOutOfBounds);
+    }
+
+    [Fact]
+    public void Validate_FlagsATeleportPadInsideAWall()
+    {
+        var open = OpenArena();
+        var map = new MapDefinition(
+            open.Name, open.Materials, open.Bushes, open.Sandbags,
+            open.PlayerSpawn, open.EnemySpawns, open.PowerupSpawns,
+            new[] { new TeleportPadLink(1, 1, 0, 0) }); // (0,0) is the steel corner
+
+        var result = MapValidator.Validate(map);
+
+        Assert.Contains(result.Errors, e => e.Code == MapValidationCode.TeleportPadNotFloor);
+    }
+
+    [Fact]
+    public void Validate_FlagsATeleportPadLinkedToItself()
+    {
+        var open = OpenArena();
+        var map = new MapDefinition(
+            open.Name, open.Materials, open.Bushes, open.Sandbags,
+            open.PlayerSpawn, open.EnemySpawns, open.PowerupSpawns,
+            new[] { new TeleportPadLink(1, 1, 1, 1) });
+
+        var result = MapValidator.Validate(map);
+
+        Assert.Contains(result.Errors, e => e.Code == MapValidationCode.TeleportPadEndpointsCoincide);
+    }
+
+    [Fact]
     public void Validate_FlagsAnArenaWithNoEnemySpawns()
     {
         var open = OpenArena();

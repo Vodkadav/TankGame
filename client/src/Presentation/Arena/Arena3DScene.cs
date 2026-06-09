@@ -94,6 +94,7 @@ public partial class Arena3DScene : Node3D
     private SandbagField _sandbags = null!;
     private Teleporter _teleporter = null!;
     private readonly List<TeleportPad3DView> _padViews = new();
+    private IReadOnlyList<TeleportPadLink> _authoredPads = Array.Empty<TeleportPadLink>();
     private (int X, int Y) _playerSpawn;
     private IReadOnlyList<(int X, int Y)> _enemySpawns = Array.Empty<(int, int)>();
     private Camera3D _camera = null!;
@@ -120,6 +121,7 @@ public partial class Arena3DScene : Node3D
             _playerSpawn = custom.PlayerSpawn;
             _enemySpawns = custom.EnemySpawns;
             _powerupPlacements = custom.PowerupSpawns.Select(s => (s.Kind, s.X, s.Y)).ToList();
+            _authoredPads = custom.TeleportPads;
         }
         else if (GameSetup.Arena == ArenaId.CliffsAndValleys)
         {
@@ -523,6 +525,14 @@ public partial class Arena3DScene : Node3D
     // cross-layer pairs. The Teleporter is the deterministic owner; the rings are pure views of its state.
     private void BuildTeleporter(int widthCells, int heightCells)
     {
+        // A custom map with authored pads overrides the auto-placement: build the linked pairs straight
+        // from its cells (flat, layer 0). With no authored pads we keep today's auto-placed pair.
+        if (_authoredPads.Count > 0)
+        {
+            BuildAuthoredTeleporter();
+            return;
+        }
+
         var taken = new HashSet<(int, int)>(_enemySpawns.Select(s => (s.X, s.Y))) { (_playerSpawn.X, _playerSpawn.Y) };
         var a = ClosestFloor(widthCells / 4, heightCells / 4, taken);
         var b = ClosestFloor(widthCells - (widthCells / 4), heightCells - (heightCells / 4), taken);
@@ -539,6 +549,28 @@ public partial class Arena3DScene : Node3D
 
         AddPadView(padA);
         AddPadView(padB);
+    }
+
+    // Build the teleporter from the chosen custom map's authored pad pairs (cells → world centres). Pads
+    // sit on the ground layer (0) for now; the rings are added in the same link order the Teleporter holds.
+    private void BuildAuthoredTeleporter()
+    {
+        var links = new List<(TeleportPad, TeleportPad)>(_authoredPads.Count);
+        var pads = new List<TeleportPad>(_authoredPads.Count * 2);
+        foreach (var link in _authoredPads)
+        {
+            var padA = new TeleportPad(CellCentre(link.AX, link.AY), 0);
+            var padB = new TeleportPad(CellCentre(link.BX, link.BY), 0);
+            links.Add((padA, padB));
+            pads.Add(padA);
+            pads.Add(padB);
+        }
+
+        _teleporter = new Teleporter(links, TeleportPadRadius);
+        foreach (var pad in pads)
+        {
+            AddPadView(pad);
+        }
     }
 
     private void AddPadView(TeleportPad pad)
