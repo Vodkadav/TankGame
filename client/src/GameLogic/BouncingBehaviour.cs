@@ -21,7 +21,7 @@ public sealed class BouncingBehaviour : IProjectileBehaviour
 
         while (remaining > 0f)
         {
-            if (arena.RaycastFirstHit(state.Position, state.Direction, remaining) is not { } hit)
+            if (arena.RaycastFirstHit(state.Position, state.Direction, remaining, state.Layer) is not { } hit)
             {
                 state.Position += state.Direction * remaining;
                 return;
@@ -30,7 +30,7 @@ public sealed class BouncingBehaviour : IProjectileBehaviour
             if (_bouncesLeft <= 0)
             {
                 state.Position = hit.Point;
-                arena.DamageAt(hit.Point, state.Direction, state.Damage);
+                arena.DamageAt(hit.Point, state.Direction, state.Damage, state.Layer);
                 state.IsAlive = false;
                 return;
             }

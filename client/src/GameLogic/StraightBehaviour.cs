@@ -17,10 +17,10 @@ public sealed class StraightBehaviour : IProjectileBehaviour
     {
         var distance = state.Speed * deltaSeconds;
 
-        if (arena.RaycastFirstHit(state.Position, state.Direction, distance) is { } hit)
+        if (arena.RaycastFirstHit(state.Position, state.Direction, distance, state.Layer) is { } hit)
         {
             state.Position = hit.Point;
-            arena.DamageAt(hit.Point, state.Direction, state.Damage);
+            arena.DamageAt(hit.Point, state.Direction, state.Damage, state.Layer);
             state.IsAlive = false;
             return;
         }

@@ -45,6 +45,7 @@ public sealed class Projectile : IProjectile
             Pierce = pierce,
             Owner = owner,
             Style = style,
+            Layer = layer,
         };
         _behaviour = behaviour ?? StraightBehaviour.Instance;
     }

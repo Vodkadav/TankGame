@@ -22,13 +22,13 @@ public sealed class PiercingBehaviour : IProjectileBehaviour
 
         while (remaining > 0f)
         {
-            if (arena.RaycastFirstHit(state.Position, state.Direction, remaining) is not { } hit)
+            if (arena.RaycastFirstHit(state.Position, state.Direction, remaining, state.Layer) is not { } hit)
             {
                 state.Position += state.Direction * remaining;
                 return;
             }
 
-            arena.DamageAt(hit.Point, state.Direction, state.Damage); // chips brick; a no-op on steel
+            arena.DamageAt(hit.Point, state.Direction, state.Damage, state.Layer); // chips brick; a no-op on steel
 
             if (!hit.Destructible || state.Pierce <= 0)
             {

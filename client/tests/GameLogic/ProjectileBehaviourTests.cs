@@ -130,4 +130,42 @@ public class ProjectileBehaviourTests
         Assert.False(state.IsAlive);
         Assert.Equal(50f, state.Position.X, precision: 3);
     }
+
+    // Records the layer it was queried with — proving a behaviour routes the shot's elevation layer
+    // through the layer-aware IArena overloads (ADR-0018 step 2), so a layered GridArena resolves
+    // walls on the shot's own layer. The flat methods are never reached.
+    private sealed class LayerRecordingArena : IArena
+    {
+        public int? RaycastLayer { get; private set; }
+        public int? DamageLayer { get; private set; }
+
+        public RaycastHit? RaycastFirstHit(Vector2 origin, Vector2 direction, float maxDistance) =>
+            throw new System.InvalidOperationException("a layered shot must use the layer-aware overload");
+
+        public RaycastHit? RaycastFirstHit(Vector2 origin, Vector2 direction, float maxDistance, int layer)
+        {
+            RaycastLayer = layer;
+            return new RaycastHit(origin, 0f, new Vector2(-1f, 0f));
+        }
+
+        public void DamageAt(Vector2 point, Vector2 direction, int amount) =>
+            throw new System.InvalidOperationException("a layered shot must use the layer-aware overload");
+
+        public void DamageAt(Vector2 point, Vector2 direction, int amount, int layer) => DamageLayer = layer;
+
+        public bool IsBlocked(Vector2 point) => false;
+    }
+
+    [Fact]
+    public void StraightBehaviour_QueriesTheArena_OnTheShotsLayer()
+    {
+        var state = ShotState();
+        state.Layer = 2;
+        var arena = new LayerRecordingArena();
+
+        StraightBehaviour.Instance.Step(state, arena, 0.2f);
+
+        Assert.Equal(2, arena.RaycastLayer);
+        Assert.Equal(2, arena.DamageLayer);
+    }
 }
