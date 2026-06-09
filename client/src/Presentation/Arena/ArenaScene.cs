@@ -105,6 +105,7 @@ public partial class ArenaScene : Node2D
     private readonly MeterBoard _meterBoard = new();
     private World _world = null!;
     private GridArena _arena = null!;
+    private IWallGrid _grid = null!;
     private BushField _bushes = null!;
     private SandbagField _sandbags = null!;
     private Camera2D _camera = null!;
@@ -122,6 +123,7 @@ public partial class ArenaScene : Node2D
         var level = _layout.Map;
         _powerups = PowerupCatalogue(new NVector2(level.Width * TileSize, level.Height * TileSize));
         var grid = level.BuildGrid();
+        _grid = grid;
         _arena = new GridArena(grid, TileSize, GridOrigin);
         _bushes = new BushField(level.Bushes, TileSize, GridOrigin);
         _sandbags = new SandbagField(_layout.Sandbags, TileSize, GridOrigin);
@@ -233,7 +235,7 @@ public partial class ArenaScene : Node2D
             foreach (var (ex, ey) in _layout.EnemySpawns)
             {
                 var ambusher = enemyIndex % 2 == 1; // every other enemy lies in wait in the grass
-                var ai = new AiInputSource(_world, _arena, _bushes, ambusher);
+                var ai = new AiInputSource(_world, _arena, _bushes, ambusher, _grid, TileSize, GridOrigin);
                 var enemy = new Tank(ai, _world, _arena, CellCentre(ex, ey),
                     EnemySpeed, FireInterval, ProjectileSpeed, maxHp: TankMaxHp, team: EnemyTeam, lives: StartingLives, terrain: _sandbags);
                 ai.Bind(enemy); // resolve the input-source ↔ tank construction cycle

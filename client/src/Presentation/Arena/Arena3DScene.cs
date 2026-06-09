@@ -88,6 +88,7 @@ public partial class Arena3DScene : Node3D
     private readonly Dictionary<Guid, Node3D> _views = new();
     private World _world = null!;
     private GridArena _arena = null!;
+    private IWallGrid _grid = null!;
     private BushField _bushes = null!;
     private SandbagField _sandbags = null!;
     private (int X, int Y) _playerSpawn;
@@ -132,6 +133,7 @@ public partial class Arena3DScene : Node3D
         _powerupEffects = PowerupCatalogue(fieldMax).ToDictionary(p => p.Kind, p => p.Effect);
 
         var grid = level.BuildGrid();
+        _grid = grid;
         _arena = new GridArena(grid, TileSize, GridOrigin);
         _bushes = new BushField(level.Bushes, TileSize, GridOrigin);
         _sandbags = new SandbagField(sandbags, TileSize, GridOrigin);
@@ -487,7 +489,7 @@ public partial class Arena3DScene : Node3D
         foreach (var (ex, ey) in _enemySpawns)
         {
             var ambusher = enemyIndex % 2 == 1;
-            var ai = new AiInputSource(_world, _arena, _bushes, ambusher);
+            var ai = new AiInputSource(_world, _arena, _bushes, ambusher, _grid, TileSize, GridOrigin);
             var enemy = new Tank(ai, _world, _arena, CellCentre(ex, ey),
                 EnemySpeed, FireInterval, ProjectileSpeed, maxHp: TankMaxHp, team: EnemyTeam, lives: StartingLives, terrain: _sandbags);
             ai.Bind(enemy);
