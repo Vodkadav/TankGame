@@ -81,6 +81,47 @@ public class LevelMapTests
     }
 
     [Fact]
+    public void FromCells_DefaultsToAFlatLayerZeroGridWithNoRamps()
+    {
+        var materials = new CellMaterial[2, 2];
+        materials[0, 0] = CellMaterial.Steel;
+
+        var map = LevelMap.FromCells(materials, new bool[2, 2], spawnX: 1, spawnY: 1);
+
+        Assert.Equal(0, map.LayerAt(0, 0));
+        Assert.Equal(0, map.LayerAt(1, 1));
+        Assert.False(map.IsRamp(1, 1));
+
+        var grid = map.BuildGrid();
+        Assert.Equal(0, grid.LayerAt(1, 1));
+        Assert.False(grid.IsRamp(1, 1));
+    }
+
+    [Fact]
+    public void FromCells_CarriesPerCellLayersAndRamps_IntoTheLevelAndGrid()
+    {
+        var materials = new CellMaterial[3, 1];
+        materials[0, 0] = CellMaterial.Floor;
+        materials[1, 0] = CellMaterial.Floor;
+        materials[2, 0] = CellMaterial.Floor;
+        var layers = new int[3, 1];
+        layers[2, 0] = 1; // a raised plateau cell
+        var ramps = new bool[3, 1];
+        ramps[1, 0] = true; // a ramp from layer 0 up to the plateau
+
+        var map = LevelMap.FromCells(materials, new bool[3, 1], spawnX: 0, spawnY: 0, layers: layers, ramps: ramps);
+
+        Assert.Equal(0, map.LayerAt(0, 0));
+        Assert.Equal(1, map.LayerAt(2, 0));
+        Assert.True(map.IsRamp(1, 0));
+        Assert.False(map.IsRamp(0, 0));
+
+        var grid = map.BuildGrid();
+        Assert.Equal(1, grid.LayerAt(2, 0));
+        Assert.True(grid.IsRamp(1, 0));
+    }
+
+    [Fact]
     public void FromCells_RejectsASpawnThatIsNotFloor()
     {
         var materials = new CellMaterial[2, 1];

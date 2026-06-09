@@ -32,7 +32,7 @@ public partial class Projectile3DView : Node3D
             return;
         }
 
-        Position = GroundProjection.ToWorld(_projectile.Position, Height);
+        Position = GroundProjection.ToWorld(_projectile.Position, _projectile.Layer, Height); // ride the shooter's layer (ADR-0018)
         if (_missile)
         {
             var dir = _projectile.Direction; // game (x,y) → world (x,z); point the bolt along travel

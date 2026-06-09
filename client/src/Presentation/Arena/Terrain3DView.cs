@@ -18,6 +18,11 @@ public partial class Terrain3DView : Node3D
     private const float BushFootprint = 0.85f;
     private const float WaterY = 1.5f;
 
+    // The dusty rock colour for the raised plateau tops and the cliff faces, so the high ground reads as
+    // a solid earthen mass rather than floating walls (ADR-0018).
+    private static readonly Color PlateauColour = new(0.62f, 0.52f, 0.36f);
+    private static readonly Color CliffColour = new(0.50f, 0.42f, 0.30f);
+
     private static readonly Dictionary<CellMaterial, string> ModelPaths = new()
     {
         [CellMaterial.Brick] = "res://src/Presentation/Arena/models/TerrainBrick.glb",
@@ -58,6 +63,7 @@ public partial class Terrain3DView : Node3D
             }
         }
 
+        BuildElevation(grid); // raised plateau tops + sloped ramps (flat maps add nothing) — ADR-0018
         BuildBuildings(grid); // one model per connected block of building cells, not one per cell
         BuildBushes(bushes);
         BuildOilPuddles(sandbags);
@@ -89,6 +95,7 @@ public partial class Terrain3DView : Node3D
     private void BuildCell(int x, int y, WallCell cell)
     {
         var centre = CellCentre(x, y);
+        var baseY = _grid.LayerAt(x, y) * GroundProjection.LayerHeight; // walls on a plateau sit on its top (ADR-0018)
         switch (cell.Material)
         {
             case CellMaterial.Floor:
@@ -103,11 +110,11 @@ public partial class Terrain3DView : Node3D
             case CellMaterial.Mountain:
                 // Each mountain cell is one enlarged rock spun to a per-cell angle, so adjacent cells'
                 // rocks overlap and vary into one cohesive rocky mass instead of separate tidy lumps.
-                var rock = Place(cell.Material, centre, MountainFootprint, $"Mountain_{x}_{y}");
+                var rock = Place(cell.Material, centre, MountainFootprint, $"Mountain_{x}_{y}", baseY);
                 rock.RotateY(Mathf.DegToRad(((x * 71) + (y * 137)) % 360));
                 return;
             default:
-                var node = Place(cell.Material, centre, WallFootprint, $"Wall_{x}_{y}");
+                var node = Place(cell.Material, centre, WallFootprint, $"Wall_{x}_{y}", baseY);
                 if (cell.Material is CellMaterial.Brick or CellMaterial.Crate)
                 {
                     _destructibles[(x, y)] = node; // track so it can be removed when destroyed
@@ -117,10 +124,11 @@ public partial class Terrain3DView : Node3D
         }
     }
 
-    // Instance the model for a material, auto-fit it to the cell, and seat it on the ground.
-    private Node3D Place(CellMaterial material, NVector2 centre, float footprint, string name)
+    // Instance the model for a material, auto-fit it to the cell, and seat it on the ground (or on a
+    // raised plateau top when baseY > 0, ADR-0018).
+    private Node3D Place(CellMaterial material, NVector2 centre, float footprint, string name, float baseY = 0f)
     {
-        var holder = new Node3D { Name = name, Position = new Vector3(centre.X, 0f, centre.Y) };
+        var holder = new Node3D { Name = name, Position = new Vector3(centre.X, baseY, centre.Y) };
         AddChild(holder);
 
         var model = Model(material).Instantiate<Node3D>();
@@ -295,6 +303,84 @@ public partial class Terrain3DView : Node3D
         ModelFit.ApplyBox(model, spanX * 0.98f, spanZ * 0.98f, seatOnGround: true);
         // No tint — this model ships with its colormap texture embedded, so its walls/roof/windows/
         // chimneys keep their own colours.
+    }
+
+    // Raise the high ground (ADR-0018): every layer>0 floor cell gets a solid earthen block from the
+    // valley floor up to its layer top, so the plateau reads as one raised mass with cliff faces; every
+    // ramp cell gets a wedge sloping from its low side up to the next layer, the climb a tank drives. A
+    // flat map (no layered or ramp cells) adds nothing here, so it stays pixel-identical.
+    private void BuildElevation(IWallGrid grid)
+    {
+        var plateauMat = new StandardMaterial3D { AlbedoColor = PlateauColour, Roughness = 1f };
+        var cliffMat = new StandardMaterial3D { AlbedoColor = CliffColour, Roughness = 1f };
+
+        for (var x = 0; x < grid.Width; x++)
+        {
+            for (var y = 0; y < grid.Height; y++)
+            {
+                var layer = grid.LayerAt(x, y);
+                if (grid.IsRamp(x, y))
+                {
+                    AddRamp(grid, x, y, layer, cliffMat);
+                }
+                else if (layer > 0)
+                {
+                    AddPlateauBlock(x, y, layer, plateauMat);
+                }
+            }
+        }
+    }
+
+    // A solid block filling the cell from the ground up to the cell's layer top: its top face is the
+    // plateau a tank drives on, its sides the cliff a tank below cannot pass.
+    private void AddPlateauBlock(int x, int y, int layer, Material material)
+    {
+        var top = layer * GroundProjection.LayerHeight;
+        var centre = CellCentre(x, y);
+        AddChild(new MeshInstance3D
+        {
+            Name = $"Plateau_{x}_{y}",
+            Mesh = new BoxMesh { Size = new Vector3(_tileSize, top, _tileSize) },
+            Position = new Vector3(centre.X, top / 2f, centre.Y),
+            MaterialOverride = material,
+        });
+    }
+
+    // A ramp wedge: a flat slab tilted so it rises from the low neighbour's level to the high one, giving
+    // a visible slope a tank climbs. The tilt axis points from the low side toward the adjacent higher
+    // (layer+1) cell, so the slope faces the plateau it leads onto.
+    private void AddRamp(IWallGrid grid, int x, int y, int layer, Material material)
+    {
+        var top = (layer + 1) * GroundProjection.LayerHeight;
+        var centre = CellCentre(x, y);
+        var (dx, dy) = HigherNeighbour(grid, x, y, layer);
+
+        var holder = new Node3D { Name = $"Ramp_{x}_{y}", Position = new Vector3(centre.X, top / 2f, centre.Y) };
+        AddChild(holder);
+        holder.AddChild(new MeshInstance3D
+        {
+            Mesh = new BoxMesh { Size = new Vector3(_tileSize, top, _tileSize) },
+            MaterialOverride = material,
+        });
+        // Tilt about the axis perpendicular to the climb direction so the slab's top face slopes up
+        // toward the plateau. ~30° reads as a ramp without clipping badly into the neighbours.
+        var tilt = Mathf.DegToRad(30f);
+        holder.Rotation = dx != 0 ? new Vector3(0f, 0f, -dx * tilt) : new Vector3(dy * tilt, 0f, 0f);
+    }
+
+    // The cardinal direction from a ramp cell toward the adjacent cell one layer higher (the plateau the
+    // ramp climbs onto); falls back to +X if none is found (a lone ramp), so the slope still has a facing.
+    private static (int Dx, int Dy) HigherNeighbour(IWallGrid grid, int x, int y, int layer)
+    {
+        foreach (var (dx, dy) in new[] { (1, 0), (-1, 0), (0, 1), (0, -1) })
+        {
+            if (grid.LayerAt(x + dx, y + dy) == layer + 1 && !grid.IsRamp(x + dx, y + dy))
+            {
+                return (dx, dy);
+            }
+        }
+
+        return (1, 0);
     }
 
     private NVector2 CellCentre(int x, int y) => new((x + 0.5f) * _tileSize, (y + 0.5f) * _tileSize);

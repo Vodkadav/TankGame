@@ -22,7 +22,7 @@ public partial class MapSelectScene : Control
     private static readonly ArenaEntry[] Arenas =
     {
         new(ArenaId.DesertWar, "DesertWar", "map.desert_war", PreviewDir + "DesertWar.png", true),
-        new(ArenaId.CliffsAndValleys, "CliffsAndValleys", "map.cliffs_and_valleys", PreviewDir + "CliffsAndValleys.png", false),
+        new(ArenaId.CliffsAndValleys, "CliffsAndValleys", "map.cliffs_and_valleys", PreviewDir + "CliffsAndValleys.png", true),
     };
 
     private TextureRect _preview = null!;
