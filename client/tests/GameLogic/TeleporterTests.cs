@@ -74,6 +74,26 @@ public class TeleporterTests
     }
 
     [Fact]
+    public void PadStatuses_ReportReadyThenCooling_AfterAWarp()
+    {
+        var teleporter = PairedPads();
+
+        var ready = teleporter.PadStatuses();
+        Assert.Equal(2, ready.Count);
+        Assert.All(ready, s => Assert.True(s.Ready));
+        Assert.All(ready, s => Assert.Equal(0f, s.CooldownFraction));
+
+        teleporter.TryTeleport(Vector2.Zero, layer: 0, out _, out _); // both ends now on cooldown
+
+        var cooling = teleporter.PadStatuses();
+        Assert.All(cooling, s => Assert.False(s.Ready));
+        Assert.All(cooling, s => Assert.True(s.CooldownFraction > 0.9f)); // just fired → near full
+
+        teleporter.Step(Cooldown);
+        Assert.All(teleporter.PadStatuses(), s => Assert.True(s.Ready)); // drained → ready again
+    }
+
+    [Fact]
     public void TryTeleport_OnlyAcceptsATankOnThePadsLayer()
     {
         // A raised pad on layer 1 linked to a pad on the ground (layer 0): using the raised pad warps

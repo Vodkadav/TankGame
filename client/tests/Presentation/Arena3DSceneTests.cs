@@ -19,13 +19,28 @@ public class Arena3DSceneTests : TestClass
         TestScene.AddChild(_arena); // runs Arena3DScene._Ready
     }
 
+    // Free the scene immediately (not QueueFree, which defers) and force a GC so no managed wrapper to one
+    // of the scene's freed resources (Environment, meshes, materials) lingers to the engine's C# shutdown —
+    // that lingering binding is what trips the fatal "Leaked unsafe reference" teardown crash once the scene
+    // holds enough resources (the teleport pad rings pushed it over).
     [Cleanup]
-    public void Cleanup() => _arena.QueueFree();
+    public void Cleanup()
+    {
+        if (GodotObject.IsInstanceValid(_arena))
+        {
+            _arena.Free();
+        }
+
+        System.GC.Collect();
+        System.GC.WaitForPendingFinalizers();
+        System.GC.Collect();
+    }
 
     [Test]
     public void Arena3D_WiresTanksAndGround_UnderA3DCamera()
     {
         var tankViews = 0;
+        var teleportPads = 0;
         Camera3D? camera = null;
         MeshInstance3D? ground = null;
         Terrain3DView? terrain = null;
@@ -35,6 +50,9 @@ public class Arena3DSceneTests : TestClass
             {
                 case Tank3DView:
                     tankViews++;
+                    break;
+                case TeleportPad3DView:
+                    teleportPads++;
                     break;
                 case Camera3D cam:
                     camera = cam;
@@ -67,6 +85,12 @@ public class Arena3DSceneTests : TestClass
         if (terrain is null || terrain.GetChildCount() == 0)
         {
             throw new System.Exception("3D arena must render terrain (walls) via a Terrain3DView.");
+        }
+
+        // Teleport pads ship as a linked pair of glowing ground rings (teleport pads T1).
+        if (teleportPads != 2)
+        {
+            throw new System.Exception($"3D arena must place a linked pair of teleport pad rings; saw {teleportPads}.");
         }
     }
 

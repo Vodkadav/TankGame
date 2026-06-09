@@ -37,6 +37,7 @@ public partial class Arena3DScene : Node3D
     private const float PlayerVisionRadius = 640f;
     private const float BushRevealRange = 96f;
 
+    private const float TeleportPadRadius = 40f; // a tank centred within this of a pad warps to its partner
     private const float PickupRadius = 28f;
     private const int RepairAmount = 2;
     private const int ShieldAmount = 3;
@@ -91,6 +92,8 @@ public partial class Arena3DScene : Node3D
     private IWallGrid _grid = null!;
     private BushField _bushes = null!;
     private SandbagField _sandbags = null!;
+    private Teleporter _teleporter = null!;
+    private readonly List<TeleportPad3DView> _padViews = new();
     private (int X, int Y) _playerSpawn;
     private IReadOnlyList<(int X, int Y)> _enemySpawns = Array.Empty<(int, int)>();
     private Camera3D _camera = null!;
@@ -150,6 +153,7 @@ public partial class Arena3DScene : Node3D
         AddChild(terrain);
         terrain.Bind(grid, level.Bushes, sandbags, TileSize);
 
+        BuildTeleporter(level.Width, level.Height); // before SpawnTanks — the tanks consult it
         SpawnPowerups();
         SpawnTanks();
         BuildPreviewHud();
@@ -272,6 +276,7 @@ public partial class Arena3DScene : Node3D
         }
 
         _world.Step((float)delta);
+        _teleporter.Step((float)delta); // age pad cooldowns once per frame (tanks warp inside world.Step)
         if (_player.Hp > 0)
         {
             var target = GroundProjection.ToWorld(_player.Position);
@@ -281,6 +286,7 @@ public partial class Arena3DScene : Node3D
 
         PositionFogLight();   // the lit circle rides the player (goes dark while the player is down)
         UpdateConcealment();  // hide enemies outside the player's vision; darken the player in cover
+        UpdatePadViews();     // pulse ready pads, dim ones on cooldown
     }
 
     private static Vector3 CameraOffset()
@@ -480,7 +486,8 @@ public partial class Arena3DScene : Node3D
     {
         var p1Input = new KeyboardMouse3DInputSource(_camera, fireOnClick: true);
         var player = new Tank(p1Input, _world, _arena, CellCentre(_playerSpawn.X, _playerSpawn.Y),
-            TankSpeed, FireInterval, ProjectileSpeed, maxHp: TankMaxHp, team: PlayerTeam, lives: StartingLives, terrain: _sandbags);
+            TankSpeed, FireInterval, ProjectileSpeed, maxHp: TankMaxHp, team: PlayerTeam, lives: StartingLives,
+            terrain: _sandbags, teleporter: _teleporter);
         _player = player;
         _viewers.Add(player); // the player's sight reveals the field; co-op allies would join this list
         SpawnTank(player);
@@ -491,13 +498,87 @@ public partial class Arena3DScene : Node3D
             var ambusher = enemyIndex % 2 == 1;
             var ai = new AiInputSource(_world, _arena, _bushes, ambusher, _grid, TileSize, GridOrigin);
             var enemy = new Tank(ai, _world, _arena, CellCentre(ex, ey),
-                EnemySpeed, FireInterval, ProjectileSpeed, maxHp: TankMaxHp, team: EnemyTeam, lives: StartingLives, terrain: _sandbags);
+                EnemySpeed, FireInterval, ProjectileSpeed, maxHp: TankMaxHp, team: EnemyTeam, lives: StartingLives,
+                terrain: _sandbags, teleporter: _teleporter);
             ai.Bind(enemy);
             SpawnTank(enemy);
             enemyIndex++;
         }
 
         SetUpFog(); // single-player → fog the field with a lit circle around the player
+    }
+
+    // Place one linked pair of teleport pads on the two best-separated floor cells (near opposite quarters),
+    // skipping the spawn cells so no tank starts on a pad. Flat (layer 0) for now; the Cliffs map will author
+    // cross-layer pairs. The Teleporter is the deterministic owner; the rings are pure views of its state.
+    private void BuildTeleporter(int widthCells, int heightCells)
+    {
+        var taken = new HashSet<(int, int)>(_enemySpawns.Select(s => (s.X, s.Y))) { (_playerSpawn.X, _playerSpawn.Y) };
+        var a = ClosestFloor(widthCells / 4, heightCells / 4, taken);
+        var b = ClosestFloor(widthCells - (widthCells / 4), heightCells - (heightCells / 4), taken);
+
+        if (a is null || b is null || a.Value == b.Value)
+        {
+            _teleporter = new Teleporter(Array.Empty<(TeleportPad, TeleportPad)>(), TeleportPadRadius);
+            return;
+        }
+
+        var padA = new TeleportPad(CellCentre(a.Value.X, a.Value.Y), 0);
+        var padB = new TeleportPad(CellCentre(b.Value.X, b.Value.Y), 0);
+        _teleporter = new Teleporter(new[] { (padA, padB) }, TeleportPadRadius);
+
+        AddPadView(padA);
+        AddPadView(padB);
+    }
+
+    private void AddPadView(TeleportPad pad)
+    {
+        var view = new TeleportPad3DView { Name = "TeleportPad" };
+        view.Configure(GroundProjection.ToWorld(pad.Position), TeleportPadRadius);
+        AddChild(view);
+        _padViews.Add(view);
+    }
+
+    // The floor cell nearest a target cell, excluding spawn cells — a guaranteed-passable spot for a pad.
+    private (int X, int Y)? ClosestFloor(int targetX, int targetY, ISet<(int, int)> exclude)
+    {
+        (int X, int Y)? best = null;
+        var bestDistance = int.MaxValue;
+        for (var x = 0; x < _grid.Width; x++)
+        {
+            for (var y = 0; y < _grid.Height; y++)
+            {
+                if (_grid.IsBlocked(x, y) || exclude.Contains((x, y)))
+                {
+                    continue;
+                }
+
+                var dx = x - targetX;
+                var dy = y - targetY;
+                var distance = (dx * dx) + (dy * dy);
+                if (distance < bestDistance)
+                {
+                    bestDistance = distance;
+                    best = (x, y);
+                }
+            }
+        }
+
+        return best;
+    }
+
+    private void UpdatePadViews()
+    {
+        if (_padViews.Count == 0)
+        {
+            return;
+        }
+
+        var statuses = _teleporter.PadStatuses();
+        for (var i = 0; i < _padViews.Count && i < statuses.Count; i++)
+        {
+            _padViews[i].SetState(statuses[i].Ready, statuses[i].CooldownFraction);
+        }
     }
 
     private void SpawnTank(Tank tank)
