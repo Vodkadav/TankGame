@@ -16,6 +16,7 @@ public sealed class Tank : ITank
     private readonly IWorld _world;
     private readonly IArena _arena;
     private readonly ITerrain? _terrain;
+    private readonly ITeleporter? _teleporter;
     private readonly Vector2 _spawnPosition;
     private readonly Stats _stats;
     private readonly float _projectileSpeed;
@@ -51,7 +52,8 @@ public sealed class Tank : ITank
         int team = 0,
         int lives = 1,
         ITerrain? terrain = null,
-        int layer = 0)
+        int layer = 0,
+        ITeleporter? teleporter = null)
     {
         Id = Guid.NewGuid();
         MaxHp = maxHp;
@@ -63,6 +65,7 @@ public sealed class Tank : ITank
         _world = world;
         _arena = arena;
         _terrain = terrain;
+        _teleporter = teleporter;
         Position = startPosition;
         _spawnPosition = startPosition;
         _stats = new Stats(new Dictionary<StatKind, float>
@@ -257,6 +260,14 @@ public sealed class Tank : ITank
 
         // Driving onto a ramp carries the tank up or down to the layer it connects.
         Layer = _arena.LayerAfterMove(previousPosition, Position, Layer);
+
+        // Driving onto a ready teleport pad warps the tank to its linked pad (and that pad's layer).
+        if (_teleporter is not null &&
+            _teleporter.TryTeleport(Position, Layer, out var warpTo, out var warpLayer))
+        {
+            Position = warpTo;
+            Layer = warpLayer;
+        }
 
         PushAgainstWall(wallX, wallY, move, deltaSeconds);
 
