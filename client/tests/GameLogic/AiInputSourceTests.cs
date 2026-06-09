@@ -96,6 +96,69 @@ public class AiInputSourceTests
     }
 
     [Fact]
+    public void RoutesAroundAWall_TowardAGoal_InsteadOfDrivingIntoIt()
+    {
+        // A horizontal steel wall fills row 1 across columns 1..4, leaving only column 0 open as the
+        // way through. The AI sits in cell (1,0) and is drawn toward enemy gunfire (no line-of-sight
+        // needed — gunfire is heard through walls) in cell (1,2), directly below across the wall (+Y).
+        // Driving straight at the shot (+Y) would grind into the wall directly below; pathfinding must
+        // instead head LEFT (-X) toward column 0, the only gap, to get around.
+        var materials = new CellMaterial[5, 3];
+        for (var x = 0; x < 5; x++)
+        {
+            for (var y = 0; y < 3; y++)
+            {
+                materials[x, y] = (y == 1 && x >= 1) ? CellMaterial.Steel : CellMaterial.Floor;
+            }
+        }
+
+        var grid = WallGrid.FromMaterials(materials);
+        var arena = new GridArena(grid, tileSize: 64f, origin: Vector2.Zero);
+        var world = new World();
+        var self = new StubTank(new Vector2(96f, 32f), team: 1); // cell (1,0) centre
+        world.Spawn(self);
+        // Enemy shot in cell (1,2) centre = (96, 160); ~128 away, within earshot, straight below on +Y.
+        world.Spawn(new StubProjectile(new Vector2(96f, 160f), team: 0));
+        var ai = new AiInputSource(world, arena, grid: grid, tileSize: 64f, origin: Vector2.Zero);
+        ai.Bind(self);
+
+        var intent = ai.Read();
+
+        // Straight-line steering would point +Y into the wall; routing heads left toward the column-0
+        // gap first.
+        Assert.True(intent.Move.X < 0f, "AI should route left toward the gap, not into the wall");
+        Assert.True(intent.Move.Y <= 0.01f, "AI should not drive straight down into the wall");
+    }
+
+    [Fact]
+    public void StillSteersDirectly_WhenNoWallIsInTheWay_WithPathfindingEnabled()
+    {
+        // Open arena with pathfinding context: a straight path means steering toward the enemy on +X.
+        var materials = new CellMaterial[10, 3];
+        for (var x = 0; x < 10; x++)
+        {
+            for (var y = 0; y < 3; y++)
+            {
+                materials[x, y] = CellMaterial.Floor;
+            }
+        }
+
+        var grid = WallGrid.FromMaterials(materials);
+        var arena = new GridArena(grid, tileSize: 64f, origin: Vector2.Zero);
+        var world = new World();
+        var self = new StubTank(new Vector2(32f, 32f), team: 1);
+        world.Spawn(self);
+        world.Spawn(new StubTank(new Vector2(480f, 32f), team: 0)); // straight ahead on +X, out of fire range
+        var ai = new AiInputSource(world, arena, grid: grid, tileSize: 64f, origin: Vector2.Zero);
+        ai.Bind(self);
+
+        var intent = ai.Read();
+
+        Assert.True(intent.Move.X > 0f);
+        Assert.True(MathF.Abs(intent.Move.Y) < 0.01f);
+    }
+
+    [Fact]
     public void AimsAndAdvances_TowardADistantEnemy()
     {
         var world = new World();
