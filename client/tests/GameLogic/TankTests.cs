@@ -618,6 +618,56 @@ public class TankTests
     }
 
     [Fact]
+    public void Step_WithNoOtherTankInTheWay_MovesFreely()
+    {
+        // A lone live tank (the only other tank is far off the path) drives the full distance:
+        // body collision must not slow or deflect a tank with a clear lane.
+        var world = new World();
+        var faraway = new Tank(
+            new ScriptedInput(new TankInput(Vector2.Zero, Aim: 0f, Fire: false)),
+            world, new OpenArena(), new Vector2(0f, 1000f), Speed, FireInterval, ProjectileSpeed);
+        var mover = new Tank(
+            new ScriptedInput(new TankInput(new Vector2(1f, 0f), Aim: 0f, Fire: false)),
+            world, new OpenArena(), new Vector2(0f, 0f), Speed, FireInterval, ProjectileSpeed);
+        world.Spawn(faraway);
+        world.Spawn(mover);
+
+        for (var i = 0; i < 10; i++)
+        {
+            mover.Step(0.1f); // 1s at 100 u/s = 100 units, unobstructed
+        }
+
+        Assert.Equal(100f, mover.Position.X, precision: 3);
+        Assert.Equal(0f, mover.Position.Y, precision: 3);
+    }
+
+    [Fact]
+    public void Step_DrivingDiagonallyIntoAnotherTank_SlidesAlongIt()
+    {
+        // The blocker sits one body-gap +X of the mover (same row), so the mover's +X is jammed
+        // immediately while its +Y is clear. Driving up-and-right (1,1) the X component is blocked
+        // each tick while the Y component keeps advancing — a slide along the body, not a dead stop.
+        var world = new World();
+        var gap0 = 2f * Tank.CollisionRadius;
+        var blocker = new Tank(
+            new ScriptedInput(new TankInput(Vector2.Zero, Aim: 0f, Fire: false)),
+            world, new OpenArena(), new Vector2(32f + gap0, 0f), Speed, FireInterval, ProjectileSpeed);
+        var mover = new Tank(
+            new ScriptedInput(new TankInput(new Vector2(1f, 1f), Aim: 0f, Fire: false)),
+            world, new OpenArena(), new Vector2(32f, 0f), Speed, FireInterval, ProjectileSpeed);
+        world.Spawn(blocker);
+        world.Spawn(mover);
+
+        // One tick: the blocker is dead ahead on X, so X cannot advance, but Y is unobstructed.
+        mover.Step(0.1f);
+
+        Assert.True(mover.Position.Y > 0.5f, "the free Y axis should keep sliding past the blocker");
+        Assert.True(
+            Vector2.Distance(mover.Position, blocker.Position) >= gap0 - 0.5f,
+            "the mover must not overlap the blocker while sliding");
+    }
+
+    [Fact]
     public void Step_PushingIntoAnotherTank_DoesNotDamageWallsBehindIt()
     {
         var (grid, arena) = ColumnArena(CellMaterial.Brick);
