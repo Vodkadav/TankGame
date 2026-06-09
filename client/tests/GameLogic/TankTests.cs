@@ -47,6 +47,23 @@ public class TankTests
     }
 
     [Fact]
+    public void Step_DrivingOntoATeleportPad_WarpsToTheLinkedPad_AndDoesNotBounceBack()
+    {
+        var teleporter = new Teleporter(
+            new[] { (new TeleportPad(Vector2.Zero, 0), new TeleportPad(new Vector2(300f, 0f), 0)) },
+            padRadius: 20f);
+        var input = new ScriptedInput(new TankInput(Vector2.Zero, Aim: 0f, Fire: false));
+        var tank = new Tank(input, new World(), new OpenArena(), Vector2.Zero, Speed, FireInterval,
+            ProjectileSpeed, teleporter: teleporter);
+
+        tank.Step(0.1f);
+        Assert.Equal(new Vector2(300f, 0f), tank.Position); // warped to the partner pad
+
+        tank.Step(0.1f);
+        Assert.Equal(new Vector2(300f, 0f), tank.Position); // the destination pad is dormant — no bounce
+    }
+
+    [Fact]
     public void Step_DrivingUpARamp_RaisesTheTanksLayer()
     {
         // A single row: ground (col 0), a ramp (col 1), then a raised plateau (cols 2-4).
