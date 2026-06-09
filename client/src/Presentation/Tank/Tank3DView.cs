@@ -149,7 +149,7 @@ public partial class Tank3DView : Node3D
 
         _smoke.Emitting = _tank.Hp <= GameLogic.Tank.LowHealthFraction * _tank.MaxHp; // wounded → trails smoke
 
-        Position = GroundProjection.ToWorld(_tank.Position);
+        Position = GroundProjection.ToWorld(_tank.Position, _tank.Layer); // ride the elevation layer (ADR-0018)
 
         var offset = Mathf.DegToRad(HeadingOffsetDeg);
         var hullYaw = offset - _tank.Rotation;          // subtract: the model turn matches the mouse (see #141)

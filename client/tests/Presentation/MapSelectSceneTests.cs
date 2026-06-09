@@ -52,22 +52,30 @@ public class MapSelectSceneTests : TestClass
     }
 
     [Test]
-    public void SelectingAnUnbuiltArena_DisablesPlay_AndShowsComingSoon()
+    public void CliffsAndValleys_IsNowPlayable_AndSelectsItsArenaSeam()
     {
-        Press("CliffsAndValleys");
-        if (!Play().Disabled)
+        var previous = GameSetup.Arena;
+        try
         {
-            throw new System.Exception("Cliffs & Valleys is not built, so Play should be disabled.");
-        }
-        if (!ComingSoon().Visible)
-        {
-            throw new System.Exception("Cliffs & Valleys is not built, so the coming-soon note should show.");
-        }
+            Press("CliffsAndValleys");
+            if (Play().Disabled)
+            {
+                throw new System.Exception("Cliffs & Valleys is built now, so Play should be enabled when selected.");
+            }
+            if (ComingSoon().Visible)
+            {
+                throw new System.Exception("Cliffs & Valleys is built now, so the coming-soon note should be hidden.");
+            }
 
-        Press("DesertWar"); // back to the playable arena
-        if (Play().Disabled || ComingSoon().Visible)
+            Play().EmitSignal(Button.SignalName.Pressed); // guarded Go: does not swap the scene under the runner
+            if (GameSetup.Arena != ArenaId.CliffsAndValleys)
+            {
+                throw new System.Exception("Playing Cliffs & Valleys must set the arena seam so the scene builds it.");
+            }
+        }
+        finally
         {
-            throw new System.Exception("Re-selecting Desert War should re-enable Play and hide coming-soon.");
+            GameSetup.Arena = previous;
         }
     }
 

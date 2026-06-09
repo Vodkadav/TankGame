@@ -111,7 +111,8 @@ public partial class Arena3DScene : Node3D
         LevelMap level;
         bool[,] sandbags;
 
-        // Build from a user-made map when one is chosen ("My Maps"), otherwise generate a Desert War.
+        // Build from a user-made map when one is chosen ("My Maps"); else the hand-authored multi-level
+        // Cliffs & Valleys map when it is selected (ADR-0018); otherwise generate a Desert War.
         if (GameSetup.CustomMap is { } custom)
         {
             level = MapLoader.ToLevel(custom);
@@ -119,6 +120,15 @@ public partial class Arena3DScene : Node3D
             _playerSpawn = custom.PlayerSpawn;
             _enemySpawns = custom.EnemySpawns;
             _powerupPlacements = custom.PowerupSpawns.Select(s => (s.Kind, s.X, s.Y)).ToList();
+        }
+        else if (GameSetup.Arena == ArenaId.CliffsAndValleys)
+        {
+            var cliffs = CliffsArena.Create();
+            level = cliffs.Map;
+            sandbags = cliffs.Sandbags;
+            _playerSpawn = cliffs.PlayerSpawn;
+            _enemySpawns = cliffs.EnemySpawns;
+            _powerupPlacements = cliffs.Powerups;
         }
         else
         {
