@@ -6,12 +6,15 @@ namespace TankGame.Presentation;
 /// is ready, dims while it is on cooldown after a warp (recovering toward bright as the cooldown drains),
 /// and pops a flash the instant it fires — so a player can read at a glance whether driving onto it will
 /// warp them. A pure view: the deterministic <c>Teleporter</c> owns the state and the scene pushes each
-/// pad's ready/cooldown into <see cref="SetState"/> every frame.</summary>
+/// pad's ready/cooldown into <see cref="SetState"/> every frame. The emission material is held in a field
+/// and mutated in place (the Tank3DView pattern) rather than re-fetched each frame, so no transient managed
+/// binding to it lingers to the engine's C# shutdown.</summary>
 public partial class TeleportPad3DView : Node3D
 {
     private static readonly Color PadColour = new(0.30f, 0.85f, 1f); // teleport cyan
 
     private float _radius = 40f;
+    private StandardMaterial3D _material = null!;
     private MeshInstance3D _ring = null!;
     private float _pulse;
     private bool _ready = true;
@@ -28,23 +31,23 @@ public partial class TeleportPad3DView : Node3D
 
     public override void _Ready()
     {
+        _material = new StandardMaterial3D
+        {
+            AlbedoColor = new Color(PadColour.R, PadColour.G, PadColour.B, 0.85f),
+            EmissionEnabled = true,
+            Emission = PadColour,
+            EmissionEnergyMultiplier = 1.5f,
+            ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded,
+            Transparency = BaseMaterial3D.TransparencyEnum.Alpha,
+        };
         _ring = new MeshInstance3D
         {
             Name = "Ring",
             Mesh = new TorusMesh { InnerRadius = _radius * 0.72f, OuterRadius = _radius, Rings = 24, RingSegments = 16 },
             Position = new Vector3(0f, 5f, 0f),
-            MaterialOverride = new StandardMaterial3D
-            {
-                AlbedoColor = new Color(PadColour.R, PadColour.G, PadColour.B, 0.85f),
-                EmissionEnabled = true,
-                Emission = PadColour,
-                EmissionEnergyMultiplier = 1.5f,
-                ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded,
-                Transparency = BaseMaterial3D.TransparencyEnum.Alpha,
-            },
+            MaterialOverride = _material,
         };
         AddChild(_ring);
-        AddChild(DebugLabel.Make("Teleport", 40f));
     }
 
     /// <summary>The scene pushes the pad's live state each frame. A ready→cooling transition is a warp, so
@@ -62,7 +65,7 @@ public partial class TeleportPad3DView : Node3D
 
     public override void _Process(double delta)
     {
-        if (_ring is null || _ring.MaterialOverride is not StandardMaterial3D material)
+        if (_material is null)
         {
             return;
         }
@@ -74,7 +77,7 @@ public partial class TeleportPad3DView : Node3D
         var energy = _ready
             ? 1.4f + (Mathf.Sin(_pulse * 3f) * 0.5f)
             : 0.35f + ((1f - _cooldownFraction) * 0.9f);
-        material.EmissionEnergyMultiplier = energy + (_flash * 3.5f);
+        _material.EmissionEnergyMultiplier = energy + (_flash * 3.5f);
 
         _ring.RotateY((float)delta * 0.8f); // slow spin reads as "active"
     }

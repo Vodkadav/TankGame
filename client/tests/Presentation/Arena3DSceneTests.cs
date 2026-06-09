@@ -19,9 +19,10 @@ public class Arena3DSceneTests : TestClass
         TestScene.AddChild(_arena); // runs Arena3DScene._Ready
     }
 
-    // Free the scene immediately rather than QueueFree: a deferred free can leave the scene's resources
-    // (Environment, meshes, materials) alive until the engine's C# shutdown, which trips a fatal "Leaked
-    // unsafe reference" teardown crash once the scene holds enough of them. Freeing now tears it down cleanly.
+    // Free the scene immediately (not QueueFree, which defers) and force a GC so no managed wrapper to one
+    // of the scene's freed resources (Environment, meshes, materials) lingers to the engine's C# shutdown —
+    // that lingering binding is what trips the fatal "Leaked unsafe reference" teardown crash once the scene
+    // holds enough resources (the teleport pad rings pushed it over).
     [Cleanup]
     public void Cleanup()
     {
@@ -29,6 +30,10 @@ public class Arena3DSceneTests : TestClass
         {
             _arena.Free();
         }
+
+        System.GC.Collect();
+        System.GC.WaitForPendingFinalizers();
+        System.GC.Collect();
     }
 
     [Test]
