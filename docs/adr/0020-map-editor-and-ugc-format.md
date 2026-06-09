@@ -106,9 +106,10 @@ with no continuous Z); it is captured here as Wave B intent and will get its own
 
 **Wave B — multilevel (after ADR-0018 step 2 makes `IArena` layer-aware + ramps exist):**
 
-4. **Drop-off-ledge physics** — `Tank` vertical sub-state + gravity + edge-fall + ramp-only-up; render at
-   `Y = Z`; landing FX. (ADR-0018 amendment.)
-5. **Elevation tools** — height brush + ramp tool in the editor; `MapDefinition` gains layers + ramps.
+1. **(step 4) Drop-off-ledge physics** — `Tank` vertical sub-state + gravity + edge-fall + ramp-only-up;
+   render at `Y = Z`; landing FX. (ADR-0018 amendment.)
+2. **(step 5) Elevation tools** — height brush + ramp tool in the editor; `MapDefinition` gains layers +
+   ramps.
 
 ## Alternatives considered
 
