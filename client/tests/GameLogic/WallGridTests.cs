@@ -59,6 +59,31 @@ public class WallGridTests
     }
 
     [Fact]
+    public void IsRamp_IsFalseEverywhere_WhenNoRampMapIsSupplied()
+    {
+        var grid = Grid();
+
+        Assert.False(grid.IsRamp(0, 0));
+        Assert.False(grid.IsRamp(1, 1));
+        Assert.False(grid.IsRamp(-1, 9)); // out of bounds is never a ramp
+    }
+
+    [Fact]
+    public void IsRamp_ReportsTheSuppliedRampCells()
+    {
+        var grid = WallGrid.FromMaterials(
+            new[,]
+            {
+                { CellMaterial.Floor, CellMaterial.Floor },
+                { CellMaterial.Floor, CellMaterial.Floor },
+            },
+            ramps: new[,] { { false, true }, { false, false } });
+
+        Assert.True(grid.IsRamp(0, 1));
+        Assert.False(grid.IsRamp(0, 0));
+    }
+
+    [Fact]
     public void GetCell_OutOfBounds_ReadsAsBlockingSteel()
     {
         var grid = Grid();

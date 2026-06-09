@@ -72,4 +72,14 @@ public class ArenaContractTests
         Assert.NotNull(layered);
         Assert.Equal(flat!.Value.Distance, layered!.Value.Distance);
     }
+
+    [Fact]
+    public void LayerAfterMove_KeepsTheCurrentLayer_ByDefault()
+    {
+        // StubArena declares no ramp logic, so a move never changes the tank's layer — a flat arena
+        // is single-layer (ADR-0018 step 2). A layered GridArena overrides this for ramps.
+        IArena arena = new StubArena(wallDistance: 5f);
+
+        Assert.Equal(3, arena.LayerAfterMove(Vector2.Zero, new Vector2(10f, 0f), currentLayer: 3));
+    }
 }

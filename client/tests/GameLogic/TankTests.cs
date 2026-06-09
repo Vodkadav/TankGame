@@ -47,6 +47,36 @@ public class TankTests
     }
 
     [Fact]
+    public void Step_DrivingUpARamp_RaisesTheTanksLayer()
+    {
+        // A single row: ground (col 0), a ramp (col 1), then a raised plateau (cols 2-4).
+        var grid = WallGrid.FromMaterials(
+            new[,]
+            {
+                { CellMaterial.Floor },
+                { CellMaterial.Floor },
+                { CellMaterial.Floor },
+                { CellMaterial.Floor },
+                { CellMaterial.Floor },
+            },
+            layers: new[,] { { 0 }, { 0 }, { 1 }, { 1 }, { 1 } },
+            ramps: new[,] { { false }, { true }, { false }, { false }, { false } });
+        var arena = new GridArena(grid, tileSize: 100f, Vector2.Zero);
+        var input = new ScriptedInput(new TankInput(new Vector2(1f, 0f), Aim: 0f, Fire: false));
+        var tank = new Tank(input, new World(), arena, new Vector2(50f, 50f), Speed, FireInterval, ProjectileSpeed);
+
+        Assert.Equal(0, tank.Layer);
+
+        for (var i = 0; i < 30; i++)
+        {
+            tank.Step(0.1f); // drive +X across the ramp onto the plateau
+        }
+
+        Assert.Equal(1, tank.Layer);
+        Assert.True(tank.Position.X > 200f, "the tank climbed up onto the plateau");
+    }
+
+    [Fact]
     public void Step_NormalisesDiagonalInput_SoSpeedIsConstant()
     {
         var input = new ScriptedInput(new TankInput(new Vector2(1f, 1f), Aim: 0f, Fire: false));

@@ -83,6 +83,12 @@ public interface IWallGrid
     /// implementation; a layered grid overrides it.</summary>
     int LayerAt(int x, int y) => 0;
 
+    /// <summary>Whether the cell at (<paramref name="x"/>, <paramref name="y"/>) is a ramp — a slope
+    /// connecting its own layer <see cref="LayerAt"/> with the one above it (<c>LayerAt + 1</c>): it
+    /// is passable to, and a layer transition for, a tank on either of those two layers (ADR-0018).
+    /// Defaults to false (a flat grid has no ramps).</summary>
+    bool IsRamp(int x, int y) => false;
+
     /// <summary>Whether the cell at (<paramref name="x"/>, <paramref name="y"/>) blocks tank
     /// movement (out-of-bounds reads as a blocking steel border). Water and walls block movement;
     /// floor and bridges do not.</summary>

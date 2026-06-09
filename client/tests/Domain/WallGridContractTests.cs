@@ -125,6 +125,17 @@ public class WallGridContractTests
     }
 
     [Fact]
+    public void IsRamp_DefaultsToFalse_ForAGridThatDoesNotDeclareRamps()
+    {
+        // StubWallGrid implements no IsRamp — it inherits the IWallGrid default (false), so a flat
+        // grid has no ramps with no edit (ADR-0018).
+        IWallGrid grid = Grid();
+
+        Assert.False(grid.IsRamp(0, 0));
+        Assert.False(grid.IsRamp(1, 1));
+    }
+
+    [Fact]
     public void DamageCell_LeavesSteelUntouched_AndRaisesNoEvent()
     {
         var grid = Grid();
