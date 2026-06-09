@@ -30,6 +30,13 @@ public partial class Arena3DScene : Node3D
     private const int StartingLives = 3;
     private const int TankMaxHp = 8; // beefier tanks so fights last longer (below 40% HP a tank limps + smokes)
 
+    // Fog of war (the 3D port of the iso fog): the player sees only a lit circle around their tank. An
+    // enemy farther than PlayerVisionRadius from every living player tank is invisible (not just dimmed);
+    // an enemy lurking in grass is hidden until a player is within BushRevealRange. The same radii the iso
+    // scene and the AI use, so both sides see about as far. Tunable balance knobs.
+    private const float PlayerVisionRadius = 640f;
+    private const float BushRevealRange = 96f;
+
     private const float PickupRadius = 28f;
     private const int RepairAmount = 2;
     private const int ShieldAmount = 3;
@@ -87,6 +94,15 @@ public partial class Arena3DScene : Node3D
     private IReadOnlyList<(int X, int Y)> _enemySpawns = Array.Empty<(int, int)>();
     private Camera3D _camera = null!;
     private ITank _player = null!;
+    private DirectionalLight3D _sun = null!;
+    private Godot.Environment _environment = null!;
+
+    // The fog spotlight rides the player and lights roughly a vision-radius circle on the ground; the
+    // viewers are the tanks whose sight reveals the field (just the player today; co-op allies would join
+    // this list so the team shares one lit field). A dark ambient — set when fog is on — is what the
+    // lights cut a hole in.
+    private SpotLight3D _fogLight = null!;
+    private readonly List<ITank> _viewers = new();
 
     public override void _Ready()
     {
@@ -157,6 +173,10 @@ public partial class Arena3DScene : Node3D
 
     /// <summary>Whether the game is paused (the Escape menu is up). Exposed for tests.</summary>
     public bool IsPaused => _paused;
+
+    /// <summary>The player tank's world position on the ground plane. Exposed so a test can assert the
+    /// fog light is centred on the player.</summary>
+    public Vector3 PlayerWorldPosition => GroundProjection.ToWorld(_player.Position);
 
     // Escape opens a pause menu (single-player, so freezing the world is fair): the world stops stepping
     // and an overlay offers Resume, Main Menu, or Exit. Public so a test can drive it.
@@ -258,6 +278,9 @@ public partial class Arena3DScene : Node3D
             _camera.Position = target + CameraOffset();
             _camera.LookAt(target, Vector3.Up);
         }
+
+        PositionFogLight();   // the lit circle rides the player (goes dark while the player is down)
+        UpdateConcealment();  // hide enemies outside the player's vision; darken the player in cover
     }
 
     private static Vector3 CameraOffset()
@@ -284,27 +307,110 @@ public partial class Arena3DScene : Node3D
         };
         AddChild(_camera);
 
-        var sun = new DirectionalLight3D
+        _sun = new DirectionalLight3D
         {
             Name = "Sun",
             RotationDegrees = new Vector3(-55f, -40f, 0f),
             LightEnergy = 1.4f,
             ShadowEnabled = true,
         };
-        AddChild(sun);
+        AddChild(_sun);
 
-        AddChild(new WorldEnvironment
+        _environment = new Godot.Environment
         {
-            Environment = new Godot.Environment
+            BackgroundMode = Godot.Environment.BGMode.Color,
+            BackgroundColor = new Color(0.45f, 0.62f, 0.78f), // sky
+            AmbientLightSource = Godot.Environment.AmbientSource.Color,
+            AmbientLightColor = new Color(0.7f, 0.72f, 0.78f),
+            AmbientLightEnergy = 0.9f,
+            TonemapMode = Godot.Environment.ToneMapper.Aces, // compress highlights so light colours don't blow out to white
+        };
+        AddChild(new WorldEnvironment { Environment = _environment });
+    }
+
+    // Fog of war: a dark world (the sun dimmed to near-dusk, a near-black ambient and sky) that the
+    // player's spotlight cuts a lit circle into. The spotlight hangs high over the player and points
+    // straight down, its cone sized so the lit ground disc is about a vision-radius across — so "lit"
+    // reads as "visible", matching the iso fog. Structured so co-op could add an ally light later
+    // (one per viewer); single-player needs just the one. Versus (shared screen) gets no fog at all.
+    private static readonly Color FogAmbient = new(0.10f, 0.10f, 0.14f);
+    private const float FogLightHeight = 1400f;   // how high over the player the spotlight hangs
+    private const float FogLightEnergy = 6f;
+    private const float FogSunEnergy = 0.18f;      // the sun dimmed to a faint dusk under fog
+
+    private void SetUpFog()
+    {
+        _sun.LightEnergy = FogSunEnergy;
+        _environment.AmbientLightColor = FogAmbient;
+        _environment.AmbientLightEnergy = 1f;
+        _environment.BackgroundColor = FogAmbient; // a dark horizon, not a bright sky
+
+        // The cone half-angle whose lit ground disc (at FogLightHeight) is ~PlayerVisionRadius across.
+        var coneDeg = Mathf.RadToDeg(Mathf.Atan2(PlayerVisionRadius, FogLightHeight));
+        _fogLight = new SpotLight3D
+        {
+            Name = "FogLight",
+            RotationDegrees = new Vector3(-90f, 0f, 0f), // point straight down
+            SpotRange = FogLightHeight * 2.4f,
+            SpotAngle = coneDeg,
+            SpotAngleAttenuation = 1.4f, // softer rim so the circle fades rather than hard-edges
+            LightEnergy = FogLightEnergy,
+            ShadowEnabled = false,
+        };
+        AddChild(_fogLight);
+        PositionFogLight();
+    }
+
+    private void PositionFogLight()
+    {
+        if (_fogLight is null)
+        {
+            return;
+        }
+
+        var on = _player.Hp > 0;
+        _fogLight.Visible = on;
+        if (on)
+        {
+            _fogLight.Position = GroundProjection.ToWorld(_player.Position) + new Vector3(0f, FogLightHeight, 0f);
+        }
+    }
+
+    // An enemy tank is shown only inside the player team's circle of vision (and not lurking unspotted
+    // in grass); beyond that it is hidden, not merely dimmed. The player's own tank darkens while it
+    // sits in a bush, to signal it is in stealth cover. The 3D port of ArenaScene.UpdateConcealment.
+    private void UpdateConcealment()
+    {
+        foreach (var entity in _world.Entities)
+        {
+            if (entity is not ITank tank || !_views.TryGetValue(tank.Id, out var node) || node is not Tank3DView view)
             {
-                BackgroundMode = Godot.Environment.BGMode.Color,
-                BackgroundColor = new Color(0.45f, 0.62f, 0.78f), // sky
-                AmbientLightSource = Godot.Environment.AmbientSource.Color,
-                AmbientLightColor = new Color(0.7f, 0.72f, 0.78f),
-                AmbientLightEnergy = 0.9f,
-                TonemapMode = Godot.Environment.ToneMapper.Aces, // compress highlights so light colours don't blow out to white
-            },
-        });
+                continue;
+            }
+
+            if (tank.Team == PlayerTeam)
+            {
+                view.Stealthed = tank.Hp > 0 && _bushes.ConcealsAt(tank.Position);
+                continue;
+            }
+
+            var outsideVision = !AnyViewerWithin(tank.Position, PlayerVisionRadius);
+            var unspottedInGrass = _bushes.ConcealsAt(tank.Position) && !AnyViewerWithin(tank.Position, BushRevealRange);
+            view.Concealed = tank.Hp > 0 && (outsideVision || unspottedInGrass);
+        }
+    }
+
+    private bool AnyViewerWithin(NVector2 point, float range)
+    {
+        foreach (var viewer in _viewers)
+        {
+            if (viewer.Hp > 0 && NVector2.Distance(viewer.Position, point) <= range)
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private void BuildGround(int widthCells, int heightCells)
@@ -375,6 +481,7 @@ public partial class Arena3DScene : Node3D
         var player = new Tank(p1Input, _world, _arena, CellCentre(_playerSpawn.X, _playerSpawn.Y),
             TankSpeed, FireInterval, ProjectileSpeed, maxHp: TankMaxHp, team: PlayerTeam, lives: StartingLives, terrain: _sandbags);
         _player = player;
+        _viewers.Add(player); // the player's sight reveals the field; co-op allies would join this list
         SpawnTank(player);
 
         var enemyIndex = 0;
@@ -388,6 +495,8 @@ public partial class Arena3DScene : Node3D
             SpawnTank(enemy);
             enemyIndex++;
         }
+
+        SetUpFog(); // single-player → fog the field with a lit circle around the player
     }
 
     private void SpawnTank(Tank tank)
