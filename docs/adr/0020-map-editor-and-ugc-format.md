@@ -97,17 +97,18 @@ with no continuous Z); it is captured here as Wave B intent and will get its own
 **Wave A — flat editor (no blockers; ships against existing seams):**
 
 1. **Map format** — `MapDefinition` value object + `MapCodec` (JSON) + `MapValidator`, all pure C#,
-   TDD-first. No UI.
+   TDD-first. No UI. *(done — #167)*
 2. **Load path** — deserialize a `MapDefinition` into `LevelMap.FromCells` + spawn lists and run it in
    `Arena3DScene`; a `user://maps/` repository (save/list/load). `MapSelectScene` "My Maps" + a bundled
-   sample custom map prove the round trip.
+   sample custom map prove the round trip. *(done — #168)*
 3. **Editor scene** — WYSIWYG top-down-over-3D authoring: size picker, paint brush over the cell palette,
    bush/sandbag overlays, spawn/powerup markers, Validate, Test-Play, Save. "Create New Map" entry wired.
+   *(done — #169)*
 
 **Wave B — multilevel (after ADR-0018 step 2 makes `IArena` layer-aware + ramps exist):**
 
 1. **(step 4) Drop-off-ledge physics** — `Tank` vertical sub-state + gravity + edge-fall + ramp-only-up;
-   render at `Y = Z`; landing FX. (ADR-0018 amendment.)
+   render at `Y = Z`; landing FX. *(done — see the ADR-0018 amendment)*
 2. **(step 5) Elevation tools** — height brush + ramp tool in the editor; `MapDefinition` gains layers +
    ramps.
 

@@ -156,6 +156,20 @@ public sealed class GridArena : IArena
         return _grid.IsBlocked(cellX, cellY) || OnAnotherLayer(cellX, cellY, layer);
     }
 
+    public int? DropTargetAt(Vector2 point, int currentLayer)
+    {
+        var local = point - _origin;
+        var cellX = FloorDiv(local.X);
+        var cellY = FloorDiv(local.Y);
+        if (_grid.IsBlocked(cellX, cellY) || ConnectsLayer(cellX, cellY, currentLayer))
+        {
+            return null; // nowhere to land (a wall, water, out of bounds), or ground that carries the tank
+        }
+
+        var cellLayer = _grid.LayerAt(cellX, cellY);
+        return cellLayer < currentLayer ? cellLayer : null;
+    }
+
     public int LayerAfterMove(Vector2 from, Vector2 to, int currentLayer)
     {
         var toLocal = to - _origin;

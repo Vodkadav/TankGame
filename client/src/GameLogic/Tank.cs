@@ -18,12 +18,17 @@ public sealed class Tank : ITank
     private readonly ITerrain? _terrain;
     private readonly ITeleporter? _teleporter;
     private readonly Vector2 _spawnPosition;
+    private readonly int _spawnLayer;
     private readonly Stats _stats;
     private readonly float _projectileSpeed;
     private float _fireCooldown;
     private float _pushTimer;
     private int _livesRemaining;
     private float _respawnTimer;
+    private bool _airborne;
+    private float _altitude;
+    private float _fallSpeed;
+    private int _fallTargetLayer;
     private readonly AmmoLoadout _ammo = new();
 
     /// <param name="input">Per-frame intent source.</param>
@@ -68,6 +73,7 @@ public sealed class Tank : ITank
         _teleporter = teleporter;
         Position = startPosition;
         _spawnPosition = startPosition;
+        _spawnLayer = layer;
         _stats = new Stats(new Dictionary<StatKind, float>
         {
             [StatKind.Speed] = speed,
@@ -105,6 +111,10 @@ public sealed class Tank : ITank
     public const float LowHealthFraction = 0.4f;
     private const float LowHealthSpeedFactor = 0.6f;
 
+    /// <summary>Downward acceleration while falling off a ledge, in layers per second² (ADR-0020
+    /// Wave B). 10 lands a one-layer drop in ~0.45 s.</summary>
+    public const float FallGravity = 10f;
+
     public Guid Id { get; }
     public Vector2 Position { get; private set; }
     public float Rotation { get; private set; }
@@ -118,6 +128,9 @@ public sealed class Tank : ITank
     /// <summary>The elevation layer this tank fights on (ADR-0018): combat and (later) collision act
     /// only within a layer, and it changes only by crossing a ramp. 0 is the ground layer.</summary>
     public int Layer { get; private set; }
+
+    public float Altitude => _airborne ? _altitude : Layer;
+    public bool IsAirborne => _airborne;
 
     // "In the match": a tank with positive hit points is fighting; one at zero hit points is
     // down but still in the match while it has a life left to respawn. Only once both are gone
@@ -196,6 +209,9 @@ public sealed class Tank : ITank
                 {
                     Hp = MaxHp;
                     Position = _spawnPosition;
+                    Layer = _spawnLayer; // back on the spawn cell's level, grounded — even if it died mid-fall
+                    _airborne = false;
+                    _fallSpeed = 0f;
                     _fireCooldown = 0f;
                     _pushTimer = 0f;
                 }
@@ -229,7 +245,7 @@ public sealed class Tank : ITank
         var nextX = Position.X;
         if (move.X != 0f)
         {
-            var hitWall = _arena.IsBlocked(new Vector2(desired.X + (MathF.Sign(move.X) * CollisionRadius), Position.Y), Layer);
+            var hitWall = MoveBlocked(new Vector2(desired.X + (MathF.Sign(move.X) * CollisionRadius), Position.Y));
             if (!hitWall && !OverlapsAnotherTank(new Vector2(desired.X, Position.Y)))
             {
                 nextX = desired.X;
@@ -244,7 +260,7 @@ public sealed class Tank : ITank
         var nextY = Position.Y;
         if (move.Y != 0f)
         {
-            var hitWall = _arena.IsBlocked(new Vector2(nextX, desired.Y + (MathF.Sign(move.Y) * CollisionRadius)), Layer);
+            var hitWall = MoveBlocked(new Vector2(nextX, desired.Y + (MathF.Sign(move.Y) * CollisionRadius)));
             if (!hitWall && !OverlapsAnotherTank(new Vector2(nextX, desired.Y)))
             {
                 nextY = desired.Y;
@@ -258,15 +274,41 @@ public sealed class Tank : ITank
         var previousPosition = Position;
         Position = new Vector2(nextX, nextY);
 
-        // Driving onto a ramp carries the tank up or down to the layer it connects.
-        Layer = _arena.LayerAfterMove(previousPosition, Position, Layer);
-
-        // Driving onto a ready teleport pad warps the tank to its linked pad (and that pad's layer).
-        if (_teleporter is not null &&
-            _teleporter.TryTeleport(Position, Layer, out var warpTo, out var warpLayer))
+        if (_airborne)
         {
-            Position = warpTo;
-            Layer = warpLayer;
+            // Mid-fall (ADR-0020 Wave B): the altitude sweeps down under fixed-step gravity while the
+            // source Layer holds (combat keeps treating the tank as where it left); ramps and teleport
+            // pads cannot grab a tank in the air.
+            _fallSpeed += FallGravity * deltaSeconds;
+            _altitude -= _fallSpeed * deltaSeconds;
+            if (_altitude <= _fallTargetLayer)
+            {
+                _altitude = _fallTargetLayer;
+                Layer = _fallTargetLayer;
+                _airborne = false;
+                _fallSpeed = 0f;
+            }
+        }
+        else
+        {
+            // Driving onto a ramp carries the tank up or down to the layer it connects.
+            Layer = _arena.LayerAfterMove(previousPosition, Position, Layer);
+
+            if (_arena.DropTargetAt(Position, Layer) is int dropTo)
+            {
+                // The tank's centre crossed a ledge: leave the ground toward the lower layer.
+                _airborne = true;
+                _altitude = Layer;
+                _fallSpeed = 0f;
+                _fallTargetLayer = dropTo;
+            }
+            else if (_teleporter is not null &&
+                _teleporter.TryTeleport(Position, Layer, out var warpTo, out var warpLayer))
+            {
+                // Driving onto a ready teleport pad warps the tank to its linked pad (and its layer).
+                Position = warpTo;
+                Layer = warpLayer;
+            }
         }
 
         PushAgainstWall(wallX, wallY, move, deltaSeconds);
@@ -279,7 +321,7 @@ public sealed class Tank : ITank
         TurretRotation = input.Aim;
 
         _fireCooldown -= deltaSeconds;
-        if (_fireCooldown <= 0f && input.Fire)
+        if (_fireCooldown <= 0f && input.Fire && !_airborne)
         {
             _fireCooldown = _stats.Current(StatKind.FireInterval);
             var direction = new Vector2(MathF.Cos(TurretRotation), MathF.Sin(TurretRotation));
@@ -316,8 +358,17 @@ public sealed class Tank : ITank
             : (new Vector2(Position.X, Position.Y + (MathF.Sign(move.Y) * CollisionRadius)),
                 new Vector2(0f, MathF.Sign(move.Y)));
 
-        _arena.DamageAt(point, direction, PushDamage, Layer);
+        _arena.DamageAt(point, direction, PushDamage, MoveLayer);
     }
+
+    // Movement collides on the layer the tank is (or is about to be) standing on: the source layer
+    // when grounded, the landing layer mid-fall — so a falling tank cannot steer back into the cliff
+    // it left. A grounded block is forgiven when the arena says the tank can drop off a ledge there.
+    private int MoveLayer => _airborne ? _fallTargetLayer : Layer;
+
+    private bool MoveBlocked(Vector2 leadingEdge) =>
+        _arena.IsBlocked(leadingEdge, MoveLayer) &&
+        (_airborne || _arena.DropTargetAt(leadingEdge, Layer) is null);
 
     // A tank is a circle of CollisionRadius; two tanks may not overlap. Scans the world for any
     // other live tank whose centre is within a tank-diameter of this candidate centre. Order is
