@@ -21,4 +21,14 @@ public interface ITank : IEntity, IDamageable
     /// touched (granted by a shield pickup). 0 when unshielded; not capped by <see cref="IDamageable.MaxHp"/>.
     /// The view renders it above the health bar.</summary>
     int Shield { get; }
+
+    /// <summary>Continuous elevation in layer units (ADR-0020 Wave B): a grounded tank sits exactly
+    /// on its <see cref="IEntity.Layer"/>; while airborne it sweeps down toward the lower layer. The
+    /// 3D view renders the tank at this height × the world layer height. Default: grounded.</summary>
+    float Altitude => Layer;
+
+    /// <summary>True while the tank is falling off a ledge (ADR-0020 Wave B). A falling tank keeps
+    /// its source <see cref="IEntity.Layer"/> for combat until it lands, cannot fire, and ignores
+    /// ramps and teleport pads. Default: grounded, never airborne.</summary>
+    bool IsAirborne => false;
 }

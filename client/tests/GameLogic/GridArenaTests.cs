@@ -298,4 +298,44 @@ public class GridArenaTests
         var plateau = arena.RaycastFirstHit(new Vector2(25f, 5f), new Vector2(-1f, 0f), 100f, layer: 1);
         Assert.Equal(10f, plateau!.Value.Point.X, precision: 3);
     }
+
+    // ── Drop-off ledges (ADR-0020 Wave B step 4) ──
+
+    [Fact]
+    public void DropTargetAt_ALowerFloorCell_IsADropToItsLayer()
+    {
+        var arena = GroundThenPlateau();
+
+        Assert.Equal(0, arena.DropTargetAt(new Vector2(15f, 5f), currentLayer: 1)); // col 1: open ground below
+    }
+
+    [Fact]
+    public void DropTargetAt_OwnLayerAndHigherGround_AreNotDrops()
+    {
+        var arena = GroundThenPlateau();
+
+        Assert.Null(arena.DropTargetAt(new Vector2(25f, 5f), currentLayer: 1)); // standing on its own plateau
+        Assert.Null(arena.DropTargetAt(new Vector2(25f, 5f), currentLayer: 0)); // a cliff above is a wall, not a drop
+    }
+
+    [Fact]
+    public void DropTargetAt_ARampJoiningTheTanksLayer_IsNotADrop()
+    {
+        var arena = GroundRampPlateau();
+
+        // The ramp (col 1, joining 0 and 1) is the smooth way down — driving onto it never falls.
+        Assert.Null(arena.DropTargetAt(new Vector2(15f, 5f), currentLayer: 1));
+    }
+
+    [Fact]
+    public void DropTargetAt_ALowerCellTheTankCannotLandOn_IsNotADrop()
+    {
+        // Col 1 is lower than the plateau but walled (steel): the ledge above it stays a wall.
+        var grid = WallGrid.FromMaterials(
+            new[,] { { CellMaterial.Floor }, { CellMaterial.Steel }, { CellMaterial.Floor } },
+            layers: new[,] { { 0 }, { 0 }, { 1 } });
+        var arena = new GridArena(grid, Tile, Vector2.Zero);
+
+        Assert.Null(arena.DropTargetAt(new Vector2(15f, 5f), currentLayer: 1));
+    }
 }

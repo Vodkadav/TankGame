@@ -31,7 +31,9 @@ public partial class Tank3DView : Node3D
     private ShaderMaterial _healthFill = null!;
     private ShaderMaterial _shieldFill = null!;
     private CpuParticles3D _smoke = null!;
+    private CpuParticles3D _landingDust = null!;
     private bool _wasAlive = true;
+    private bool _wasAirborne;
     private bool _stealthed;
 
     public override void _Ready()
@@ -48,6 +50,7 @@ public partial class Tank3DView : Node3D
 
         BuildBars();
         BuildSmoke();
+        BuildLandingDust();
     }
 
     public void Bind(ITank tank) => _tank = tank;
@@ -116,6 +119,44 @@ public partial class Tank3DView : Node3D
         AddChild(_smoke);
     }
 
+    // A one-shot ring of sandy puffs kicked out when the tank lands after dropping off a ledge
+    // (ADR-0020 Wave B) — built once and restarted per landing, never re-created (GC-leak rule).
+    private void BuildLandingDust()
+    {
+        var mat = new StandardMaterial3D
+        {
+            Transparency = BaseMaterial3D.TransparencyEnum.Alpha,
+            ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded,
+            VertexColorUseAsAlbedo = true,
+        };
+        var puff = new SphereMesh { Radius = 8f, Height = 16f, RadialSegments = 6, Rings = 3, Material = mat };
+        var ramp = new Gradient
+        {
+            Offsets = new[] { 0f, 1f },
+            Colors = new[] { new Color(0.78f, 0.68f, 0.5f, 0.85f), new Color(0.7f, 0.6f, 0.45f, 0f) },
+        };
+        _landingDust = new CpuParticles3D
+        {
+            Name = "LandingDust",
+            Emitting = false,
+            OneShot = true,
+            Explosiveness = 1f,
+            Amount = 18,
+            Lifetime = 0.5,
+            Position = new Vector3(0f, 4f, 0f),
+            Mesh = puff,
+            Direction = new Vector3(0f, 1f, 0f),
+            Spread = 80f,
+            Gravity = new Vector3(0f, -60f, 0f),
+            InitialVelocityMin = 40f,
+            InitialVelocityMax = 90f,
+            ScaleAmountMin = 0.5f,
+            ScaleAmountMax = 1.2f,
+            ColorRamp = ramp,
+        };
+        AddChild(_landingDust);
+    }
+
     /// <summary>Paints the body to its team colour; safe to call before the node enters the tree.</summary>
     public void ApplyTeamTint(int team)
     {
@@ -149,7 +190,15 @@ public partial class Tank3DView : Node3D
 
         _smoke.Emitting = _tank.Hp <= GameLogic.Tank.LowHealthFraction * _tank.MaxHp; // wounded → trails smoke
 
-        Position = GroundProjection.ToWorld(_tank.Position, _tank.Layer); // ride the elevation layer (ADR-0018)
+        // Ride the continuous altitude: a grounded tank sits on its layer; a falling one sweeps down
+        // the cliff it drove off (ADR-0018 / ADR-0020 Wave B). A landing kicks up a puff of dust.
+        Position = GroundProjection.ToWorld(_tank.Position, _tank.Altitude * GroundProjection.LayerHeight);
+        if (_wasAirborne && !_tank.IsAirborne)
+        {
+            _landingDust.Restart();
+        }
+
+        _wasAirborne = _tank.IsAirborne;
 
         var offset = Mathf.DegToRad(HeadingOffsetDeg);
         var hullYaw = offset - _tank.Rotation;          // subtract: the model turn matches the mouse (see #141)

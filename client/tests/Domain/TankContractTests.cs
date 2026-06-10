@@ -52,6 +52,17 @@ public class TankContractTests
     }
 
     [Fact]
+    public void Altitude_DefaultsToTheLayer_AndGrounded()
+    {
+        // A tank that predates ledge drops (ADR-0020 Wave B) is always grounded: its altitude is
+        // exactly its layer and it is never airborne — so every existing fake keeps working untouched.
+        ITank tank = new StubTank(new FixedInput(new TankInput(Vector2.Zero, 0f, false)), speed: 0f);
+
+        Assert.Equal(0f, tank.Altitude);
+        Assert.False(tank.IsAirborne);
+    }
+
+    [Fact]
     public void Step_PointsTurretAtAim()
     {
         var input = new FixedInput(new TankInput(Vector2.Zero, Aim: 1.25f, Fire: false));

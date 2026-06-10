@@ -55,4 +55,11 @@ public interface IArena
     /// changes layer only by driving onto a ramp, which connects two adjacent layers; on a flat arena
     /// (the default) the layer never changes.</summary>
     int LayerAfterMove(Vector2 from, Vector2 to, int currentLayer) => currentLayer;
+
+    /// <summary>The lower layer a grounded tank at <paramref name="point"/> on
+    /// <paramref name="currentLayer"/> would drop onto by driving off the ledge there (ADR-0020
+    /// Wave B), or <c>null</c> when the ground carries the tank instead — its own layer, a ramp
+    /// joining its layer, higher ground (a cliff face, still a wall), or a cell it cannot land on
+    /// (a wall, water, out of bounds). On a flat arena (the default) there is never a drop.</summary>
+    int? DropTargetAt(Vector2 point, int currentLayer) => null;
 }

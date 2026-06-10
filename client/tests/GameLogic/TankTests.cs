@@ -93,6 +93,184 @@ public class TankTests
         Assert.True(tank.Position.X > 200f, "the tank climbed up onto the plateau");
     }
 
+    // ── Drop-off ledges (ADR-0020 Wave B step 4) ──
+    // A single row: a raised plateau (cols 0-2, layer 1) ending in a cliff down to open ground (cols 3-7).
+    private static GridArena PlateauThenGround()
+    {
+        var grid = WallGrid.FromMaterials(
+            new[,]
+            {
+                { CellMaterial.Floor }, { CellMaterial.Floor }, { CellMaterial.Floor },
+                { CellMaterial.Floor }, { CellMaterial.Floor }, { CellMaterial.Floor },
+                { CellMaterial.Floor }, { CellMaterial.Floor },
+            },
+            layers: new[,] { { 1 }, { 1 }, { 1 }, { 0 }, { 0 }, { 0 }, { 0 }, { 0 } });
+        return new GridArena(grid, tileSize: 100f, Vector2.Zero);
+    }
+
+    [Fact]
+    public void Step_DrivingOffALedge_FallsToTheLowerLayer_KeepingItsLayerUntilLanding()
+    {
+        var input = new ScriptedInput(new TankInput(new Vector2(1f, 0f), Aim: 0f, Fire: false));
+        var tank = new Tank(input, new World(), PlateauThenGround(), new Vector2(250f, 50f), Speed,
+            FireInterval, ProjectileSpeed, layer: 1);
+
+        var sawAirborne = false;
+        var keptSourceLayer = true;
+        var altitudeSweptDown = false;
+        var previousAltitude = tank.Altitude;
+        for (var i = 0; i < 60; i++)
+        {
+            tank.Step(0.05f); // drive +X over the cliff at x=300
+            if (tank.IsAirborne)
+            {
+                sawAirborne = true;
+                keptSourceLayer &= tank.Layer == 1;
+                altitudeSweptDown |= tank.Altitude < previousAltitude;
+            }
+
+            previousAltitude = tank.Altitude;
+        }
+
+        Assert.True(sawAirborne, "the tank should leave the ledge airborne");
+        Assert.True(keptSourceLayer, "a falling tank keeps its source layer until it lands");
+        Assert.True(altitudeSweptDown, "the fall sweeps the altitude down — not a snap");
+        Assert.False(tank.IsAirborne);
+        Assert.Equal(0, tank.Layer);
+        Assert.Equal(0f, tank.Altitude);
+        Assert.True(tank.Position.X > 300f, "the tank rolled on past the cliff base");
+    }
+
+    [Fact]
+    public void Step_WhileAirborne_DoesNotFire_ThenFiresAgainAfterLanding()
+    {
+        var world = new World();
+        var input = new ScriptedInput(new TankInput(new Vector2(1f, 0f), Aim: 0f, Fire: true));
+        var tank = new Tank(input, world, PlateauThenGround(), new Vector2(250f, 50f), Speed,
+            FireInterval, ProjectileSpeed, layer: 1);
+
+        // The fall (~0.45 s) outlasts the fire cooldown (0.3 s), so an unguarded tank WOULD shoot mid-air.
+        var shotsWhenAirborne = -1;
+        var firedWhileAirborne = false;
+        for (var i = 0; i < 60; i++)
+        {
+            tank.Step(0.05f);
+            if (tank.IsAirborne)
+            {
+                var shots = world.Entities.Count();
+                if (shotsWhenAirborne < 0)
+                {
+                    shotsWhenAirborne = shots;
+                }
+
+                firedWhileAirborne |= shots > shotsWhenAirborne;
+            }
+        }
+
+        Assert.True(shotsWhenAirborne >= 0, "the run must include an airborne stretch");
+        Assert.False(firedWhileAirborne, "a falling tank cannot fire");
+        Assert.True(world.Entities.Count() > shotsWhenAirborne, "firing resumes once it lands");
+    }
+
+    [Fact]
+    public void Step_ALedgeAboveAWalledCell_StaysAWall()
+    {
+        // The ground below the cliff (col 2) is steel: there is nowhere to land, so the edge still blocks.
+        var grid = WallGrid.FromMaterials(
+            new[,]
+            {
+                { CellMaterial.Floor }, { CellMaterial.Floor },
+                { CellMaterial.Steel }, { CellMaterial.Floor },
+            },
+            layers: new[,] { { 1 }, { 1 }, { 0 }, { 0 } });
+        var arena = new GridArena(grid, tileSize: 100f, Vector2.Zero);
+        var input = new ScriptedInput(new TankInput(new Vector2(1f, 0f), Aim: 0f, Fire: false));
+        var tank = new Tank(input, new World(), arena, new Vector2(150f, 50f), Speed, FireInterval,
+            ProjectileSpeed, layer: 1);
+
+        for (var i = 0; i < 30; i++)
+        {
+            tank.Step(0.05f);
+        }
+
+        Assert.False(tank.IsAirborne);
+        Assert.Equal(1, tank.Layer);
+        Assert.True(tank.Position.X + Tank.CollisionRadius <= 200f, "the tank must stop at the ledge");
+    }
+
+    [Fact]
+    public void Step_DrivingTowardHigherGroundWithoutARamp_IsStillBlocked()
+    {
+        var input = new ScriptedInput(new TankInput(new Vector2(-1f, 0f), Aim: 0f, Fire: false));
+        var tank = new Tank(input, new World(), PlateauThenGround(), new Vector2(550f, 50f), Speed,
+            FireInterval, ProjectileSpeed);
+
+        for (var i = 0; i < 60; i++)
+        {
+            tank.Step(0.05f); // drive -X into the plateau cliff at x=300
+        }
+
+        Assert.False(tank.IsAirborne);
+        Assert.Equal(0, tank.Layer);
+        Assert.True(tank.Position.X - Tank.CollisionRadius >= 300f, "high ground is reached only by ramp");
+    }
+
+    [Fact]
+    public void Step_TerracedLedges_ChainIntoASecondFall()
+    {
+        var grid = WallGrid.FromMaterials(
+            new[,]
+            {
+                { CellMaterial.Floor }, { CellMaterial.Floor },
+                { CellMaterial.Floor }, { CellMaterial.Floor },
+                { CellMaterial.Floor }, { CellMaterial.Floor },
+                { CellMaterial.Floor }, { CellMaterial.Floor },
+            },
+            layers: new[,] { { 2 }, { 2 }, { 1 }, { 1 }, { 0 }, { 0 }, { 0 }, { 0 } });
+        var arena = new GridArena(grid, tileSize: 100f, Vector2.Zero);
+        var input = new ScriptedInput(new TankInput(new Vector2(1f, 0f), Aim: 0f, Fire: false));
+        var tank = new Tank(input, new World(), arena, new Vector2(150f, 50f), Speed, FireInterval,
+            ProjectileSpeed, layer: 2);
+
+        for (var i = 0; i < 120; i++)
+        {
+            tank.Step(0.05f); // 6 s: off the first ledge, across the terrace, off the second
+        }
+
+        Assert.False(tank.IsAirborne);
+        Assert.Equal(0, tank.Layer);
+        Assert.Equal(0f, tank.Altitude);
+        Assert.True(tank.Position.X > 500f, "the tank terraced all the way down to the valley floor");
+    }
+
+    [Fact]
+    public void DownedTank_KilledMidAir_RespawnsGrounded_OnItsSpawnLayer()
+    {
+        var input = new ScriptedInput(new TankInput(new Vector2(1f, 0f), Aim: 0f, Fire: false));
+        var tank = new Tank(input, new World(), PlateauThenGround(), new Vector2(250f, 50f), Speed,
+            FireInterval, ProjectileSpeed, lives: 2, layer: 1);
+
+        for (var i = 0; i < 200 && !tank.IsAirborne; i++)
+        {
+            tank.Step(0.05f);
+        }
+
+        Assert.True(tank.IsAirborne, "the tank should be falling before it is shot down");
+
+        tank.TakeDamage(99); // shot out of the air
+        input.Value = new TankInput(Vector2.Zero, Aim: 0f, Fire: false);
+        for (var i = 0; i < 50; i++)
+        {
+            tank.Step(0.05f); // 2.5 s ≥ the respawn delay
+        }
+
+        Assert.True(tank.Hp > 0);
+        Assert.Equal(new Vector2(250f, 50f), tank.Position);
+        Assert.False(tank.IsAirborne);
+        Assert.Equal(1, tank.Layer);
+        Assert.Equal(1f, tank.Altitude);
+    }
+
     [Fact]
     public void Step_NormalisesDiagonalInput_SoSpeedIsConstant()
     {

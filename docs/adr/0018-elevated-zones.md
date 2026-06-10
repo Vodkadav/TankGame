@@ -113,7 +113,29 @@ protocol change is not a surprise later.
   2. **Layer-aware arena + ramps** — lift `Layer` onto the `IEntity`/`ITank`/`IProjectile` contracts
      (so views can read height), make `IArena` (`IsBlocked`/`RaycastFirstHit`/`DamageAt`) layer-aware,
      and add ramp cells + per-cell layers to the arena model. This is where the wider `IArena`
-     call-site/fake ripple lands — justified because the elevated map needs it.
+     call-site/fake ripple lands — justified because the elevated map needs it. *(done — #176–#179)*
   3. **The "Cliffs & Valleys" map + raised meshes + the map seam** — a new themed map that uses
      multiple layers and ramps, rendered at `y = Layer × LayerHeight`, reached through a map-selection
-     seam that also offers "Desert War". The other themed arenas are later content.
+     seam that also offers "Desert War". The other themed arenas are later content. *(done — #182)*
+
+## Amendment (2026-06-10): drop-off ledges (ADR-0020 Wave B step 4)
+
+The original decision made a plateau edge a wall in *both* directions. Built per ADR-0020 Wave B,
+the downhill direction is now open: driving off a raised edge into a lower, rampless cell starts a
+deterministic **fall** integrated in `Tank.Step` — never Godot physics, preserving netcode parity
+(ADR-0019).
+
+- `ITank` gains `Altitude` (continuous elevation in layer units; grounded ⇒ exactly `Layer`) and
+  `IsAirborne`, both default interface members, so every existing implementation and test fake is
+  untouched.
+- `IArena.DropTargetAt(point, currentLayer)` (default `null`) answers "what layer would a tank
+  driving off a ledge here land on". `GridArena` returns the lower cell's layer, unless a ramp
+  connects the tank's layer (the smooth way down) or the landing cell cannot be stood on (a wall,
+  water, out of bounds) — those edges stay walls.
+- While airborne the tank keeps its source `Layer` (the `CombatResolver` filter needs no airborne
+  case), cannot fire, ignores ramps and teleport pads, and steers against the landing layer's
+  walls. Gravity is fixed-step (`Tank.FallGravity`, in layers/s²; a one-layer drop lands in
+  ~0.45 s). Landings chain, so terraces fall again; a tank killed mid-air respawns grounded on its
+  spawn layer.
+- Ramps remain the only way **up**; a cliff only drops.
+- The view renders tanks at `y = Altitude × LayerHeight` and kicks up a dust puff on landing.
