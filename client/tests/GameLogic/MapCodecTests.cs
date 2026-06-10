@@ -77,4 +77,62 @@ public class MapCodecTests
 
         Assert.Empty(restored.TeleportPads);
     }
+
+    // ── Elevation (ADR-0020 Wave B step 5) ──
+
+    private static MapDefinition ElevatedMap()
+    {
+        var map = MapDefinition.CreateBlank("Cliffy", 6, 5);
+        var layers = new int[6, 5];
+        layers[3, 2] = 1;
+        layers[4, 2] = 2;
+        var ramps = new bool[6, 5];
+        ramps[2, 2] = true;
+        return new MapDefinition(
+            map.Name, map.Materials, map.Bushes, map.Sandbags,
+            (1, 1), new (int X, int Y)[] { (4, 3) }, System.Array.Empty<PowerupSpawn>(),
+            layers: layers, ramps: ramps);
+    }
+
+    [Fact]
+    public void EncodeThenDecode_RoundTripsLayersAndRamps()
+    {
+        var original = ElevatedMap();
+
+        var restored = MapCodec.Decode(MapCodec.Encode(original));
+
+        Assert.NotNull(restored.Layers);
+        Assert.NotNull(restored.Ramps);
+        for (var y = 0; y < original.Height; y++)
+        {
+            for (var x = 0; x < original.Width; x++)
+            {
+                Assert.Equal(original.Layers![x, y], restored.Layers![x, y]);
+                Assert.Equal(original.Ramps![x, y], restored.Ramps![x, y]);
+            }
+        }
+    }
+
+    [Fact]
+    public void Encode_OmitsElevation_OnAFlatMap_AndDecodeRestoresFlat()
+    {
+        // A flat map stays the lean pre-elevation document — and any pre-elevation document
+        // (no "layers"/"ramps" keys) keeps decoding as flat (backward-compatible).
+        var json = MapCodec.Encode(MapDefinition.CreateBlank("Flat", 4, 4));
+
+        Assert.DoesNotContain("\"layers\"", json);
+        Assert.DoesNotContain("\"ramps\"", json);
+
+        var restored = MapCodec.Decode(json);
+        Assert.Null(restored.Layers);
+        Assert.Null(restored.Ramps);
+    }
+
+    [Fact]
+    public void Decode_ThrowsOnANonDigitLayerGlyph()
+    {
+        var json = MapCodec.Encode(ElevatedMap()).Replace('2', '?');
+
+        Assert.Throws<MapFormatException>(() => MapCodec.Decode(json));
+    }
 }

@@ -46,6 +46,7 @@ public static class MapCodec
 
     private const char OverlayOn = 'b';
     private const char OverlayOff = '.';
+    private const char RampOn = 'r';
 
     public static string Encode(MapDefinition map)
     {
@@ -60,6 +61,17 @@ public static class MapCodec
             WriteRows(writer, "materials", map.Width, map.Height, (x, y) => MaterialGlyph[map.Materials[x, y]]);
             WriteRows(writer, "bushes", map.Width, map.Height, (x, y) => map.Bushes[x, y] ? OverlayOn : OverlayOff);
             WriteRows(writer, "sandbags", map.Width, map.Height, (x, y) => map.Sandbags[x, y] ? OverlayOn : OverlayOff);
+
+            // Elevation only when authored — a flat map keeps the lean pre-elevation document shape.
+            if (map.Layers is { } layers)
+            {
+                WriteRows(writer, "layers", map.Width, map.Height, (x, y) => (char)('0' + layers[x, y]));
+            }
+
+            if (map.Ramps is { } ramps)
+            {
+                WriteRows(writer, "ramps", map.Width, map.Height, (x, y) => ramps[x, y] ? RampOn : OverlayOff);
+            }
 
             WriteCell(writer, "playerSpawn", map.PlayerSpawn.X, map.PlayerSpawn.Y);
 
@@ -157,7 +169,14 @@ public static class MapCodec
                     }
                 }
 
-                return new MapDefinition(name, materials, bushes, sandbags, playerSpawn, enemySpawns, powerupSpawns, teleportPads);
+                var layers = ReadLayers(root, width, height);
+                var ramps = root.TryGetProperty("ramps", out _)
+                    ? ReadRampOverlay(root, width, height)
+                    : null;
+
+                return new MapDefinition(
+                    name, materials, bushes, sandbags, playerSpawn, enemySpawns, powerupSpawns,
+                    teleportPads, layers, ramps);
             }
             catch (KeyNotFoundException ex)
             {
@@ -222,6 +241,48 @@ public static class MapCodec
         }
 
         return materials;
+    }
+
+    // Elevation rows are optional: a document without them is a flat (pre-elevation) map.
+    private static int[,]? ReadLayers(JsonElement root, int width, int height)
+    {
+        if (!root.TryGetProperty("layers", out _))
+        {
+            return null;
+        }
+
+        var rows = ReadRowStrings(root, "layers", width, height);
+        var layers = new int[width, height];
+        for (var y = 0; y < height; y++)
+        {
+            for (var x = 0; x < width; x++)
+            {
+                var glyph = rows[y][x];
+                if (glyph is < '0' or > '9')
+                {
+                    throw new MapFormatException($"unknown layer glyph '{glyph}' at ({x},{y})");
+                }
+
+                layers[x, y] = glyph - '0';
+            }
+        }
+
+        return layers;
+    }
+
+    private static bool[,] ReadRampOverlay(JsonElement root, int width, int height)
+    {
+        var rows = ReadRowStrings(root, "ramps", width, height);
+        var ramps = new bool[width, height];
+        for (var y = 0; y < height; y++)
+        {
+            for (var x = 0; x < width; x++)
+            {
+                ramps[x, y] = rows[y][x] == RampOn;
+            }
+        }
+
+        return ramps;
     }
 
     private static bool[,] ReadOverlay(JsonElement root, string property, int width, int height)

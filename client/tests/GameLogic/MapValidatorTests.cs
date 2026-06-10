@@ -145,4 +145,84 @@ public class MapValidatorTests
 
         Assert.Contains(result.Errors, e => e.Code == MapValidationCode.NoEnemySpawns);
     }
+
+    // ── Elevation (ADR-0020 Wave B step 5) ──
+    // An 8x5 steel-ringed arena whose right half (x 4-6) is a layer-1 plateau; the player starts on
+    // the ground at (1,1) and the enemy up on the plateau at (5,2).
+    private static (MapDefinition Map, int[,] Layers, bool[,] Ramps) PlateauArena()
+    {
+        var blank = MapDefinition.CreateBlank("Plateau", 8, 5);
+        var layers = new int[8, 5];
+        var ramps = new bool[8, 5];
+        for (var x = 4; x <= 6; x++)
+        {
+            for (var y = 1; y <= 3; y++)
+            {
+                layers[x, y] = 1;
+            }
+        }
+
+        var map = new MapDefinition(
+            blank.Name, blank.Materials, blank.Bushes, blank.Sandbags,
+            (1, 1), new (int X, int Y)[] { (5, 2) }, System.Array.Empty<PowerupSpawn>(),
+            layers: layers, ramps: ramps);
+        return (map, layers, ramps);
+    }
+
+    [Fact]
+    public void Validate_FlagsAPlateauSpawn_WithNoRampUpToIt()
+    {
+        // Drops only go DOWN — without a ramp the player can never reach the enemy up top.
+        var (map, _, _) = PlateauArena();
+
+        var result = MapValidator.Validate(map);
+
+        Assert.Contains(result.Errors, e => e.Code == MapValidationCode.SpawnUnreachable && e.X == 5 && e.Y == 2);
+    }
+
+    [Fact]
+    public void Validate_PassesWhenARampConnectsTheGroundToThePlateau()
+    {
+        var (map, _, ramps) = PlateauArena();
+        ramps[3, 2] = true; // a ground-layer ramp cell joining layers 0 and 1, flush with the plateau
+
+        Assert.True(MapValidator.Validate(map).IsValid);
+    }
+
+    [Fact]
+    public void Validate_AcceptsADropOnlyDescent_FromARaisedPlayerSpawn()
+    {
+        // The player starts on the plateau and the enemy is below: a rampless map is still playable
+        // because the tank can drive off the ledge and fall (ADR-0020 Wave B step 4).
+        var (map, _, _) = PlateauArena();
+        var dropOnly = new MapDefinition(
+            map.Name, map.Materials, map.Bushes, map.Sandbags,
+            (5, 2), new (int X, int Y)[] { (1, 1) }, System.Array.Empty<PowerupSpawn>(),
+            layers: map.Layers, ramps: map.Ramps);
+
+        Assert.True(MapValidator.Validate(dropOnly).IsValid);
+    }
+
+    [Fact]
+    public void Validate_FlagsALayerOutsideTheAllowedRange()
+    {
+        var (map, layers, _) = PlateauArena();
+        layers[2, 2] = MapValidator.MaxLayer + 1;
+
+        var result = MapValidator.Validate(map);
+
+        Assert.Contains(result.Errors, e => e.Code == MapValidationCode.LayerOutOfRange && e.X == 2 && e.Y == 2);
+    }
+
+    [Fact]
+    public void Validate_FlagsARampOnANonFloorCell()
+    {
+        var (map, _, ramps) = PlateauArena();
+        map.Materials[2, 2] = CellMaterial.Steel;
+        ramps[2, 2] = true;
+
+        var result = MapValidator.Validate(map);
+
+        Assert.Contains(result.Errors, e => e.Code == MapValidationCode.RampNotOnFloor && e.X == 2 && e.Y == 2);
+    }
 }

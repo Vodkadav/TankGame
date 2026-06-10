@@ -95,4 +95,46 @@ public class MapDefinitionTests
         Assert.Single(map.TeleportPads);
         Assert.Equal(new TeleportPadLink(1, 2, 4, 2), map.TeleportPads[0]);
     }
+
+    // ── Elevation (ADR-0020 Wave B step 5) ──
+
+    [Fact]
+    public void Elevation_DefaultsToFlat_WhenOmitted()
+    {
+        var map = MapDefinition.CreateBlank("Blank", 6, 5);
+
+        Assert.Null(map.Layers);
+        Assert.Null(map.Ramps);
+    }
+
+    [Fact]
+    public void Constructor_ExposesLayersAndRamps()
+    {
+        var layers = new int[6, 5];
+        layers[3, 2] = 1;
+        var ramps = new bool[6, 5];
+        ramps[2, 2] = true;
+
+        var map = new MapDefinition(
+            "Cliffy", new CellMaterial[6, 5], new bool[6, 5], new bool[6, 5],
+            (1, 1), new (int X, int Y)[] { (4, 3) }, Array.Empty<PowerupSpawn>(),
+            layers: layers, ramps: ramps);
+
+        Assert.Equal(1, map.Layers![3, 2]);
+        Assert.True(map.Ramps![2, 2]);
+    }
+
+    [Fact]
+    public void Constructor_ThrowsWhenElevationDimensionsDoNotMatchMaterials()
+    {
+        Assert.Throws<ArgumentException>(() => new MapDefinition(
+            "Bad", new CellMaterial[6, 5], new bool[6, 5], new bool[6, 5],
+            (1, 1), Array.Empty<(int, int)>(), Array.Empty<PowerupSpawn>(),
+            layers: new int[4, 4]));
+
+        Assert.Throws<ArgumentException>(() => new MapDefinition(
+            "Bad", new CellMaterial[6, 5], new bool[6, 5], new bool[6, 5],
+            (1, 1), Array.Empty<(int, int)>(), Array.Empty<PowerupSpawn>(),
+            ramps: new bool[4, 4]));
+    }
 }
