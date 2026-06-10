@@ -185,4 +185,98 @@ public class MapEditorTests
 
         Assert.Single(editor.ToMap().TeleportPads);
     }
+
+    // ── Elevation tools (ADR-0020 Wave B step 5) ──
+
+    [Fact]
+    public void RaiseLayer_LiftsACell_AndClampsAtTheMaximum()
+    {
+        var editor = Medium();
+        editor.Action = EditorAction.RaiseLayer;
+
+        for (var i = 0; i < MapValidator.MaxLayer + 3; i++)
+        {
+            editor.ApplyAt(5, 5);
+        }
+
+        Assert.Equal(MapValidator.MaxLayer, editor.LayerAt(5, 5));
+    }
+
+    [Fact]
+    public void LowerLayer_DropsACell_AndClampsAtTheGround()
+    {
+        var editor = Medium();
+        editor.Action = EditorAction.RaiseLayer;
+        editor.ApplyAt(5, 5);
+
+        editor.Action = EditorAction.LowerLayer;
+        editor.ApplyAt(5, 5);
+        editor.ApplyAt(5, 5); // already at ground — stays 0
+
+        Assert.Equal(0, editor.LayerAt(5, 5));
+    }
+
+    [Fact]
+    public void RaiseLayer_IgnoresTheBorder()
+    {
+        var editor = Medium();
+        editor.Action = EditorAction.RaiseLayer;
+
+        editor.ApplyAt(0, 0);
+
+        Assert.Equal(0, editor.LayerAt(0, 0));
+    }
+
+    [Fact]
+    public void ToggleRamp_OnlyOnFloor_AndTogglesOff()
+    {
+        var editor = Medium();
+        editor.Action = EditorAction.PaintMaterial;
+        editor.PaintMaterial = CellMaterial.Steel;
+        editor.ApplyAt(4, 4);
+
+        editor.Action = EditorAction.ToggleRamp;
+        editor.ApplyAt(4, 4); // steel — refused
+        editor.ApplyAt(5, 5); // floor — placed
+        Assert.False(editor.RampAt(4, 4));
+        Assert.True(editor.RampAt(5, 5));
+
+        editor.ApplyAt(5, 5); // second click clears it
+        Assert.False(editor.RampAt(5, 5));
+    }
+
+    [Fact]
+    public void Erase_FlattensTheCell()
+    {
+        var editor = Medium();
+        editor.Action = EditorAction.RaiseLayer;
+        editor.ApplyAt(5, 5);
+        editor.Action = EditorAction.ToggleRamp;
+        editor.ApplyAt(6, 5);
+
+        editor.Action = EditorAction.Erase;
+        editor.ApplyAt(5, 5);
+        editor.ApplyAt(6, 5);
+
+        Assert.Equal(0, editor.LayerAt(5, 5));
+        Assert.False(editor.RampAt(6, 5));
+    }
+
+    [Fact]
+    public void ToMap_CarriesElevation_OnlyWhenAuthored()
+    {
+        var flat = Medium().ToMap();
+        Assert.Null(flat.Layers); // an untouched map keeps the lean flat document
+        Assert.Null(flat.Ramps);
+
+        var editor = Medium();
+        editor.Action = EditorAction.RaiseLayer;
+        editor.ApplyAt(5, 5);
+        editor.Action = EditorAction.ToggleRamp;
+        editor.ApplyAt(4, 5);
+
+        var map = editor.ToMap();
+        Assert.Equal(1, map.Layers![5, 5]);
+        Assert.True(map.Ramps![4, 5]);
+    }
 }
