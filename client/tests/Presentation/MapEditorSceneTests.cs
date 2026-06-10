@@ -31,7 +31,7 @@ public class MapEditorSceneTests : TestClass
     [Test]
     public void Editor_BuildsThePaletteAndTheActionButtons()
     {
-        foreach (var name in new[] { "Steel", "Bush", "Player", "Enemy", "TeleportPad", "Erase", "SizeMedium", "Validate", "TestPlay", "Save", "Back" })
+        foreach (var name in new[] { "Steel", "Bush", "Player", "Enemy", "TeleportPad", "RaiseLayer", "LowerLayer", "Ramp", "Erase", "SizeMedium", "Validate", "TestPlay", "Save", "Back" })
         {
             if (_editor.FindChild(name, recursive: true, owned: false) is not Button)
             {
@@ -98,6 +98,51 @@ public class MapEditorSceneTests : TestClass
         if (GameSetup.CustomMap is null || GameSetup.CustomMap.TeleportPads.Count != 1)
         {
             throw new System.Exception("Test Play must carry the authored teleport pads into play.");
+        }
+    }
+
+    [Test]
+    public void RaisingGroundAndPlacingARamp_ShowsRealElevationMeshes_AndCarriesIntoTheMap()
+    {
+        _editor.NewMap(28, 16);
+        _editor.MapName = "Cliff Test Map";
+
+        // A 2x2 plateau at (10-11, 5-6) with a ramp leading up to it from the west.
+        _editor.SelectAction(EditorAction.RaiseLayer);
+        _editor.Paint(10, 5);
+        _editor.Paint(11, 5);
+        _editor.Paint(10, 6);
+        _editor.Paint(11, 6);
+        _editor.SelectAction(EditorAction.ToggleRamp);
+        _editor.Paint(9, 5);
+
+        var map = _editor.CurrentMap();
+        if (map.Layers is null || map.Layers[10, 5] != 1 || map.Ramps is null || !map.Ramps[9, 5])
+        {
+            throw new System.Exception("The elevation tools must author layers and ramps into the map.");
+        }
+
+        // WYSIWYG: the editor terrain must render the same plateau blocks and ramp wedges the match uses.
+        var terrain = _editor.FindChild("Terrain3DView", recursive: true, owned: false)
+            ?? throw new System.Exception("The editor must render its map through a Terrain3DView.");
+        var plateaus = 0;
+        var ramps = 0;
+        foreach (var node in terrain.GetChildren())
+        {
+            var name = node.Name.ToString();
+            if (name.StartsWith("Plateau_"))
+            {
+                plateaus++;
+            }
+            else if (name.StartsWith("Ramp_"))
+            {
+                ramps++;
+            }
+        }
+
+        if (plateaus == 0 || ramps == 0)
+        {
+            throw new System.Exception($"Raised cells must show as plateau/ramp meshes (saw {plateaus} plateaus, {ramps} ramps).");
         }
     }
 }

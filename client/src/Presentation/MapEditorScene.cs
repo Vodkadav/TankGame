@@ -187,12 +187,16 @@ public partial class MapEditorScene : Node3D
     {
         var map = _editor.ToMap();
 
-        _terrain?.QueueFree();
+        // Free immediately, not deferred: a drag-paint refreshes every mouse event, and deferred frees
+        // would pile dead terrains into the tree until the frame ends (and confuse FindChild).
+        _terrain?.Free();
         _terrain = new Terrain3DView { Name = "Terrain3DView" };
         AddChild(_terrain);
-        _terrain.Bind(WallGrid.FromMaterials(map.Materials), map.Bushes, map.Sandbags, TileSize);
+        // Layers/ramps ride along so raised cells show as real plateau blocks and ramp wedges live
+        // (ADR-0020 Wave B) — the same WYSIWYG meshes the match renders.
+        _terrain.Bind(WallGrid.FromMaterials(map.Materials, map.Layers, map.Ramps), map.Bushes, map.Sandbags, TileSize);
 
-        _gizmos?.QueueFree();
+        _gizmos?.Free();
         _gizmos = new Node3D { Name = "Gizmos" };
         AddChild(_gizmos);
         AddMarker(_editor.PlayerSpawn.X, _editor.PlayerSpawn.Y, "P", new Color(0.4f, 1f, 0.4f));
@@ -313,6 +317,9 @@ public partial class MapEditorScene : Node3D
         palette.AddChild(ToolButton("Player", "editor.player", () => SelectAction(EditorAction.SetPlayerSpawn)));
         palette.AddChild(ToolButton("Enemy", "editor.enemy", () => SelectAction(EditorAction.ToggleEnemySpawn)));
         palette.AddChild(ToolButton("TeleportPad", "editor.teleport", () => SelectAction(EditorAction.PlaceTeleportPad)));
+        palette.AddChild(ToolButton("RaiseLayer", "editor.raise", () => SelectAction(EditorAction.RaiseLayer)));
+        palette.AddChild(ToolButton("LowerLayer", "editor.lower", () => SelectAction(EditorAction.LowerLayer)));
+        palette.AddChild(ToolButton("Ramp", "editor.ramp", () => SelectAction(EditorAction.ToggleRamp)));
         palette.AddChild(ToolButton("Erase", "editor.erase", () => SelectAction(EditorAction.Erase)));
 
         var powerups = new OptionButton { Name = "PowerupKind" };

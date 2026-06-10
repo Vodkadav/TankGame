@@ -14,6 +14,9 @@ public enum EditorAction
     ToggleEnemySpawn,
     TogglePowerup,
     PlaceTeleportPad,
+    RaiseLayer,
+    LowerLayer,
+    ToggleRamp,
     Erase,
 }
 
@@ -27,6 +30,8 @@ public sealed class MapEditor
     private readonly CellMaterial[,] _materials;
     private readonly bool[,] _bushes;
     private readonly bool[,] _sandbags;
+    private readonly int[,] _layers;
+    private readonly bool[,] _ramps;
     private readonly List<(int X, int Y)> _enemySpawns = new();
     private readonly List<PowerupSpawn> _powerupSpawns = new();
     private readonly List<TeleportPadLink> _teleportPads = new();
@@ -40,6 +45,8 @@ public sealed class MapEditor
         _materials = blank.Materials;
         _bushes = blank.Bushes;
         _sandbags = blank.Sandbags;
+        _layers = new int[width, height];
+        _ramps = new bool[width, height];
         Width = width;
         Height = height;
     }
@@ -73,6 +80,10 @@ public sealed class MapEditor
     public bool BushAt(int x, int y) => _bushes[x, y];
 
     public bool SandbagAt(int x, int y) => _sandbags[x, y];
+
+    public int LayerAt(int x, int y) => _layers[x, y];
+
+    public bool RampAt(int x, int y) => _ramps[x, y];
 
     /// <summary>Applies the current <see cref="Action"/> to cell (x, y). A click on the steel border, or
     /// an overlay/spawn placement on a non-floor cell, is ignored.</summary>
@@ -123,10 +134,24 @@ public sealed class MapEditor
                 PlaceTeleportPad(x, y);
                 break;
 
+            case EditorAction.RaiseLayer:
+                _layers[x, y] = System.Math.Min(MapValidator.MaxLayer, _layers[x, y] + 1);
+                break;
+
+            case EditorAction.LowerLayer:
+                _layers[x, y] = System.Math.Max(0, _layers[x, y] - 1);
+                break;
+
+            case EditorAction.ToggleRamp when IsFloor(x, y):
+                _ramps[x, y] = !_ramps[x, y];
+                break;
+
             case EditorAction.Erase:
                 _materials[x, y] = CellMaterial.Floor;
                 _bushes[x, y] = false;
                 _sandbags[x, y] = false;
+                _layers[x, y] = 0;
+                _ramps[x, y] = false;
                 _enemySpawns.Remove((x, y));
                 _powerupSpawns.RemoveAll(p => p.X == x && p.Y == y);
                 RemoveTeleportPadAt(x, y);
@@ -142,7 +167,31 @@ public sealed class MapEditor
         _playerSpawn,
         _enemySpawns.ToList(),
         _powerupSpawns.ToList(),
-        _teleportPads.ToList());
+        _teleportPads.ToList(),
+        HasElevation() ? (int[,])_layers.Clone() : null,
+        HasElevation() ? (bool[,])_ramps.Clone() : null);
+
+    // An untouched (flat) map keeps the lean pre-elevation document: no layers/ramps keys at all.
+    private bool HasElevation()
+    {
+        foreach (var layer in _layers)
+        {
+            if (layer != 0)
+            {
+                return true;
+            }
+        }
+
+        foreach (var ramp in _ramps)
+        {
+            if (ramp)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
 
     public MapValidationResult Validate() => MapValidator.Validate(ToMap());
 

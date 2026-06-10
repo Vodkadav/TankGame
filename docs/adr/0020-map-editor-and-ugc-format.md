@@ -110,7 +110,8 @@ with no continuous Z); it is captured here as Wave B intent and will get its own
 1. **(step 4) Drop-off-ledge physics** — `Tank` vertical sub-state + gravity + edge-fall + ramp-only-up;
    render at `Y = Z`; landing FX. *(done — see the ADR-0018 amendment)*
 2. **(step 5) Elevation tools** — height brush + ramp tool in the editor; `MapDefinition` gains layers +
-   ramps.
+   ramps. *(done — format/validator/load path #185, editor tools follow-up PR; layer-aware reachability
+   validates ramp-up/drop-down movement)*
 
 ## Alternatives considered
 
