@@ -17,6 +17,8 @@ public enum MapValidationCode
     TeleportPadOutOfBounds,
     TeleportPadNotFloor,
     TeleportPadEndpointsCoincide,
+    LayerOutOfRange,
+    RampNotOnFloor,
 }
 
 /// <summary>One validation problem, with the cell it concerns (or (-1, -1) when it is not about a
@@ -42,9 +44,14 @@ public sealed class MapValidationResult
 /// <see cref="LevelMap"/> and <see cref="ArenaGenerator"/> enforce for built-in arenas.</summary>
 public static class MapValidator
 {
+    /// <summary>The highest elevation layer a map may author (ADR-0020 Wave B). Four levels
+    /// (0–3) is plenty of verticality for an arena this size and keeps the editor palette small.</summary>
+    public const int MaxLayer = 3;
+
     public static MapValidationResult Validate(MapDefinition map)
     {
         var errors = new List<MapValidationError>();
+        CheckElevation(map, errors);
 
         var playerInBounds = InBounds(map, map.PlayerSpawn.X, map.PlayerSpawn.Y);
         if (!playerInBounds)
@@ -119,38 +126,95 @@ public static class MapValidator
         }
     }
 
+    private static void CheckElevation(MapDefinition map, List<MapValidationError> errors)
+    {
+        for (var x = 0; x < map.Width; x++)
+        {
+            for (var y = 0; y < map.Height; y++)
+            {
+                if (map.Layers is { } layers && (layers[x, y] < 0 || layers[x, y] > MaxLayer))
+                {
+                    errors.Add(new MapValidationError(MapValidationCode.LayerOutOfRange, x, y));
+                }
+
+                if (map.Ramps is { } ramps && ramps[x, y] && !IsFloor(map, x, y))
+                {
+                    errors.Add(new MapValidationError(MapValidationCode.RampNotOnFloor, x, y));
+                }
+            }
+        }
+    }
+
+    // BFS over (cell, layer) states, mirroring how a tank actually moves (GridArena, ADR-0018/0020):
+    // a plain cell is entered on its own layer; a ramp cell is stood on at either layer it joins
+    // (LayerAt and LayerAt+1); a LOWER plain cell is entered by dropping off the ledge — one-way, so
+    // high ground with no ramp up is correctly unreachable from below.
     private static bool[,] FloodFill(MapDefinition map)
     {
         var reachable = new bool[map.Width, map.Height];
-        var queue = new Queue<(int X, int Y)>();
-        reachable[map.PlayerSpawn.X, map.PlayerSpawn.Y] = true;
-        queue.Enqueue(map.PlayerSpawn);
+        var visited = new HashSet<(int X, int Y, int Layer)>();
+        var queue = new Queue<(int X, int Y, int Layer)>();
+        var start = (map.PlayerSpawn.X, map.PlayerSpawn.Y, LayerAt(map, map.PlayerSpawn.X, map.PlayerSpawn.Y));
+        reachable[start.Item1, start.Item2] = true;
+        visited.Add(start);
+        queue.Enqueue(start);
 
         var steps = new (int Dx, int Dy)[] { (1, 0), (-1, 0), (0, 1), (0, -1) };
         while (queue.Count > 0)
         {
-            var (x, y) = queue.Dequeue();
+            var (x, y, layer) = queue.Dequeue();
             foreach (var (dx, dy) in steps)
             {
                 var nx = x + dx;
                 var ny = y + dy;
-                if (!InBounds(map, nx, ny) || reachable[nx, ny])
+                if (!InBounds(map, nx, ny) || CellMaterials.BlocksMovement(map.Materials[nx, ny]))
                 {
                     continue;
                 }
 
-                if (CellMaterials.BlocksMovement(map.Materials[nx, ny]))
+                foreach (var nextLayer in EnterableLayers(map, nx, ny, layer))
                 {
-                    continue;
-                }
+                    if (!visited.Add((nx, ny, nextLayer)))
+                    {
+                        continue;
+                    }
 
-                reachable[nx, ny] = true;
-                queue.Enqueue((nx, ny));
+                    reachable[nx, ny] = true;
+                    queue.Enqueue((nx, ny, nextLayer));
+                }
             }
         }
 
         return reachable;
     }
+
+    // The layers a tank on fromLayer can occupy after moving onto cell (x, y), or none when the move
+    // is blocked (the cell is a cliff face above the tank).
+    private static IEnumerable<int> EnterableLayers(MapDefinition map, int x, int y, int fromLayer)
+    {
+        var cellLayer = LayerAt(map, x, y);
+        if (IsRamp(map, x, y))
+        {
+            // Entered from either level it joins — or by dropping onto it from higher up — a ramp
+            // lets the tank leave at both levels it connects.
+            if (fromLayer >= cellLayer)
+            {
+                yield return cellLayer;
+                yield return cellLayer + 1;
+            }
+
+            yield break;
+        }
+
+        if (cellLayer == fromLayer || cellLayer < fromLayer)
+        {
+            yield return cellLayer; // its own level, or a one-way drop off the ledge
+        }
+    }
+
+    private static int LayerAt(MapDefinition map, int x, int y) => map.Layers?[x, y] ?? 0;
+
+    private static bool IsRamp(MapDefinition map, int x, int y) => map.Ramps?[x, y] ?? false;
 
     private static bool InBounds(MapDefinition map, int x, int y) =>
         x >= 0 && y >= 0 && x < map.Width && y < map.Height;

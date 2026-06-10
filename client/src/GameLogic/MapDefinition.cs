@@ -36,7 +36,9 @@ public sealed class MapDefinition
         (int X, int Y) playerSpawn,
         IReadOnlyList<(int X, int Y)> enemySpawns,
         IReadOnlyList<PowerupSpawn> powerupSpawns,
-        IReadOnlyList<TeleportPadLink>? teleportPads = null)
+        IReadOnlyList<TeleportPadLink>? teleportPads = null,
+        int[,]? layers = null,
+        bool[,]? ramps = null)
     {
         Name = name ?? throw new ArgumentNullException(nameof(name));
         Materials = materials ?? throw new ArgumentNullException(nameof(materials));
@@ -45,9 +47,20 @@ public sealed class MapDefinition
 
         RequireMatchingDimensions(bushes, nameof(bushes));
         RequireMatchingDimensions(sandbags, nameof(sandbags));
+        if (layers is not null && (layers.GetLength(0) != Width || layers.GetLength(1) != Height))
+        {
+            throw new ArgumentException("layers must match the materials' dimensions", nameof(layers));
+        }
+
+        if (ramps is not null && (ramps.GetLength(0) != Width || ramps.GetLength(1) != Height))
+        {
+            throw new ArgumentException("ramps must match the materials' dimensions", nameof(ramps));
+        }
 
         Bushes = bushes;
         Sandbags = sandbags;
+        Layers = layers;
+        Ramps = ramps;
         PlayerSpawn = playerSpawn;
         EnemySpawns = enemySpawns ?? throw new ArgumentNullException(nameof(enemySpawns));
         PowerupSpawns = powerupSpawns ?? throw new ArgumentNullException(nameof(powerupSpawns));
@@ -80,6 +93,14 @@ public sealed class MapDefinition
 
     /// <summary>Authored teleport-pad pairs; empty when the map has none (then play auto-places a pair).</summary>
     public IReadOnlyList<TeleportPadLink> TeleportPads { get; }
+
+    /// <summary>Per-cell elevation layers indexed <c>[x, y]</c> (0 = ground, ADR-0018), or <c>null</c>
+    /// for a flat map — the pre-elevation document shape, kept so older maps stay valid.</summary>
+    public int[,]? Layers { get; }
+
+    /// <summary>Which cells are ramps joining their layer to the one above (ADR-0018), indexed
+    /// <c>[x, y]</c>; <c>null</c> on a flat map.</summary>
+    public bool[,]? Ramps { get; }
 
     /// <summary>A fresh arena of the given size: a steel-walled border around an all-floor interior,
     /// with the player spawn seated at the top-left interior corner and no enemies or powerups yet.

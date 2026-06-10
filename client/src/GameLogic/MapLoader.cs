@@ -31,6 +31,7 @@ public static class MapLoader
             throw new InvalidMapException(result.Errors);
         }
 
-        return LevelMap.FromCells(map.Materials, map.Bushes, map.PlayerSpawn.X, map.PlayerSpawn.Y);
+        return LevelMap.FromCells(
+            map.Materials, map.Bushes, map.PlayerSpawn.X, map.PlayerSpawn.Y, map.Layers, map.Ramps);
     }
 }
