@@ -604,6 +604,28 @@ public class TankTests
     }
 
     [Fact]
+    public void DownedTank_WithARespawnPointSeam_RevivesWhereTheSeamSays_EachDeath()
+    {
+        // Custom maps deal a fresh random spawn marker per respawn — the seam supplies the
+        // point, and it must be consulted anew on every revive, not just the first.
+        var picks = new[] { new Vector2(300f, 100f), new Vector2(40f, 250f) };
+        var nextPick = 0;
+        var input = new ScriptedInput(new TankInput(Vector2.Zero, Aim: 0f, Fire: false));
+        var tank = new Tank(input, new World(), new OpenArena(), new Vector2(50f, 60f),
+            Speed, FireInterval, ProjectileSpeed, maxHp: 1, team: 0, lives: 3,
+            respawnPoint: () => picks[nextPick++]);
+
+        tank.TakeDamage(1);
+        tank.Step(Tank.RespawnDelay + 0.1f);
+        Assert.Equal(tank.MaxHp, tank.Hp);
+        Assert.Equal(picks[0], tank.Position);
+
+        tank.TakeDamage(1);
+        tank.Step(Tank.RespawnDelay + 0.1f);
+        Assert.Equal(picks[1], tank.Position);
+    }
+
+    [Fact]
     public void DownedTank_DoesNotMove_WhileAwaitingRespawn()
     {
         var input = new ScriptedInput(new TankInput(new Vector2(1f, 0f), Aim: 0f, Fire: false));
