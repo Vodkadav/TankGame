@@ -57,6 +57,42 @@ public static class ModelFit
         }
     }
 
+    /// <summary>Multi-colour tint for bare kit models (owner feedback 2026-06-11): the LARGEST part
+    /// (by bounding-box surface area, so flat panels still rank) takes <paramref name="primary"/> and
+    /// every smaller part cycles the <paramref name="secondaries"/> as detail colours, starting at an
+    /// offset from <paramref name="seed"/> so different assets in one category vary while any one
+    /// asset always looks the same. Per-surface overrides, so multi-material meshes split too.</summary>
+    public static void TintPalette(Node3D model, Color primary, IReadOnlyList<Color> secondaries, int seed = 0)
+    {
+        var surfaces = new List<(MeshInstance3D Mi, int Surface, float Size)>();
+        foreach (var mi in MeshInstances(model))
+        {
+            var size = mi.GetAabb().Size;
+            var area = (size.X * size.Y) + (size.Y * size.Z) + (size.X * size.Z);
+            for (var s = 0; s < mi.Mesh.GetSurfaceCount(); s++)
+            {
+                surfaces.Add((mi, s, area));
+            }
+        }
+
+        var ranked = new List<(MeshInstance3D Mi, int Surface, float Size)>(surfaces);
+        ranked.Sort((a, b) => b.Size.CompareTo(a.Size));
+
+        var offset = System.Math.Abs(seed);
+        for (var i = 0; i < ranked.Count; i++)
+        {
+            var colour = i == 0 || secondaries.Count == 0
+                ? primary
+                : secondaries[(i - 1 + offset) % secondaries.Count];
+            ranked[i].Mi.SetSurfaceOverrideMaterial(ranked[i].Surface, new StandardMaterial3D
+            {
+                AlbedoColor = colour,
+                Roughness = 1f,
+                SpecularMode = BaseMaterial3D.SpecularModeEnum.Disabled,
+            });
+        }
+    }
+
     // Union of the model's MeshInstance3D bounding boxes in the MODEL's own local space — each mesh's
     // global transform is taken relative to the model root, so the measurement is independent of where
     // the model sits in the world (it may be parented at a cell's world position). The model must be in

@@ -88,12 +88,44 @@ public partial class DecorationView : Node3D
         ModelFit.Apply(model, _tileSize * Footprint, seatOnGround: true);
         if (new FileInfo(path).Length < BareGeometryBytes)
         {
-            ModelFit.Tint(model, CategoryTint(AssetLibrary.CategoryFor(_assetId.Split('/')[0])));
+            // Smart multi-colour (owner feedback 2026-06-11): the biggest part wears the category's
+            // main colour, the details cycle its secondary palette — seeded by the asset id, so one
+            // asset always looks the same while its pack-mates vary.
+            var category = AssetLibrary.CategoryFor(_assetId.Split('/')[0]);
+            ModelFit.TintPalette(model, CategoryTint(category), SecondaryTints(category), StableSeed(_assetId));
         }
 
         RotationDegrees = new Vector3(_pose.PitchDeg, _pose.YawDeg, _pose.RollDeg);
         Scale = Vector3.One * _pose.Scale;
     }
+
+    // String.GetHashCode is randomised per process — a stable char sum keeps an asset's colour
+    // arrangement identical across sessions and machines.
+    private static int StableSeed(string id)
+    {
+        var seed = 0;
+        foreach (var c in id)
+        {
+            seed = (seed * 31) + c;
+        }
+
+        return seed & 0x7FFFFFFF;
+    }
+
+    // Each category's 3 detail colours, picked to read against its primary.
+    private static Color[] SecondaryTints(string category) => category switch
+    {
+        "Nature" => new[] { new Color(0.42f, 0.30f, 0.18f), new Color(0.20f, 0.36f, 0.18f), new Color(0.62f, 0.58f, 0.36f) },
+        "Buildings" => new[] { new Color(0.55f, 0.28f, 0.22f), new Color(0.35f, 0.40f, 0.46f), new Color(0.78f, 0.74f, 0.64f) },
+        "Vehicles" => new[] { new Color(0.16f, 0.16f, 0.18f), new Color(0.75f, 0.72f, 0.65f), new Color(0.70f, 0.35f, 0.20f) },
+        "Sci-fi" => new[] { new Color(0.25f, 0.28f, 0.34f), new Color(0.85f, 0.55f, 0.20f), new Color(0.45f, 0.75f, 0.80f) },
+        "Dungeon" => new[] { new Color(0.30f, 0.26f, 0.22f), new Color(0.55f, 0.50f, 0.42f), new Color(0.50f, 0.30f, 0.20f) },
+        "Characters" => new[] { new Color(0.30f, 0.25f, 0.20f), new Color(0.55f, 0.20f, 0.18f), new Color(0.85f, 0.78f, 0.65f) },
+        "Weapons" => new[] { new Color(0.15f, 0.15f, 0.17f), new Color(0.80f, 0.60f, 0.20f), new Color(0.50f, 0.12f, 0.10f) },
+        "Military" => new[] { new Color(0.25f, 0.28f, 0.20f), new Color(0.16f, 0.16f, 0.15f), new Color(0.60f, 0.55f, 0.40f) },
+        "Terrain" => new[] { new Color(0.42f, 0.32f, 0.24f), new Color(0.66f, 0.60f, 0.52f), new Color(0.36f, 0.42f, 0.30f) },
+        _ => new[] { new Color(0.40f, 0.35f, 0.28f), new Color(0.66f, 0.62f, 0.54f), new Color(0.50f, 0.26f, 0.20f) },
+    };
 
     private static Color CategoryTint(string category) => category switch
     {
