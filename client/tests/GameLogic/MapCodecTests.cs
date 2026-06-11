@@ -103,6 +103,23 @@ public class MapCodecTests
     }
 
     [Fact]
+    public void Decorations_RoundTrip_AndAMissingField_MeansNone()
+    {
+        var blank = MapDefinition.CreateBlank("Decorated", 4, 4);
+        var decorated = new MapDefinition(
+            blank.Name, blank.Materials, blank.Bushes, blank.Sandbags, (1, 1),
+            new (int X, int Y)[] { (2, 2) }, System.Array.Empty<PowerupSpawn>(),
+            decorations: new[] { new Decoration("kenney_nature-kit/tree_oak", 2, 1) });
+
+        var restored = MapCodec.Decode(MapCodec.Encode(decorated));
+        Assert.Equal(new Decoration("kenney_nature-kit/tree_oak", 2, 1), Assert.Single(restored.Decorations));
+
+        var plain = MapCodec.Decode(MapCodec.Encode(MapDefinition.CreateBlank("Plain", 4, 4)));
+        Assert.Empty(plain.Decorations);
+        Assert.DoesNotContain("decorations", MapCodec.Encode(MapDefinition.CreateBlank("Plain", 4, 4)));
+    }
+
+    [Fact]
     public void Decode_ConvertsLegacyQuarterTurnOrientations_ToYawTransforms()
     {
         // A #199-era document stored quarter turns as glyph rows; it must decode to the equivalent

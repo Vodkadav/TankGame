@@ -234,6 +234,42 @@ public class MapEditorTests
         Assert.Equal((1, 1), editor.PlayerSpawn); // rehomed to the safe default
     }
 
+    // ── Decorations (owner ask 2026-06-11): props placed from the asset browser ──
+
+    [Fact]
+    public void PlaceDecoration_PlacesTheBrowsersPick_AndTogglesOff()
+    {
+        var editor = Medium();
+        editor.Action = EditorAction.PlaceDecoration;
+        editor.ApplyAt(5, 5); // no pick chosen yet — nothing placed
+        Assert.Empty(editor.Decorations);
+
+        editor.PaintAsset = "kenney_nature-kit/tree_oak";
+        editor.ApplyAt(5, 5);
+        Assert.Equal(new Decoration("kenney_nature-kit/tree_oak", 5, 5), Assert.Single(editor.Decorations));
+        Assert.Single(editor.ToMap().Decorations);
+
+        editor.ApplyAt(5, 5); // clicking the placed prop removes it
+        Assert.Empty(editor.Decorations);
+    }
+
+    [Fact]
+    public void Erase_AndResize_DropDecorations()
+    {
+        var editor = Medium();
+        editor.Action = EditorAction.PlaceDecoration;
+        editor.PaintAsset = "kenney_nature-kit/tree_oak";
+        editor.ApplyAt(5, 5);
+        editor.ApplyAt(20, 12);
+
+        editor.Action = EditorAction.Erase;
+        editor.ApplyAt(5, 5);
+        Assert.Equal((20, 12), (editor.Decorations[0].X, editor.Decorations[0].Y));
+
+        editor.Resize(12, 10); // (20,12) no longer fits
+        Assert.Empty(editor.Decorations);
+    }
+
     // ── Posing (owner follow-up 2026-06-11): the selection gizmo rotates and scales placed items ──
 
     [Fact]

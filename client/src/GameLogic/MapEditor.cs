@@ -21,6 +21,10 @@ public enum EditorAction
     RaiseLayer,
     LowerLayer,
     ToggleRamp,
+
+    /// <summary>Places the asset browser's current pick (<see cref="MapEditor.PaintAsset"/>) as a
+    /// decorative prop (owner ask 2026-06-11); clicking an existing decoration removes it.</summary>
+    PlaceDecoration,
     Erase,
 }
 
@@ -41,6 +45,7 @@ public sealed class MapEditor
     private readonly List<(int X, int Y)> _enemySpawns = new();
     private readonly List<PowerupSpawn> _powerupSpawns = new();
     private readonly List<TeleportPadLink> _teleportPads = new();
+    private readonly List<Decoration> _decorations = new();
     private (int X, int Y) _playerSpawn = (1, 1);
     private (int X, int Y)? _pendingTeleportPad;
 
@@ -104,6 +109,8 @@ public sealed class MapEditor
         {
             _transforms.Remove(cell);
         }
+
+        _decorations.RemoveAll(d => !Fits(d.X, d.Y));
         _enemySpawns.RemoveAll(s => !Fits(s.X, s.Y));
         _powerupSpawns.RemoveAll(p => !Fits(p.X, p.Y));
         _teleportPads.RemoveAll(p => !Fits(p.AX, p.AY) || !Fits(p.BX, p.BY));
@@ -121,6 +128,13 @@ public sealed class MapEditor
     public EditorAction Action { get; set; } = EditorAction.PaintMaterial;
 
     public CellMaterial PaintMaterial { get; set; } = CellMaterial.Brick;
+
+    /// <summary>The asset browser's current pick — what <see cref="EditorAction.PlaceDecoration"/>
+    /// places. Empty until the author chooses something.</summary>
+    public string PaintAsset { get; set; } = "";
+
+    /// <summary>The decorative props placed from the asset browser, in placement order.</summary>
+    public IReadOnlyList<Decoration> Decorations => _decorations;
 
     public PowerupKind PaintPowerup { get; set; } = PowerupKind.Repair;
 
@@ -232,6 +246,20 @@ public sealed class MapEditor
                 ToggleSpawn(x, y);
                 break;
 
+            case EditorAction.PlaceDecoration when IsFloor(x, y):
+                // Toggle semantics like the other placeables: a click on an existing prop removes
+                // it (and its pose); empty floor takes the browser's current pick.
+                if (_decorations.RemoveAll(d => d.X == x && d.Y == y) > 0)
+                {
+                    _transforms.Remove((x, y));
+                }
+                else if (PaintAsset.Length > 0)
+                {
+                    _decorations.Add(new Decoration(PaintAsset, x, y));
+                }
+
+                break;
+
             case EditorAction.TogglePowerup when IsFloor(x, y):
                 TogglePowerup(x, y);
                 break;
@@ -261,6 +289,7 @@ public sealed class MapEditor
                 _transforms.Remove((x, y));
                 _enemySpawns.Remove((x, y));
                 _powerupSpawns.RemoveAll(p => p.X == x && p.Y == y);
+                _decorations.RemoveAll(d => d.X == x && d.Y == y);
                 RemoveTeleportPadAt(x, y);
                 break;
         }
@@ -305,7 +334,8 @@ public sealed class MapEditor
         HasElevation() ? (int[,])_layers.Clone() : null,
         HasElevation() ? (bool[,])_ramps.Clone() : null,
         GroundTheme,
-        _transforms.Count > 0 ? new Dictionary<(int X, int Y), PropTransform>(_transforms) : null);
+        _transforms.Count > 0 ? new Dictionary<(int X, int Y), PropTransform>(_transforms) : null,
+        _decorations.ToList());
 
     // An untouched (flat) map keeps the lean pre-elevation document: no layers/ramps keys at all.
     private bool HasElevation()
