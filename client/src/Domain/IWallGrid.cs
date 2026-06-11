@@ -89,10 +89,11 @@ public interface IWallGrid
     /// Defaults to false (a flat grid has no ramps).</summary>
     bool IsRamp(int x, int y) => false;
 
-    /// <summary>The cell's authored facing in clockwise quarter turns (0–3) — cosmetic only, the
-    /// view turns the prop's mesh; blocking and damage are unaffected. Defaults to 0 (unrotated)
-    /// for every grid that never authors a facing.</summary>
-    int OrientationAt(int x, int y) => 0;
+    /// <summary>The cell's authored pose (free rotation + uniform scale, owner follow-up
+    /// 2026-06-11) — cosmetic only, the view poses the prop's mesh; blocking and damage are
+    /// unaffected. Defaults to <see cref="PropTransform.Identity"/> for every grid that never
+    /// authors a pose.</summary>
+    PropTransform TransformAt(int x, int y) => PropTransform.Identity;
 
     /// <summary>Whether the cell at (<paramref name="x"/>, <paramref name="y"/>) blocks tank
     /// movement (out-of-bounds reads as a blocking steel border). Water and walls block movement;

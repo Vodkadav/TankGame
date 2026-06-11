@@ -56,6 +56,97 @@ public partial class MapEditorScene : Node3D
     private Label _status = null!;
     private bool _painting;
 
+    // The selection gizmo (owner follow-up 2026-06-11): right-CLICK a placed item to select it —
+    // three axis rings rotate it freely, the slider scales it. Right-DRAG still orbits; the two are
+    // told apart by how far the mouse travelled while the button was down.
+    private (int X, int Y)? _selected;
+    private RotationGizmo3D? _selectionGizmo;
+    private PanelContainer _scalePanel = null!;
+    private HSlider _scaleSlider = null!;
+    private bool _syncingScale;
+    private int? _draggingAxis;
+    private float _dragStartAngle;
+    private float _dragStartValue;
+    private float _rightDragDistance;
+    private const float ClickSlopPx = 6f; // under this much travel, a right press-release is a click
+    private const float GizmoHoverY = 40f;
+    private const float MinPropScale = 0.4f;
+    private const float MaxPropScale = 2.5f;
+
+    /// <summary>The cell whose prop is selected for posing, or null. Exposed for tests.</summary>
+    public (int X, int Y)? SelectedCell => _selected;
+
+    /// <summary>Selects the placed item at (x, y) — shows the axis rings and the scale slider. A
+    /// floor cell deselects (there is nothing standing there to pose). Public so tests can drive
+    /// the flow without synthesising mouse events.</summary>
+    public void SelectCell(int x, int y)
+    {
+        if (_editor.MaterialAt(x, y) == CellMaterial.Floor)
+        {
+            Deselect();
+            return;
+        }
+
+        _selected = (x, y);
+        if (_selectionGizmo is null)
+        {
+            _selectionGizmo = new RotationGizmo3D { Name = "SelectionGizmo" };
+            AddChild(_selectionGizmo); // a root child: RefreshScene never frees it
+        }
+
+        _selectionGizmo.Visible = true;
+        _selectionGizmo.Position = new Vector3((x + 0.5f) * TileSize, GizmoHoverY, (y + 0.5f) * TileSize);
+
+        _syncingScale = true;
+        _scaleSlider.Value = _editor.TransformAt(x, y).Scale;
+        _syncingScale = false;
+        _scalePanel.Visible = true;
+    }
+
+    public void Deselect()
+    {
+        _selected = null;
+        _draggingAxis = null;
+        if (_selectionGizmo is not null)
+        {
+            _selectionGizmo.Visible = false;
+        }
+
+        _scalePanel.Visible = false;
+    }
+
+    /// <summary>Turns the selected prop around one gizmo axis (X = pitch, Y = yaw, Z = roll).</summary>
+    public void RotateSelected(int axis, float degrees)
+    {
+        if (_selected is not { } cell)
+        {
+            return;
+        }
+
+        var t = _editor.TransformAt(cell.X, cell.Y);
+        t = axis switch
+        {
+            RotationGizmo3D.AxisX => t with { PitchDeg = Mathf.Wrap(t.PitchDeg + degrees, -180f, 180f) },
+            RotationGizmo3D.AxisY => t with { YawDeg = Mathf.Wrap(t.YawDeg + degrees, -180f, 180f) },
+            _ => t with { RollDeg = Mathf.Wrap(t.RollDeg + degrees, -180f, 180f) },
+        };
+        _editor.SetTransform(cell.X, cell.Y, t);
+        RefreshScene();
+    }
+
+    /// <summary>Sets the selected prop's uniform scale (the slider's commit).</summary>
+    public void ScaleSelected(float scale)
+    {
+        if (_selected is not { } cell)
+        {
+            return;
+        }
+
+        var t = _editor.TransformAt(cell.X, cell.Y);
+        _editor.SetTransform(cell.X, cell.Y, t with { Scale = Mathf.Clamp(scale, MinPropScale, MaxPropScale) });
+        RefreshScene();
+    }
+
     /// <summary>Stamps the whole-arena ground tileset and selects floor painting — the WYSIWYG
     /// ground re-tints immediately. Public so tests can drive it.</summary>
     public void SelectGroundTheme(GroundTheme theme)
@@ -119,6 +210,11 @@ public partial class MapEditorScene : Node3D
     public void Paint(int x, int y)
     {
         _editor.ApplyAt(x, y);
+        if (_selected is { } cell && _editor.MaterialAt(cell.X, cell.Y) == CellMaterial.Floor)
+        {
+            Deselect(); // the selected prop was just erased or painted away
+        }
+
         RefreshScene();
     }
 
@@ -169,6 +265,16 @@ public partial class MapEditorScene : Node3D
             }
             else if (click.ButtonIndex == MouseButton.Left)
             {
+                if (click.Pressed && TryGrabGizmoRing(click.Position))
+                {
+                    return; // the drag turns the selected prop, it does not paint
+                }
+
+                if (!click.Pressed)
+                {
+                    _draggingAxis = null;
+                }
+
                 _painting = click.Pressed;
                 if (click.Pressed)
                 {
@@ -177,7 +283,24 @@ public partial class MapEditorScene : Node3D
             }
             else if (click.ButtonIndex == MouseButton.Right)
             {
-                _orbiting = click.Pressed; // hold right and drag to orbit/tilt around the map
+                // Hold-and-drag orbits; a press-release that barely moved is a click = select the
+                // placed item under the cursor (owner follow-up 2026-06-11).
+                _orbiting = click.Pressed;
+                if (click.Pressed)
+                {
+                    _rightDragDistance = 0f;
+                }
+                else if (_rightDragDistance < ClickSlopPx)
+                {
+                    if (CellAtScreen(click.Position) is var (sx, sy))
+                    {
+                        SelectCell(sx, sy);
+                    }
+                    else
+                    {
+                        Deselect();
+                    }
+                }
             }
             else if (click.ButtonIndex == MouseButton.Middle)
             {
@@ -186,12 +309,17 @@ public partial class MapEditorScene : Node3D
         }
         else if (@event is InputEventMouseMotion motion)
         {
-            if (_painting)
+            if (_draggingAxis is { } axis)
+            {
+                DragGizmoRing(axis, motion.Position);
+            }
+            else if (_painting)
             {
                 PaintAtScreen(motion.Position);
             }
             else if (_orbiting)
             {
+                _rightDragDistance += motion.Relative.Length();
                 _camYawDeg -= motion.Relative.X * OrbitDegreesPerPixel;
                 _camPitchDeg = Mathf.Clamp(
                     _camPitchDeg + (motion.Relative.Y * OrbitDegreesPerPixel), MinPitchDeg, MaxPitchDeg);
@@ -215,6 +343,53 @@ public partial class MapEditorScene : Node3D
     {
         v.Y = 0f;
         return v.LengthSquared() > 1e-6f ? v.Normalized() : Vector3.Zero;
+    }
+
+    // A left press over a gizmo ring begins the rotation drag: remember which ring, the cursor's
+    // angle on it, and the pose component it edits — motion then applies the angle difference.
+    private bool TryGrabGizmoRing(Vector2 screen)
+    {
+        if (_selected is not { } cell || _selectionGizmo is not { Visible: true } gizmo)
+        {
+            return false;
+        }
+
+        if (gizmo.RingAt(_camera, screen) is not { } axis ||
+            gizmo.AngleAround(_camera, screen, axis) is not { } angle)
+        {
+            return false;
+        }
+
+        var t = _editor.TransformAt(cell.X, cell.Y);
+        _draggingAxis = axis;
+        _dragStartAngle = angle;
+        _dragStartValue = axis switch
+        {
+            RotationGizmo3D.AxisX => t.PitchDeg,
+            RotationGizmo3D.AxisY => t.YawDeg,
+            _ => t.RollDeg,
+        };
+        return true;
+    }
+
+    private void DragGizmoRing(int axis, Vector2 screen)
+    {
+        if (_selected is not { } cell || _selectionGizmo is null ||
+            _selectionGizmo.AngleAround(_camera, screen, axis) is not { } angle)
+        {
+            return;
+        }
+
+        var degrees = Mathf.RadToDeg(angle - _dragStartAngle);
+        var t = _editor.TransformAt(cell.X, cell.Y);
+        t = axis switch
+        {
+            RotationGizmo3D.AxisX => t with { PitchDeg = Mathf.Wrap(_dragStartValue + degrees, -180f, 180f) },
+            RotationGizmo3D.AxisY => t with { YawDeg = Mathf.Wrap(_dragStartValue + degrees, -180f, 180f) },
+            _ => t with { RollDeg = Mathf.Wrap(_dragStartValue + degrees, -180f, 180f) },
+        };
+        _editor.SetTransform(cell.X, cell.Y, t);
+        RefreshScene();
     }
 
     private void PaintAtScreen(Vector2 screen)
@@ -267,7 +442,7 @@ public partial class MapEditorScene : Node3D
         // Layers/ramps ride along so raised cells show as real plateau blocks and ramp wedges live
         // (ADR-0020 Wave B) — the same WYSIWYG meshes the match renders.
         _terrain.Bind(
-            WallGrid.FromMaterials(map.Materials, map.Layers, map.Ramps, map.Orientations),
+            WallGrid.FromMaterials(map.Materials, map.Layers, map.Ramps, map.Transforms),
             map.Bushes, map.Sandbags, TileSize);
 
         // The authored ground tileset under everything, sized to the map — WYSIWYG with play.
@@ -456,6 +631,32 @@ public partial class MapEditorScene : Node3D
         _floorThemes.AddChild(themeList);
         layer.AddChild(_floorThemes);
 
+        // The selected prop's size bar (owner follow-up 2026-06-11) — shown beside the palette
+        // while something is selected; the rings handle rotation, this handles scale.
+        _scalePanel = new PanelContainer { Name = "ScalePanel", Visible = false };
+        _scalePanel.Position = new Vector2(224f, 320f);
+        var scaleBox = new VBoxContainer();
+        scaleBox.AddChild(new Label { Text = "editor.scale", HorizontalAlignment = HorizontalAlignment.Center });
+        _scaleSlider = new HSlider
+        {
+            Name = "ScaleSlider",
+            MinValue = MinPropScale,
+            MaxValue = MaxPropScale,
+            Step = 0.05,
+            Value = 1.0,
+            CustomMinimumSize = new Vector2(170f, 0f),
+        };
+        _scaleSlider.ValueChanged += value =>
+        {
+            if (!_syncingScale)
+            {
+                ScaleSelected((float)value);
+            }
+        };
+        scaleBox.AddChild(_scaleSlider);
+        _scalePanel.AddChild(scaleBox);
+        layer.AddChild(_scalePanel);
+
         foreach (var (material, key) in new[]
         {
             (CellMaterial.Brick, "editor.brick"),
@@ -475,7 +676,6 @@ public partial class MapEditorScene : Node3D
         palette.AddChild(ToolButton("RaiseLayer", "editor.raise", () => SelectAction(EditorAction.RaiseLayer)));
         palette.AddChild(ToolButton("LowerLayer", "editor.lower", () => SelectAction(EditorAction.LowerLayer)));
         palette.AddChild(ToolButton("Ramp", "editor.ramp", () => SelectAction(EditorAction.ToggleRamp)));
-        palette.AddChild(ToolButton("Rotate", "editor.rotate", () => SelectAction(EditorAction.RotateCell)));
         palette.AddChild(ToolButton("Erase", "editor.erase", () => SelectAction(EditorAction.Erase)));
 
         var powerups = new OptionButton { Name = "PowerupKind" };

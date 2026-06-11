@@ -41,16 +41,10 @@ public sealed class MapDefinition
         int[,]? layers = null,
         bool[,]? ramps = null,
         GroundTheme groundTheme = GroundTheme.Sand,
-        int[,]? orientations = null)
+        IReadOnlyDictionary<(int X, int Y), PropTransform>? transforms = null)
     {
         GroundTheme = groundTheme;
-        if (orientations is not null
-            && (orientations.GetLength(0) != materials.GetLength(0) || orientations.GetLength(1) != materials.GetLength(1)))
-        {
-            throw new ArgumentException("orientations must match the materials' dimensions", nameof(orientations));
-        }
-
-        Orientations = orientations;
+        Transforms = transforms;
         Name = name ?? throw new ArgumentNullException(nameof(name));
         Materials = materials ?? throw new ArgumentNullException(nameof(materials));
         Width = materials.GetLength(0);
@@ -117,10 +111,10 @@ public sealed class MapDefinition
     /// when the author never picked one.</summary>
     public GroundTheme GroundTheme { get; }
 
-    /// <summary>Per-cell facing in clockwise quarter turns (0–3), indexed <c>[x, y]</c> — cosmetic,
-    /// the view turns the prop's mesh (owner feedback 2026-06-11). Null when nothing is rotated,
-    /// keeping the lean document shape.</summary>
-    public int[,]? Orientations { get; }
+    /// <summary>Authored poses of placed props, keyed by cell (owner follow-up 2026-06-11): free
+    /// rotation plus uniform scale, edited by the selection gizmo. Cosmetic — the view poses the
+    /// mesh. Null when nothing is posed, keeping the lean document shape.</summary>
+    public IReadOnlyDictionary<(int X, int Y), PropTransform>? Transforms { get; }
 
     /// <summary>A fresh arena of the given size: a steel-walled border around an all-floor interior,
     /// with the player spawn seated at the top-left interior corner and no enemies or powerups yet.

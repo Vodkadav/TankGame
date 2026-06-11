@@ -21,7 +21,6 @@ public enum EditorAction
     RaiseLayer,
     LowerLayer,
     ToggleRamp,
-    RotateCell,
     Erase,
 }
 
@@ -38,7 +37,7 @@ public sealed class MapEditor
     private bool[,] _sandbags;
     private int[,] _layers;
     private bool[,] _ramps;
-    private int[,] _orientations;
+    private readonly Dictionary<(int X, int Y), PropTransform> _transforms = new();
     private readonly List<(int X, int Y)> _enemySpawns = new();
     private readonly List<PowerupSpawn> _powerupSpawns = new();
     private readonly List<TeleportPadLink> _teleportPads = new();
@@ -54,7 +53,6 @@ public sealed class MapEditor
         _sandbags = blank.Sandbags;
         _layers = new int[width, height];
         _ramps = new bool[width, height];
-        _orientations = new int[width, height];
         Width = width;
         Height = height;
     }
@@ -78,7 +76,6 @@ public sealed class MapEditor
         var sandbags = new bool[width, height];
         var layers = new int[width, height];
         var ramps = new bool[width, height];
-        var orientations = new int[width, height];
 
         // Copy the shared interior only — both rings (the old border and the new) stay out of it, so
         // growing a map melts the old steel ring into open floor instead of leaving a stray wall.
@@ -91,7 +88,6 @@ public sealed class MapEditor
                 sandbags[x, y] = _sandbags[x, y];
                 layers[x, y] = _layers[x, y];
                 ramps[x, y] = _ramps[x, y];
-                orientations[x, y] = _orientations[x, y];
             }
         }
 
@@ -100,11 +96,14 @@ public sealed class MapEditor
         _sandbags = sandbags;
         _layers = layers;
         _ramps = ramps;
-        _orientations = orientations;
         Width = width;
         Height = height;
 
         bool Fits(int x, int y) => x >= 1 && y >= 1 && x < width - 1 && y < height - 1;
+        foreach (var cell in _transforms.Keys.Where(c => !Fits(c.X, c.Y)).ToList())
+        {
+            _transforms.Remove(cell);
+        }
         _enemySpawns.RemoveAll(s => !Fits(s.X, s.Y));
         _powerupSpawns.RemoveAll(p => !Fits(p.X, p.Y));
         _teleportPads.RemoveAll(p => !Fits(p.AX, p.AY) || !Fits(p.BX, p.BY));
@@ -199,7 +198,7 @@ public sealed class MapEditor
         {
             case EditorAction.PaintMaterial:
                 _materials[x, y] = PaintMaterial;
-                _orientations[x, y] = 0; // a freshly-painted item starts unrotated
+                _transforms.Remove((x, y)); // a freshly-painted item starts unposed
                 if (PaintMaterial != CellMaterial.Floor)
                 {
                     _bushes[x, y] = false;
@@ -253,18 +252,13 @@ public sealed class MapEditor
                 _ramps[x, y] = !_ramps[x, y];
                 break;
 
-            case EditorAction.RotateCell when !IsFloor(x, y):
-                // A quarter turn clockwise per click; cosmetic, so any placed item rotates freely.
-                _orientations[x, y] = (_orientations[x, y] + 1) % 4;
-                break;
-
             case EditorAction.Erase:
                 _materials[x, y] = CellMaterial.Floor;
                 _bushes[x, y] = false;
                 _sandbags[x, y] = false;
                 _layers[x, y] = 0;
                 _ramps[x, y] = false;
-                _orientations[x, y] = 0;
+                _transforms.Remove((x, y));
                 _enemySpawns.Remove((x, y));
                 _powerupSpawns.RemoveAll(p => p.X == x && p.Y == y);
                 RemoveTeleportPadAt(x, y);
@@ -274,6 +268,30 @@ public sealed class MapEditor
 
     /// <summary>The whole-arena ground tileset the author picked (owner feedback 2026-06-11).</summary>
     public GroundTheme GroundTheme { get; set; } = GroundTheme.Sand;
+
+    /// <summary>The authored pose of the prop at (x, y) — <see cref="PropTransform.Identity"/> when
+    /// untouched. The selection gizmo reads it to seed its rings and slider.</summary>
+    public PropTransform TransformAt(int x, int y) =>
+        _transforms.TryGetValue((x, y), out var transform) ? transform : PropTransform.Identity;
+
+    /// <summary>Poses the placed prop at (x, y) — the selection gizmo's commit. Ignored on floor
+    /// (nothing stands there to pose); an identity pose removes the entry so the document stays lean.</summary>
+    public void SetTransform(int x, int y, PropTransform transform)
+    {
+        if (!IsInterior(x, y) || IsFloor(x, y))
+        {
+            return;
+        }
+
+        if (transform.IsIdentity)
+        {
+            _transforms.Remove((x, y));
+        }
+        else
+        {
+            _transforms[(x, y)] = transform;
+        }
+    }
 
     public MapDefinition ToMap() => new(
         Name,
@@ -287,21 +305,7 @@ public sealed class MapEditor
         HasElevation() ? (int[,])_layers.Clone() : null,
         HasElevation() ? (bool[,])_ramps.Clone() : null,
         GroundTheme,
-        HasRotation() ? (int[,])_orientations.Clone() : null);
-
-    // An unrotated map keeps the lean document: no orientations key at all.
-    private bool HasRotation()
-    {
-        foreach (var facing in _orientations)
-        {
-            if (facing != 0)
-            {
-                return true;
-            }
-        }
-
-        return false;
-    }
+        _transforms.Count > 0 ? new Dictionary<(int X, int Y), PropTransform>(_transforms) : null);
 
     // An untouched (flat) map keeps the lean pre-elevation document: no layers/ramps keys at all.
     private bool HasElevation()
