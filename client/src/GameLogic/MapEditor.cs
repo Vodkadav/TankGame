@@ -136,6 +136,9 @@ public sealed class MapEditor
     /// <summary>The decorative props placed from the asset browser, in placement order.</summary>
     public IReadOnlyList<Decoration> Decorations => _decorations;
 
+    /// <summary>Whether a decoration stands at (x, y) — what makes a floor cell selectable.</summary>
+    public bool HasDecorationAt(int x, int y) => _decorations.Any(d => d.X == x && d.Y == y);
+
     public PowerupKind PaintPowerup { get; set; } = PowerupKind.Repair;
 
     public (int X, int Y) PlayerSpawn => _playerSpawn;
@@ -303,11 +306,12 @@ public sealed class MapEditor
     public PropTransform TransformAt(int x, int y) =>
         _transforms.TryGetValue((x, y), out var transform) ? transform : PropTransform.Identity;
 
-    /// <summary>Poses the placed prop at (x, y) — the selection gizmo's commit. Ignored on floor
-    /// (nothing stands there to pose); an identity pose removes the entry so the document stays lean.</summary>
+    /// <summary>Poses the placed prop at (x, y) — the selection gizmo's commit. Ignored on bare
+    /// floor (nothing stands there to pose — but a decoration on floor poses fine); an identity
+    /// pose removes the entry so the document stays lean.</summary>
     public void SetTransform(int x, int y, PropTransform transform)
     {
-        if (!IsInterior(x, y) || IsFloor(x, y))
+        if (!IsInterior(x, y) || (IsFloor(x, y) && !HasDecorationAt(x, y)))
         {
             return;
         }

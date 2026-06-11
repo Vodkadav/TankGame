@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using Godot;
 using TankGame.Domain;
 using TankGame.GameLogic;
@@ -52,6 +53,9 @@ public partial class MapEditorScene : Node3D
     private Node3D? _gizmos;
     private MeshInstance3D? _ground;
     private PanelContainer _floorThemes = null!;
+    private PanelContainer _assetBrowser = null!;
+    private LineEdit _assetSearch = null!;
+    private Tree _assetTree = null!;
     private LineEdit _nameEdit = null!;
     private Label _status = null!;
     private bool _painting;
@@ -81,9 +85,9 @@ public partial class MapEditorScene : Node3D
     /// the flow without synthesising mouse events.</summary>
     public void SelectCell(int x, int y)
     {
-        if (_editor.MaterialAt(x, y) == CellMaterial.Floor)
+        if (_editor.MaterialAt(x, y) == CellMaterial.Floor && !_editor.HasDecorationAt(x, y))
         {
-            Deselect();
+            Deselect(); // bare floor — nothing standing there to pose
             return;
         }
 
@@ -210,7 +214,17 @@ public partial class MapEditorScene : Node3D
     public void Paint(int x, int y)
     {
         _editor.ApplyAt(x, y);
-        if (_selected is { } cell && _editor.MaterialAt(cell.X, cell.Y) == CellMaterial.Floor)
+
+        // Copy-on-place (owner ask 2026-06-11): the first placement of an external library asset
+        // imports its file into the project, so the saved map keeps resolving after a clone.
+        if (_editor.Action == EditorAction.PlaceDecoration && _editor.HasDecorationAt(x, y)
+            && DecorationAssets.External.FirstOrDefault(e => e.Id == _editor.PaintAsset) is { } external)
+        {
+            AssetImporter.EnsureImported(external, DecorationAssets.ImportRoot);
+        }
+
+        if (_selected is { } cell && _editor.MaterialAt(cell.X, cell.Y) == CellMaterial.Floor
+            && !_editor.HasDecorationAt(cell.X, cell.Y))
         {
             Deselect(); // the selected prop was just erased or painted away
         }
@@ -496,6 +510,15 @@ public partial class MapEditorScene : Node3D
         {
             AddMarker(pending.X, pending.Y, "T?", padColour); // a half-placed pad awaiting its partner
         }
+
+        // Library props, WYSIWYG with the match: the real model, posed by the selection gizmo.
+        foreach (var decoration in _editor.Decorations)
+        {
+            var view = new DecorationView { Name = $"Decoration_{decoration.X}_{decoration.Y}" };
+            view.Configure(decoration.AssetId, _editor.TransformAt(decoration.X, decoration.Y), TileSize);
+            view.Position = new Vector3((decoration.X + 0.5f) * TileSize, 0f, (decoration.Y + 0.5f) * TileSize);
+            _gizmos!.AddChild(view);
+        }
     }
 
     private void AddMarker(int x, int y, string glyph, Color colour)
@@ -630,6 +653,7 @@ public partial class MapEditorScene : Node3D
 
         _floorThemes.AddChild(themeList);
         layer.AddChild(_floorThemes);
+        BuildAssetBrowser(layer);
 
         // The selected prop's size bar (owner follow-up 2026-06-11) — shown beside the palette
         // while something is selected; the rings handle rotation, this handles scale.
@@ -672,6 +696,7 @@ public partial class MapEditorScene : Node3D
         palette.AddChild(ToolButton("Bush", "editor.bush", () => SelectAction(EditorAction.ToggleBush)));
         palette.AddChild(ToolButton("Sandbag", "editor.sandbag", () => SelectAction(EditorAction.ToggleSandbag)));
         palette.AddChild(ToolButton("Spawn", "editor.spawn", () => SelectAction(EditorAction.ToggleSpawn)));
+        palette.AddChild(ToolButton("Assets", "editor.assets", () => _assetBrowser.Visible = !_assetBrowser.Visible));
         palette.AddChild(ToolButton("TeleportPad", "editor.teleport", () => SelectAction(EditorAction.PlaceTeleportPad)));
         palette.AddChild(ToolButton("RaiseLayer", "editor.raise", () => SelectAction(EditorAction.RaiseLayer)));
         palette.AddChild(ToolButton("LowerLayer", "editor.lower", () => SelectAction(EditorAction.LowerLayer)));
@@ -706,6 +731,75 @@ public partial class MapEditorScene : Node3D
         _status = new Label { Name = "Status" };
         bottom.AddChild(_status);
         layer.AddChild(bottom);
+    }
+
+    // The asset browser (owner ask 2026-06-11): a fly-out beside the palette with a search field
+    // over the whole library, grouped into collapsible categories. Selecting an entry arms the
+    // decoration tool with that asset.
+    private void BuildAssetBrowser(CanvasLayer layer)
+    {
+        _assetBrowser = new PanelContainer { Name = "AssetBrowser", Visible = false };
+        _assetBrowser.Position = new Vector2(224f, 96f);
+
+        var box = new VBoxContainer { CustomMinimumSize = new Vector2(280f, 440f) };
+        _assetSearch = new LineEdit { Name = "AssetSearch", PlaceholderText = "editor.search" };
+        _assetSearch.TextChanged += _ => RepopulateAssetTree();
+        box.AddChild(_assetSearch);
+
+        _assetTree = new Tree
+        {
+            Name = "AssetTree",
+            HideRoot = true,
+            SizeFlagsVertical = Control.SizeFlags.ExpandFill,
+        };
+        _assetTree.ItemSelected += () =>
+        {
+            if (_assetTree.GetSelected()?.GetMetadata(0).AsString() is { Length: > 0 } id)
+            {
+                PickAsset(id);
+            }
+        };
+        box.AddChild(_assetTree);
+        _assetBrowser.AddChild(box);
+        layer.AddChild(_assetBrowser);
+        RepopulateAssetTree();
+    }
+
+    // Categories collapse when browsing and expand while searching — a hit hidden in a closed
+    // branch would read as "no results".
+    private void RepopulateAssetTree()
+    {
+        _assetTree.Clear();
+        var root = _assetTree.CreateItem();
+        var query = _assetSearch.Text;
+        var searching = query.Trim().Length > 0;
+        var entries = AssetLibrary.Search(DecorationAssets.Catalogue(), query);
+
+        TreeItem? branch = null;
+        string? branchCategory = null;
+        foreach (var entry in entries) // catalogue order is category-then-name
+        {
+            if (branchCategory != entry.Category)
+            {
+                branch = _assetTree.CreateItem(root);
+                branch.SetText(0, entry.Category);
+                branch.SetSelectable(0, false);
+                branch.Collapsed = !searching;
+                branchCategory = entry.Category;
+            }
+
+            var item = _assetTree.CreateItem(branch);
+            item.SetText(0, entry.DisplayName);
+            item.SetMetadata(0, entry.Id);
+        }
+    }
+
+    /// <summary>Arms the decoration tool with a browsed asset. Public so tests can drive the pick
+    /// without synthesising Tree selection.</summary>
+    public void PickAsset(string assetId)
+    {
+        _editor.PaintAsset = assetId;
+        SelectAction(EditorAction.PlaceDecoration);
     }
 
     private void ShowValidation()
