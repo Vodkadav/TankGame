@@ -15,6 +15,7 @@ dashboard reads — keep it in sync with the detailed sections below.
 - [~] Local polish arc — no new art, no networking
 - [~] M3 / ADR-0019 — networked multiplayer, host-authoritative relay (steps 1–3 done: relay DO, Host/Join lobby UX, host-side transport + HostSession + 3D net scene; next: step 4 protocol fidelity, step 5 two-device playtest — owner-gated)
 - [~] 3D arena arc (ADR-0017/0018/0020) — full-3D port shipped; elevation engine + Cliffs & Valleys map; map editor Waves A+B (elevation tools); teleport pads T1–T3 (cross-layer valley↔plateau) — all awaiting owner playtest
+- [x] Owner feedback batch 2026-06-11 (8 tickets, #192–#199) — victory screen + per-tank stats + award tags; tank names (derpy AI cast, player prompt, concealment-aware tags); editor: own menu entry, scrolling palette, honest labels, floor tilesets, rotation, numbered spawns (8 cap), teleport pair link line
 
 ## Current status: **M1 + S1 + M2 + local-first combat arc complete; local polish arc in progress** (2026-06-03)
 

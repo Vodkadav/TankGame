@@ -82,6 +82,26 @@ public class MapCodecTests
     }
 
     [Fact]
+    public void Orientations_RoundTrip_AndAMissingField_MeansUnrotated()
+    {
+        var blank = MapDefinition.CreateBlank("Turny", 4, 4);
+        var orientations = new int[4, 4];
+        orientations[1, 2] = 3;
+        var rotated = new MapDefinition(
+            blank.Name, blank.Materials, blank.Bushes, blank.Sandbags, (1, 1),
+            new (int X, int Y)[] { (2, 2) }, System.Array.Empty<PowerupSpawn>(),
+            orientations: orientations);
+
+        var restored = MapCodec.Decode(MapCodec.Encode(rotated));
+        Assert.NotNull(restored.Orientations);
+        Assert.Equal(3, restored.Orientations![1, 2]);
+
+        var plain = MapCodec.Decode(MapCodec.Encode(MapDefinition.CreateBlank("Plain", 4, 4)));
+        Assert.Null(plain.Orientations);
+        Assert.DoesNotContain("orientations", MapCodec.Encode(MapDefinition.CreateBlank("Plain", 4, 4)));
+    }
+
+    [Fact]
     public void Decode_TreatsAMissingTeleportPadsField_AsNoPads()
     {
         // A pre-teleport document has no "teleportPads" key — it must still decode (backward-compatible).

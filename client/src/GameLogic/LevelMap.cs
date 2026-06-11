@@ -15,9 +15,10 @@ public sealed class LevelMap
     // case (every text map and the procedural arena), kept allocation-free.
     private readonly int[,]? _layers;
     private readonly bool[,]? _ramps;
+    private readonly int[,]? _orientations;
 
     private LevelMap(CellMaterial[,] materials, bool[,] bushes, int spawnX, int spawnY,
-        int[,]? layers = null, bool[,]? ramps = null)
+        int[,]? layers = null, bool[,]? ramps = null, int[,]? orientations = null)
     {
         Materials = materials;
         Bushes = bushes;
@@ -27,6 +28,7 @@ public sealed class LevelMap
         SpawnY = spawnY;
         _layers = layers;
         _ramps = ramps;
+        _orientations = orientations;
     }
 
     /// <summary>Builds a level directly from cell data — the producer seam a procedural generator
@@ -35,7 +37,7 @@ public sealed class LevelMap
     /// <paramref name="layers"/> + <paramref name="ramps"/> maps (same shape) raise cells onto
     /// elevation layers and mark ramp cells (ADR-0018); omit them for a flat layer-0 arena.</summary>
     public static LevelMap FromCells(CellMaterial[,] materials, bool[,] bushes, int spawnX, int spawnY,
-        int[,]? layers = null, bool[,]? ramps = null)
+        int[,]? layers = null, bool[,]? ramps = null, int[,]? orientations = null)
     {
         var width = materials.GetLength(0);
         var height = materials.GetLength(1);
@@ -64,7 +66,7 @@ public sealed class LevelMap
             throw new ArgumentException("spawn must be a floor cell");
         }
 
-        return new LevelMap(materials, bushes, spawnX, spawnY, layers, ramps);
+        return new LevelMap(materials, bushes, spawnX, spawnY, layers, ramps, orientations);
     }
 
     /// <summary>Cell materials indexed <c>[x, y]</c>.</summary>
@@ -161,7 +163,7 @@ public sealed class LevelMap
 
     /// <summary>Builds the <see cref="WallGrid"/> for this level (brick starts at full hp), carrying
     /// any per-cell elevation layers + ramps (ADR-0018).</summary>
-    public WallGrid BuildGrid() => WallGrid.FromMaterials(Materials, _layers, _ramps);
+    public WallGrid BuildGrid() => WallGrid.FromMaterials(Materials, _layers, _ramps, _orientations);
 
     private static List<string> SplitRows(string text)
     {

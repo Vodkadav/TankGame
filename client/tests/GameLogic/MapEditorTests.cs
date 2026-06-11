@@ -138,6 +138,48 @@ public class MapEditorTests
         Assert.Equal(6, editor.EnemySpawns.Count);
     }
 
+    // ── Rotation (owner feedback 2026-06-11): any placed item can be rotated in quarter turns ──
+
+    [Fact]
+    public void RotateCell_CyclesAPlacedItemsQuarterTurns()
+    {
+        var editor = Medium();
+        editor.Action = EditorAction.PaintMaterial;
+        editor.PaintMaterial = CellMaterial.Brick; // the fence
+        editor.ApplyAt(5, 5);
+
+        editor.Action = EditorAction.RotateCell;
+        editor.ApplyAt(5, 5);
+        Assert.Equal(1, editor.ToMap().Orientations![5, 5]);
+
+        editor.ApplyAt(5, 5);
+        editor.ApplyAt(5, 5);
+        Assert.Equal(3, editor.ToMap().Orientations![5, 5]);
+
+        editor.ApplyAt(5, 5); // full circle
+        Assert.Null(editor.ToMap().Orientations); // back to unrotated → the lean document again
+    }
+
+    [Fact]
+    public void RotateCell_IgnoresFloor_AndRepaintingResets()
+    {
+        var editor = Medium();
+        editor.Action = EditorAction.RotateCell;
+        editor.ApplyAt(6, 6); // floor — nothing to rotate
+        Assert.Null(editor.ToMap().Orientations);
+
+        editor.Action = EditorAction.PaintMaterial;
+        editor.PaintMaterial = CellMaterial.Crate;
+        editor.ApplyAt(7, 6);
+        editor.Action = EditorAction.RotateCell;
+        editor.ApplyAt(7, 6);
+        Assert.Equal(1, editor.ToMap().Orientations![7, 6]);
+
+        editor.Action = EditorAction.PaintMaterial;
+        editor.ApplyAt(7, 6); // repainting the cell resets its facing
+        Assert.Null(editor.ToMap().Orientations);
+    }
+
     [Fact]
     public void ToMap_CarriesTheGroundTheme()
     {

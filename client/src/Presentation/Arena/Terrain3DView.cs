@@ -115,6 +115,9 @@ public partial class Terrain3DView : Node3D
                 return;
             default:
                 var node = Place(cell.Material, centre, WallFootprint, $"Wall_{x}_{y}", baseY);
+                // The authored facing (owner feedback 2026-06-11): quarter turns, cosmetic only —
+                // the fence finally stands in any orientation.
+                node.RotateY(Mathf.DegToRad(-90f * _grid.OrientationAt(x, y)));
                 if (cell.Material is CellMaterial.Brick or CellMaterial.Crate)
                 {
                     _destructibles[(x, y)] = node; // track so it can be removed when destroyed

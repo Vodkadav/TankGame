@@ -32,6 +32,7 @@ public static class MapLoader
         }
 
         return LevelMap.FromCells(
-            map.Materials, map.Bushes, map.PlayerSpawn.X, map.PlayerSpawn.Y, map.Layers, map.Ramps);
+            map.Materials, map.Bushes, map.PlayerSpawn.X, map.PlayerSpawn.Y, map.Layers, map.Ramps,
+            map.Orientations);
     }
 }

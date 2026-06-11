@@ -17,6 +17,7 @@ public enum EditorAction
     RaiseLayer,
     LowerLayer,
     ToggleRamp,
+    RotateCell,
     Erase,
 }
 
@@ -32,6 +33,7 @@ public sealed class MapEditor
     private readonly bool[,] _sandbags;
     private readonly int[,] _layers;
     private readonly bool[,] _ramps;
+    private readonly int[,] _orientations;
     private readonly List<(int X, int Y)> _enemySpawns = new();
     private readonly List<PowerupSpawn> _powerupSpawns = new();
     private readonly List<TeleportPadLink> _teleportPads = new();
@@ -47,6 +49,7 @@ public sealed class MapEditor
         _sandbags = blank.Sandbags;
         _layers = new int[width, height];
         _ramps = new bool[width, height];
+        _orientations = new int[width, height];
         Width = width;
         Height = height;
     }
@@ -98,6 +101,7 @@ public sealed class MapEditor
         {
             case EditorAction.PaintMaterial:
                 _materials[x, y] = PaintMaterial;
+                _orientations[x, y] = 0; // a freshly-painted item starts unrotated
                 if (PaintMaterial != CellMaterial.Floor)
                 {
                     _bushes[x, y] = false;
@@ -147,12 +151,18 @@ public sealed class MapEditor
                 _ramps[x, y] = !_ramps[x, y];
                 break;
 
+            case EditorAction.RotateCell when !IsFloor(x, y):
+                // A quarter turn clockwise per click; cosmetic, so any placed item rotates freely.
+                _orientations[x, y] = (_orientations[x, y] + 1) % 4;
+                break;
+
             case EditorAction.Erase:
                 _materials[x, y] = CellMaterial.Floor;
                 _bushes[x, y] = false;
                 _sandbags[x, y] = false;
                 _layers[x, y] = 0;
                 _ramps[x, y] = false;
+                _orientations[x, y] = 0;
                 _enemySpawns.Remove((x, y));
                 _powerupSpawns.RemoveAll(p => p.X == x && p.Y == y);
                 RemoveTeleportPadAt(x, y);
@@ -174,7 +184,22 @@ public sealed class MapEditor
         _teleportPads.ToList(),
         HasElevation() ? (int[,])_layers.Clone() : null,
         HasElevation() ? (bool[,])_ramps.Clone() : null,
-        GroundTheme);
+        GroundTheme,
+        HasRotation() ? (int[,])_orientations.Clone() : null);
+
+    // An unrotated map keeps the lean document: no orientations key at all.
+    private bool HasRotation()
+    {
+        foreach (var facing in _orientations)
+        {
+            if (facing != 0)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
 
     // An untouched (flat) map keeps the lean pre-elevation document: no layers/ramps keys at all.
     private bool HasElevation()

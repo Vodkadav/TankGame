@@ -206,7 +206,9 @@ public partial class MapEditorScene : Node3D
         AddChild(_terrain);
         // Layers/ramps ride along so raised cells show as real plateau blocks and ramp wedges live
         // (ADR-0020 Wave B) — the same WYSIWYG meshes the match renders.
-        _terrain.Bind(WallGrid.FromMaterials(map.Materials, map.Layers, map.Ramps), map.Bushes, map.Sandbags, TileSize);
+        _terrain.Bind(
+            WallGrid.FromMaterials(map.Materials, map.Layers, map.Ramps, map.Orientations),
+            map.Bushes, map.Sandbags, TileSize);
 
         // The authored ground tileset under everything, sized to the map — WYSIWYG with play.
         _ground?.Free();
@@ -395,6 +397,7 @@ public partial class MapEditorScene : Node3D
         palette.AddChild(ToolButton("RaiseLayer", "editor.raise", () => SelectAction(EditorAction.RaiseLayer)));
         palette.AddChild(ToolButton("LowerLayer", "editor.lower", () => SelectAction(EditorAction.LowerLayer)));
         palette.AddChild(ToolButton("Ramp", "editor.ramp", () => SelectAction(EditorAction.ToggleRamp)));
+        palette.AddChild(ToolButton("Rotate", "editor.rotate", () => SelectAction(EditorAction.RotateCell)));
         palette.AddChild(ToolButton("Erase", "editor.erase", () => SelectAction(EditorAction.Erase)));
 
         var powerups = new OptionButton { Name = "PowerupKind" };
