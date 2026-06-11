@@ -32,11 +32,20 @@ public class MapEditorSceneTests : TestClass
     [Test]
     public void Editor_BuildsThePaletteAndTheActionButtons()
     {
-        foreach (var name in new[] { "Steel", "Bush", "Player", "Enemy", "TeleportPad", "RaiseLayer", "LowerLayer", "Ramp", "Rotate", "Erase", "SizeMedium", "Validate", "TestPlay", "Save", "Back" })
+        foreach (var name in new[] { "Steel", "Bush", "Spawn", "TeleportPad", "RaiseLayer", "LowerLayer", "Ramp", "Rotate", "Erase", "SizeMedium", "Validate", "TestPlay", "Save", "Back" })
         {
             if (_editor.FindChild(name, recursive: true, owned: false) is not Button)
             {
                 throw new System.Exception($"The editor must offer a '{name}' button.");
+            }
+        }
+
+        // One unified Spawn tool replaced the per-role buttons (owner follow-up 2026-06-11).
+        foreach (var retired in new[] { "Player", "Enemy" })
+        {
+            if (_editor.FindChild(retired, recursive: true, owned: false) is Button)
+            {
+                throw new System.Exception($"The '{retired}' button is retired — spawns are one numbered pool.");
             }
         }
     }
@@ -143,33 +152,23 @@ public class MapEditorSceneTests : TestClass
         }
     }
 
-    // Spawn markers are numbered (owner feedback 2026-06-11): the player is "1", each enemy gets the
-    // next number, so a creator can track which of the up-to-8 tank spawns is which.
+    // Spawn markers are one numbered pool drawn as the ringed-disc gizmo (owner follow-up
+    // 2026-06-11): a red disc with two white rings and the marker number, easy to spot while editing.
     [Test]
-    public void SpawnMarkers_AreNumbered_PlayerFirst()
+    public void SpawnMarkers_AreRingedDiscs_NumberedFromOne()
     {
         _editor.NewMap(28, 16);
-        _editor.SelectAction(EditorAction.ToggleEnemySpawn);
+        _editor.SelectAction(EditorAction.ToggleSpawn);
         _editor.Paint(20, 12);
         _editor.Paint(21, 12);
 
-        var labels = new System.Collections.Generic.HashSet<string>();
         var gizmos = _editor.FindChild("Gizmos", recursive: true, owned: false)
             ?? throw new System.Exception("The editor must render its spawn gizmos.");
-        foreach (var child in gizmos.GetChildren())
+        foreach (var expected in new[] { "Spawn1", "Spawn2", "Spawn3" })
         {
-            if (child is Label3D label)
+            if (gizmos.FindChild(expected, recursive: true, owned: false) is not SpawnMarker3D)
             {
-                labels.Add(label.Text);
-            }
-        }
-
-        foreach (var expected in new[] { "1", "2", "3" })
-        {
-            if (!labels.Contains(expected))
-            {
-                throw new System.Exception(
-                    $"Spawn markers must be numbered; missing '{expected}' among [{string.Join(", ", labels)}].");
+                throw new System.Exception($"Spawn markers must be numbered ringed discs; missing '{expected}'.");
             }
         }
     }
