@@ -131,6 +131,7 @@ public partial class Arena3DScene : Node3D
             _playerSpawn = cliffs.PlayerSpawn;
             _enemySpawns = cliffs.EnemySpawns;
             _powerupPlacements = cliffs.Powerups;
+            _authoredPads = cliffs.Pads; // the cross-layer valley↔plateau pair (teleport pads T3)
         }
         else
         {
@@ -521,12 +522,11 @@ public partial class Arena3DScene : Node3D
     }
 
     // Place one linked pair of teleport pads on the two best-separated floor cells (near opposite quarters),
-    // skipping the spawn cells so no tank starts on a pad. Flat (layer 0) for now; the Cliffs map will author
-    // cross-layer pairs. The Teleporter is the deterministic owner; the rings are pure views of its state.
+    // skipping the spawn cells so no tank starts on a pad. The Teleporter is the deterministic owner; the
+    // rings are pure views of its state.
     private void BuildTeleporter(int widthCells, int heightCells)
     {
-        // A custom map with authored pads overrides the auto-placement: build the linked pairs straight
-        // from its cells (flat, layer 0). With no authored pads we keep today's auto-placed pair.
+        // Authored pads (a custom map's, or Cliffs' cross-layer pair) override the auto-placement.
         if (_authoredPads.Count > 0)
         {
             BuildAuthoredTeleporter();
@@ -543,24 +543,24 @@ public partial class Arena3DScene : Node3D
             return;
         }
 
-        var padA = new TeleportPad(CellCentre(a.Value.X, a.Value.Y), 0);
-        var padB = new TeleportPad(CellCentre(b.Value.X, b.Value.Y), 0);
+        var padA = PadAt(a.Value.X, a.Value.Y);
+        var padB = PadAt(b.Value.X, b.Value.Y);
         _teleporter = new Teleporter(new[] { (padA, padB) }, TeleportPadRadius);
 
         AddPadView(padA);
         AddPadView(padB);
     }
 
-    // Build the teleporter from the chosen custom map's authored pad pairs (cells → world centres). Pads
-    // sit on the ground layer (0) for now; the rings are added in the same link order the Teleporter holds.
+    // Build the teleporter from the authored pad pairs (cells → world centres). The rings are added in
+    // the same link order the Teleporter holds, so the scene can mirror pad state to them by index.
     private void BuildAuthoredTeleporter()
     {
         var links = new List<(TeleportPad, TeleportPad)>(_authoredPads.Count);
         var pads = new List<TeleportPad>(_authoredPads.Count * 2);
         foreach (var link in _authoredPads)
         {
-            var padA = new TeleportPad(CellCentre(link.AX, link.AY), 0);
-            var padB = new TeleportPad(CellCentre(link.BX, link.BY), 0);
+            var padA = PadAt(link.AX, link.AY);
+            var padB = PadAt(link.BX, link.BY);
             links.Add((padA, padB));
             pads.Add(padA);
             pads.Add(padB);
@@ -573,10 +573,14 @@ public partial class Arena3DScene : Node3D
         }
     }
 
+    // A pad sits on whatever elevation layer its cell has (teleport pads T3): the layer is derived from
+    // the grid, never authored separately, so pad data stays plain cells and cannot disagree with the map.
+    private TeleportPad PadAt(int x, int y) => new(CellCentre(x, y), _grid.LayerAt(x, y));
+
     private void AddPadView(TeleportPad pad)
     {
         var view = new TeleportPad3DView { Name = "TeleportPad" };
-        view.Configure(GroundProjection.ToWorld(pad.Position), TeleportPadRadius);
+        view.Configure(GroundProjection.ToWorld(pad.Position, pad.Layer), TeleportPadRadius);
         AddChild(view);
         _padViews.Add(view);
     }

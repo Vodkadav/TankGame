@@ -14,6 +14,7 @@ dashboard reads — keep it in sync with the detailed sections below.
 - [x] Local-first combat arc — single-player vs AI, local 2-player co-op & versus (ADR-0011)
 - [~] Local polish arc — no new art, no networking
 - [~] M3 — networked multiplayer (secret-free scaffolding underway; live deploy needs Cloudflare Durable Object + secrets + two-device testing)
+- [~] 3D arena arc (ADR-0017/0018/0020) — full-3D port shipped; elevation engine + Cliffs & Valleys map; map editor Waves A+B (elevation tools); teleport pads T1–T3 (cross-layer valley↔plateau) — all awaiting owner playtest
 
 ## Current status: **M1 + S1 + M2 + local-first combat arc complete; local polish arc in progress** (2026-06-03)
 

@@ -113,6 +113,30 @@ public class CliffsArenaTests
         Assert.True(climbedOntoPlateau, "a tank must be able to climb onto the plateau from the valley");
     }
 
+    // ── Cross-layer teleport pads (T3) ──
+    [Fact]
+    public void Create_AuthorsACrossLayerTeleportPadPair()
+    {
+        var layout = CliffsArena.Create();
+        var map = layout.Map;
+
+        Assert.NotEmpty(layout.Pads);
+        Assert.Contains(layout.Pads, p => map.LayerAt(p.AX, p.AY) != map.LayerAt(p.BX, p.BY));
+
+        foreach (var pad in layout.Pads)
+        {
+            // Both ends drivable, off the ramps, and clear of every spawn so no tank starts on a pad.
+            Assert.Equal(CellMaterial.Floor, map.Materials[pad.AX, pad.AY]);
+            Assert.Equal(CellMaterial.Floor, map.Materials[pad.BX, pad.BY]);
+            Assert.False(map.IsRamp(pad.AX, pad.AY));
+            Assert.False(map.IsRamp(pad.BX, pad.BY));
+            Assert.NotEqual(layout.PlayerSpawn, (pad.AX, pad.AY));
+            Assert.NotEqual(layout.PlayerSpawn, (pad.BX, pad.BY));
+            Assert.DoesNotContain((pad.AX, pad.AY), layout.EnemySpawns);
+            Assert.DoesNotContain((pad.BX, pad.BY), layout.EnemySpawns);
+        }
+    }
+
     // Layer-aware flood fill: a tank moves between two adjacent floor cells only when their layers
     // match, or when one of them is a ramp bridging the two layers (mirrors GridArena's rules).
     private static HashSet<(int X, int Y)> ReachableFromSpawn(LevelMap map, (int X, int Y) spawn)

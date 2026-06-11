@@ -90,6 +90,69 @@ public class MapValidatorTests
     }
 
     [Fact]
+    public void Validate_TreatsATeleportPadPair_AsAConnection_ToAWalledOffPocket()
+    {
+        var map = MapDefinition.CreateBlank("PadBridged", 7, 5);
+        // Seal off column 4 so the right pocket is only reachable through the pad pair.
+        for (var y = 1; y < map.Height - 1; y++)
+        {
+            map.Materials[4, y] = CellMaterial.Steel;
+        }
+
+        var bridged = new MapDefinition(
+            map.Name, map.Materials, map.Bushes, map.Sandbags,
+            (1, 1),
+            new (int X, int Y)[] { (5, 2) },
+            System.Array.Empty<PowerupSpawn>(),
+            new[] { new TeleportPadLink(2, 2, 5, 3) });
+
+        var result = MapValidator.Validate(bridged);
+
+        Assert.True(result.IsValid, string.Join(", ", result.Errors));
+    }
+
+    [Fact]
+    public void Validate_TreatsATeleportPadPair_AsAConnection_ToAnIslandPlateau_AcrossLayers()
+    {
+        var map = MapDefinition.CreateBlank("Island", 7, 5);
+        var layers = new int[7, 5];
+        layers[4, 2] = 1;
+        layers[5, 2] = 1; // a layer-1 island with no ramp up — pad-only access
+
+        var island = new MapDefinition(
+            map.Name, map.Materials, map.Bushes, map.Sandbags,
+            (1, 1),
+            new (int X, int Y)[] { (5, 2) },
+            System.Array.Empty<PowerupSpawn>(),
+            new[] { new TeleportPadLink(2, 2, 4, 2) },
+            layers);
+
+        var result = MapValidator.Validate(island);
+
+        Assert.True(result.IsValid, string.Join(", ", result.Errors));
+    }
+
+    [Fact]
+    public void Validate_FlagsAnIslandPlateau_WithNoPadOrRampUp()
+    {
+        var map = MapDefinition.CreateBlank("Stranded", 7, 5);
+        var layers = new int[7, 5];
+        layers[4, 2] = 1;
+        layers[5, 2] = 1;
+
+        var stranded = new MapDefinition(
+            map.Name, map.Materials, map.Bushes, map.Sandbags,
+            (1, 1),
+            new (int X, int Y)[] { (5, 2) },
+            System.Array.Empty<PowerupSpawn>(),
+            layers: layers);
+
+        var result = MapValidator.Validate(stranded);
+
+        Assert.Contains(result.Errors, e => e.Code == MapValidationCode.SpawnUnreachable && e.X == 5 && e.Y == 2);
+    }
+
+    [Fact]
     public void Validate_FlagsATeleportPadOutOfBounds()
     {
         var open = OpenArena();

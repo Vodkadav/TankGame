@@ -148,12 +148,15 @@ public static class MapValidator
     // BFS over (cell, layer) states, mirroring how a tank actually moves (GridArena, ADR-0018/0020):
     // a plain cell is entered on its own layer; a ramp cell is stood on at either layer it joins
     // (LayerAt and LayerAt+1); a LOWER plain cell is entered by dropping off the ledge — one-way, so
-    // high ground with no ramp up is correctly unreachable from below.
+    // high ground with no ramp up is correctly unreachable from below. Teleport pads are extra edges:
+    // standing on a pad (on the pad cell's own layer) warps to its partner, so a pad pair may be the
+    // only route into a pocket or up onto a plateau (teleport pads T3).
     private static bool[,] FloodFill(MapDefinition map)
     {
         var reachable = new bool[map.Width, map.Height];
         var visited = new HashSet<(int X, int Y, int Layer)>();
         var queue = new Queue<(int X, int Y, int Layer)>();
+        var warps = PadWarps(map);
         var start = (map.PlayerSpawn.X, map.PlayerSpawn.Y, LayerAt(map, map.PlayerSpawn.X, map.PlayerSpawn.Y));
         reachable[start.Item1, start.Item2] = true;
         visited.Add(start);
@@ -163,6 +166,19 @@ public static class MapValidator
         while (queue.Count > 0)
         {
             var (x, y, layer) = queue.Dequeue();
+            if (layer == LayerAt(map, x, y) && warps.TryGetValue((x, y), out var partners))
+            {
+                foreach (var (px, py) in partners)
+                {
+                    var arrival = (px, py, LayerAt(map, px, py));
+                    if (visited.Add(arrival))
+                    {
+                        reachable[px, py] = true;
+                        queue.Enqueue(arrival);
+                    }
+                }
+            }
+
             foreach (var (dx, dy) in steps)
             {
                 var nx = x + dx;
@@ -210,6 +226,38 @@ public static class MapValidator
         {
             yield return cellLayer; // its own level, or a one-way drop off the ledge
         }
+    }
+
+    // Each well-formed pad link as a two-way warp edge, keyed by cell. Links with an end out of
+    // bounds or inside a wall are skipped — those are already their own validation errors, not routes.
+    private static Dictionary<(int X, int Y), List<(int X, int Y)>> PadWarps(MapDefinition map)
+    {
+        var warps = new Dictionary<(int X, int Y), List<(int X, int Y)>>();
+        foreach (var pad in map.TeleportPads)
+        {
+            if (!InBounds(map, pad.AX, pad.AY) || !InBounds(map, pad.BX, pad.BY)
+                || !IsFloor(map, pad.AX, pad.AY) || !IsFloor(map, pad.BX, pad.BY))
+            {
+                continue;
+            }
+
+            AddWarp(warps, (pad.AX, pad.AY), (pad.BX, pad.BY));
+            AddWarp(warps, (pad.BX, pad.BY), (pad.AX, pad.AY));
+        }
+
+        return warps;
+    }
+
+    private static void AddWarp(
+        Dictionary<(int X, int Y), List<(int X, int Y)>> warps, (int X, int Y) from, (int X, int Y) to)
+    {
+        if (!warps.TryGetValue(from, out var partners))
+        {
+            partners = new List<(int X, int Y)>();
+            warps[from] = partners;
+        }
+
+        partners.Add(to);
     }
 
     private static int LayerAt(MapDefinition map, int x, int y) => map.Layers?[x, y] ?? 0;

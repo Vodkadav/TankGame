@@ -11,8 +11,9 @@ namespace TankGame.GameLogic;
 public readonly record struct PowerupSpawn(PowerupKind Kind, int X, int Y);
 
 /// <summary>A linked pair of teleport pads on an authored map, given by the two cells they sit on. Driving
-/// onto one pad warps a tank to its partner. Both ends are on the ground layer (0) for now — the fields are
-/// kept cell-based and layer-free so a future Cliffs map can extend this with per-end layers (ADR-0018).</summary>
+/// onto one pad warps a tank to its partner — across elevation layers too (teleport pads T3): each end's
+/// layer is derived from the cell it sits on in the map's layer grid, never stored here, so the link can
+/// never disagree with the terrain.</summary>
 /// <param name="AX">Pad A column.</param>
 /// <param name="AY">Pad A row.</param>
 /// <param name="BX">Pad B column.</param>

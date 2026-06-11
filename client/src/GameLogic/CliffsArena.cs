@@ -11,7 +11,8 @@ public sealed record CliffsLayout(
     (int X, int Y) PlayerSpawn,
     IReadOnlyList<(int X, int Y)> EnemySpawns,
     IReadOnlyList<(PowerupKind Kind, int X, int Y)> Powerups,
-    bool[,] Sandbags);
+    bool[,] Sandbags,
+    IReadOnlyList<TeleportPadLink> Pads);
 
 /// <summary>The hand-authored "Cliffs &amp; Valleys" themed map (ADR-0018 step 3): a steel-ringed
 /// field whose centre is a raised layer-1 plateau, reached by ramps on each side. Tanks on the valley
@@ -88,8 +89,13 @@ public static class CliffsArena
             (PowerupKind.RapidFire, Width / 2, Height - 3),
         };
 
+        // A cross-layer teleport pad pair (T3): a valley corner pad warps straight up onto the plateau
+        // (and back), a flanking route past the defended ramps. Each pad's layer is derived from the
+        // cell it sits on, so the link data stays plain cells.
+        var pads = new[] { new TeleportPadLink(2, 2, 11, 9) };
+
         var map = LevelMap.FromCells(materials, bushes, playerSpawn.Item1, playerSpawn.Item2, layers, ramps);
-        return new CliffsLayout(map, playerSpawn, enemySpawns, powerups, sandbags);
+        return new CliffsLayout(map, playerSpawn, enemySpawns, powerups, sandbags, pads);
     }
 
     private static void AddRamp(int[,] layers, bool[,] ramps, int x, int y)
