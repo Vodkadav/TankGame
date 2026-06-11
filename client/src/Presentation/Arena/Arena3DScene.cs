@@ -420,6 +420,21 @@ public partial class Arena3DScene : Node3D
         AddChild(terrain);
         terrain.Bind(grid, level.Bushes, sandbags, TileSize);
 
+        // A custom map's library props (owner ask 2026-06-11): cosmetic scenery, posed as authored.
+        if (GameSetup.CustomMap is { } decorated)
+        {
+            foreach (var decoration in decorated.Decorations)
+            {
+                var prop = new DecorationView { Name = $"Decoration_{decoration.X}_{decoration.Y}" };
+                var pose = decorated.Transforms is { } poses && poses.TryGetValue((decoration.X, decoration.Y), out var t)
+                    ? t
+                    : PropTransform.Identity;
+                prop.Configure(decoration.AssetId, pose, TileSize);
+                prop.Position = new Vector3((decoration.X + 0.5f) * TileSize, 0f, (decoration.Y + 0.5f) * TileSize);
+                AddChild(prop);
+            }
+        }
+
         BuildTeleporter(level.Width, level.Height); // before SpawnTanks — the tanks consult it
         SpawnPowerups();
         SpawnTanks();

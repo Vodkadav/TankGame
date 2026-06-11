@@ -63,6 +63,92 @@ public class MapEditorSceneTests : TestClass
         }
     }
 
+    // The asset browser (owner ask 2026-06-11): a fly-out with search + collapsible categories over
+    // the library. CI has no external library, so the committed sample under models/imported/ is the
+    // catalogue — picking it arms the decoration tool, placing renders the real model in the preview.
+    [Test]
+    public void AssetBrowser_SearchFindsTheImportedSample_AndPlacingRendersIt()
+    {
+        var browser = _editor.FindChild("AssetBrowser", recursive: true, owned: false) as Control
+            ?? throw new System.Exception("The editor must hold the 'AssetBrowser' fly-out.");
+        if (browser.Visible)
+        {
+            throw new System.Exception("The browser should stay closed until Assets is pressed.");
+        }
+
+        Press("Assets");
+        if (!browser.Visible)
+        {
+            throw new System.Exception("Pressing Assets must open the browser.");
+        }
+
+        var search = _editor.FindChild("AssetSearch", recursive: true, owned: false) as LineEdit
+            ?? throw new System.Exception("The browser must offer a search field.");
+        search.Text = "crate";
+        search.EmitSignal(LineEdit.SignalName.TextChanged, "crate");
+
+        var tree = _editor.FindChild("AssetTree", recursive: true, owned: false) as Tree
+            ?? throw new System.Exception("The browser must list assets in a tree.");
+        if (FindTreeItem(tree.GetRoot(), "crate medium") is null)
+        {
+            throw new System.Exception("Searching 'crate' must surface the imported sample crate.");
+        }
+
+        _editor.NewMap(28, 16);
+        _editor.PickAsset("kenney_blaster-kit/crate-medium");
+        _editor.Paint(6, 6);
+
+        if (_editor.CurrentMap().Decorations.Count != 1)
+        {
+            throw new System.Exception("Placing the picked asset must add a decoration to the map.");
+        }
+
+        var view = _editor.FindChild("Decoration_6_6", recursive: true, owned: false) as DecorationView
+            ?? throw new System.Exception("The placed prop must render in the preview.");
+        if (view.GetChildCount() == 0)
+        {
+            throw new System.Exception("The decoration must load its real model.");
+        }
+
+        // Decorations pose like any placed item: select, turn, scale (the gizmo flow).
+        _editor.SelectCell(6, 6);
+        if (_editor.SelectedCell != (6, 6))
+        {
+            throw new System.Exception("A decoration on floor must be selectable for posing.");
+        }
+
+        _editor.ScaleSelected(1.6f);
+        var rescaled = _editor.FindChild("Decoration_6_6", recursive: true, owned: false) as DecorationView
+            ?? throw new System.Exception("The reposed prop must re-render.");
+        if (Mathf.Abs(rescaled.Scale.X - 1.6f) > 0.01f)
+        {
+            throw new System.Exception($"The size bar must scale the prop; scale was {rescaled.Scale.X}.");
+        }
+    }
+
+    private static TreeItem? FindTreeItem(TreeItem? item, string text)
+    {
+        if (item is null)
+        {
+            return null;
+        }
+
+        if (item.GetText(0) == text)
+        {
+            return item;
+        }
+
+        for (var child = item.GetFirstChild(); child is not null; child = child.GetNext())
+        {
+            if (FindTreeItem(child, text) is { } found)
+            {
+                return found;
+            }
+        }
+
+        return null;
+    }
+
     // The editor views the map from the game's ¾ isometric angle (owner follow-up 2026-06-11) —
     // straight-down made walls read as flat squares and placed items near-impossible to tell apart.
     [Test]
