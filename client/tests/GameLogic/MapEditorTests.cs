@@ -138,6 +138,56 @@ public class MapEditorTests
         Assert.Equal(6, editor.EnemySpawns.Count);
     }
 
+    // ── Resize (owner follow-up 2026-06-11): changing the map size keeps everything that fits ──
+
+    [Fact]
+    public void Resize_PreservesEverythingThatFits()
+    {
+        var editor = Medium(); // 28x16
+        editor.GroundTheme = GroundTheme.Mars;
+        editor.PaintMaterial = CellMaterial.Brick;
+        editor.ApplyAt(5, 5);
+        editor.Action = EditorAction.RotateCell;
+        editor.ApplyAt(5, 5);
+        editor.Action = EditorAction.ToggleBush;
+        editor.ApplyAt(6, 6);
+        editor.Action = EditorAction.RaiseLayer;
+        editor.ApplyAt(7, 7);
+        editor.Action = EditorAction.ToggleEnemySpawn;
+        editor.ApplyAt(20, 12);
+
+        editor.Resize(40, 24);
+
+        Assert.Equal(40, editor.Width);
+        Assert.Equal(GroundTheme.Mars, editor.GroundTheme);
+        Assert.Equal(CellMaterial.Brick, editor.MaterialAt(5, 5));
+        Assert.Equal(1, editor.ToMap().Orientations![5, 5]);
+        Assert.True(editor.BushAt(6, 6));
+        Assert.Equal(1, editor.LayerAt(7, 7));
+        Assert.Contains((20, 12), editor.EnemySpawns);
+        Assert.Equal(CellMaterial.Steel, editor.MaterialAt(39, 23)); // the new border ring
+        Assert.Equal(CellMaterial.Floor, editor.MaterialAt(27, 15)); // the old border melts into floor
+    }
+
+    [Fact]
+    public void Resize_DropsWhatNoLongerFits_AndRehomesThePlayerSpawn()
+    {
+        var editor = Medium(); // 28x16
+        editor.Action = EditorAction.SetPlayerSpawn;
+        editor.ApplyAt(20, 12);
+        editor.Action = EditorAction.ToggleEnemySpawn;
+        editor.ApplyAt(25, 13);
+        editor.Action = EditorAction.PlaceTeleportPad;
+        editor.ApplyAt(5, 5);
+        editor.ApplyAt(22, 12); // a pair whose far end will fall outside
+
+        editor.Resize(12, 10);
+
+        Assert.Empty(editor.EnemySpawns); // (25,13) no longer fits
+        Assert.Empty(editor.TeleportPads); // one end out → the whole link goes
+        Assert.Equal((1, 1), editor.PlayerSpawn); // rehomed to the safe default
+    }
+
     // ── Rotation (owner feedback 2026-06-11): any placed item can be rotated in quarter turns ──
 
     [Fact]

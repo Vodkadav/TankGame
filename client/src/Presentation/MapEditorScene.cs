@@ -77,6 +77,15 @@ public partial class MapEditorScene : Node3D
         RefreshScene();
     }
 
+    /// <summary>Re-sizes the current map, keeping everything that fits (owner follow-up 2026-06-11)
+    /// — the size buttons resize, they do not start over.</summary>
+    public void ResizeMap(int width, int height)
+    {
+        _editor.Resize(width, height);
+        FrameCamera();
+        RefreshScene();
+    }
+
     public void SelectMaterial(CellMaterial material)
     {
         _editor.Action = EditorAction.PaintMaterial;
@@ -438,7 +447,7 @@ public partial class MapEditorScene : Node3D
     private Button SizeButton(string name, string key, int w, int h)
     {
         var button = new Button { Name = name, Text = key };
-        button.Pressed += () => NewMap(w, h);
+        button.Pressed += () => ResizeMap(w, h);
         return button;
     }
 
