@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using TankGame.Domain.Net;
 using Xunit;
@@ -72,6 +73,27 @@ public class ProtocolCodecTests
             0x00, 0x00, 0x00, 0x3F, // aim = 0.5
             0x01,                   // buttons = fire
         }, bytes);
+    }
+
+    // ADR-0019 step 3: inputs gained a kind tag. The relay forwards guest bytes to the HOST CLIENT,
+    // whose one socket also carries the welcome — so every message must self-identify, inputs included.
+    [Fact]
+    public void InputMessage_EncodesToTheTaggedCanonicalByteVector()
+    {
+        var frame = new InputFrame(Seq: 1, MoveX: 1f, MoveY: -1f, Aim: 0.5f, Buttons: 1);
+
+        var bytes = ProtocolCodec.EncodeInputMessage(frame);
+
+        Assert.Equal(new byte[]
+        {
+            0x03,                   // MsgInput
+            0x01, 0x00, 0x00, 0x00, // seq = 1
+            0x00, 0x00, 0x80, 0x3F, // moveX = 1.0
+            0x00, 0x00, 0x80, 0xBF, // moveY = -1.0
+            0x00, 0x00, 0x00, 0x3F, // aim = 0.5
+            0x01,                   // buttons = fire
+        }, bytes);
+        Assert.Equal(frame, ProtocolCodec.DecodeInput(bytes.AsSpan(1)));
     }
 
     [Fact]

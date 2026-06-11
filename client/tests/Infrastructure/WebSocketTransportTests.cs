@@ -27,7 +27,7 @@ public class WebSocketTransportTests
     }
 
     [Fact]
-    public void SendInput_EncodesTheFrameOntoTheSocket()
+    public void SendInput_EncodesTheTaggedFrameOntoTheSocket()
     {
         var socket = new FakeSocket();
         var transport = new WebSocketTransport(socket);
@@ -36,7 +36,38 @@ public class WebSocketTransportTests
         transport.SendInput(frame);
 
         Assert.Single(socket.Sent);
-        Assert.Equal(ProtocolCodec.EncodeInput(frame), socket.Sent[0]);
+        Assert.Equal(ProtocolCodec.EncodeInputMessage(frame), socket.Sent[0]);
+    }
+
+    // ── Host side (ADR-0019 step 3): the host broadcasts snapshots and receives relayed guest inputs ──
+
+    [Fact]
+    public void SendSnapshot_EncodesTheTaggedSnapshotOntoTheSocket()
+    {
+        var socket = new FakeSocket();
+        var transport = new WebSocketTransport(socket);
+        var frame = new SnapshotFrame(3, 2,
+            new List<TankState> { new(0, 64f, 128f, 0f, 0.5f, 8, 0) }, new List<WallDelta>());
+
+        transport.SendSnapshot(frame);
+
+        Assert.Single(socket.Sent);
+        Assert.Equal(SnapshotMessage(frame), socket.Sent[0]);
+    }
+
+    [Fact]
+    public void Poll_DispatchesARelayedGuestInput_ToInputReceived()
+    {
+        var socket = new FakeSocket();
+        var transport = new WebSocketTransport(socket);
+        var frame = new InputFrame(9, 1f, 0f, 0.25f, 0);
+        InputFrame? received = null;
+        transport.InputReceived += f => received = f;
+        socket.Inbound.Enqueue(ProtocolCodec.EncodeInputMessage(frame));
+
+        transport.Poll();
+
+        Assert.Equal(frame, received);
     }
 
     // Server→client messages carry a leading kind tag; the transport strips it and dispatches.

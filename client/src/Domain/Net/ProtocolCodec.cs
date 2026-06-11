@@ -26,6 +26,11 @@ public static class ProtocolCodec
     /// <summary>Leading kind byte of a server→client snapshot message.</summary>
     public const byte MsgSnapshot = 2;
 
+    /// <summary>Leading kind byte of an input message (ADR-0019 step 3). Inputs are tagged like every
+    /// other message because the relay forwards guest bytes to the HOST CLIENT, whose one socket also
+    /// carries the welcome — untagged 17-byte inputs would be ambiguous against the other kinds.</summary>
+    public const byte MsgInput = 3;
+
     /// <summary>A welcome message: <c>[MsgWelcome, slot]</c>. The server sends it once on connect to
     /// tell the client which slot it controls. Mirrors <c>encodeWelcome</c> in the TS codec — the
     /// byte vector is a cross-language parity anchor.</summary>
@@ -40,6 +45,17 @@ public static class ProtocolCodec
         }
 
         return data[1];
+    }
+
+    /// <summary>An input message: <c>[MsgInput | EncodeInput(frame)]</c> — what a guest puts on the
+    /// socket; the host strips the tag and decodes the payload with <see cref="DecodeInput"/>.</summary>
+    public static byte[] EncodeInputMessage(InputFrame frame)
+    {
+        var payload = EncodeInput(frame);
+        var message = new byte[payload.Length + 1];
+        message[0] = MsgInput;
+        payload.CopyTo(message, 1);
+        return message;
     }
 
     public static byte[] EncodeInput(InputFrame frame)
