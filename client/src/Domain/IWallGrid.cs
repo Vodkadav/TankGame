@@ -90,9 +90,10 @@ public interface IWallGrid
     bool IsRamp(int x, int y) => false;
 
     /// <summary>The cell's authored pose (free rotation + uniform scale, owner follow-up
-    /// 2026-06-11) — cosmetic only, the view poses the prop's mesh; blocking and damage are
-    /// unaffected. Defaults to <see cref="PropTransform.Identity"/> for every grid that never
-    /// authors a pose.</summary>
+    /// 2026-06-11). Rotation is cosmetic — the view poses the prop's mesh; a scale above 1 on a
+    /// solid cell also enlarges its collision footprint so the prop blocks what it shows, while
+    /// damage stays routed to real cells. Defaults to <see cref="PropTransform.Identity"/> for
+    /// every grid that never authors a pose.</summary>
     PropTransform TransformAt(int x, int y) => PropTransform.Identity;
 
     /// <summary>Whether the cell at (<paramref name="x"/>, <paramref name="y"/>) blocks tank

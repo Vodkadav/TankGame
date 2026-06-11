@@ -26,8 +26,14 @@ public sealed class WallGrid : IWallGrid
     // Cells that are ramps (connecting LayerAt and LayerAt+1), or null for a flat grid.
     private readonly bool[,]? _ramps;
 
-    // Per-cell authored poses (cosmetic, owner follow-up 2026-06-11), or null when nothing is posed.
+    // Per-cell authored poses (owner follow-up 2026-06-11), or null when nothing is posed.
+    // Rotation is cosmetic; scale also grows the cell's collision footprint (see _overlapSources).
     private readonly IReadOnlyDictionary<(int X, int Y), PropTransform>? _transforms;
+
+    // Cells overlapped by a neighbouring solid cell's scaled footprint, each mapped to the source
+    // cell(s) projecting onto it. Precomputed once — transforms are immutable per grid instance —
+    // so IsBlocked/BlocksShots never scan the transforms. Null when no transform enlarges anything.
+    private readonly Dictionary<(int X, int Y), List<(int X, int Y)>>? _overlapSources;
 
     public WallGrid(WallCell[,] cells, int[,]? layers = null, bool[,]? ramps = null,
         IReadOnlyDictionary<(int X, int Y), PropTransform>? transforms = null)
@@ -38,6 +44,7 @@ public sealed class WallGrid : IWallGrid
         _layers = layers;
         _ramps = ramps;
         _transforms = transforms;
+        _overlapSources = BuildOverlapSources();
     }
 
     /// <summary>Builds a grid from a material map, filling each brick cell with
@@ -87,9 +94,84 @@ public sealed class WallGrid : IWallGrid
             ? transform
             : PropTransform.Identity;
 
-    public bool IsBlocked(int x, int y) => CellMaterials.BlocksMovement(GetCell(x, y).Material);
+    public bool IsBlocked(int x, int y) =>
+        CellMaterials.BlocksMovement(GetCell(x, y).Material) || OverlappedBy(x, y, forShots: false);
 
-    public bool BlocksShots(int x, int y) => CellMaterials.BlocksShots(GetCell(x, y).Material);
+    public bool BlocksShots(int x, int y) =>
+        CellMaterials.BlocksShots(GetCell(x, y).Material) || OverlappedBy(x, y, forShots: true);
+
+    // A scaled prop blocks what it shows (owner feedback 2026-06-11 evening): its footprint is the
+    // axis-aligned square of side Scale × cell centred on the source cell, so a cell counts as
+    // overlapped when its centre lies inside that square — Chebyshev distance ≤ Scale / 2 from the
+    // source, boundary inclusive (i.e. within (Scale - 1) / 2 cells of the source cell's edge).
+    // Rotation is intentionally ignored: collision is cell-granular, so a turned square still
+    // rounds to the same ring of cells. Scale <= 1 reaches no neighbour and changes nothing.
+    private Dictionary<(int X, int Y), List<(int X, int Y)>>? BuildOverlapSources()
+    {
+        if (_transforms is null)
+        {
+            return null;
+        }
+
+        Dictionary<(int X, int Y), List<(int X, int Y)>>? map = null;
+        foreach (var ((sourceX, sourceY), transform) in _transforms)
+        {
+            var reach = (int)MathF.Floor((transform.Scale / 2f) + 0.0001f);
+            if (reach < 1 || !InBounds(sourceX, sourceY))
+            {
+                continue;
+            }
+
+            var material = _cells[sourceX, sourceY].Material;
+            if (!CellMaterials.BlocksMovement(material) && !CellMaterials.BlocksShots(material))
+            {
+                continue; // a floor/bridge pose projects nothing, however large
+            }
+
+            for (var dx = -reach; dx <= reach; dx++)
+            {
+                for (var dy = -reach; dy <= reach; dy++)
+                {
+                    if ((dx == 0 && dy == 0) || !InBounds(sourceX + dx, sourceY + dy))
+                    {
+                        continue;
+                    }
+
+                    map ??= new Dictionary<(int X, int Y), List<(int X, int Y)>>();
+                    if (!map.TryGetValue((sourceX + dx, sourceY + dy), out var sources))
+                    {
+                        map[(sourceX + dx, sourceY + dy)] = sources = new List<(int X, int Y)>();
+                    }
+
+                    sources.Add((sourceX, sourceY));
+                }
+            }
+        }
+
+        return map;
+    }
+
+    // The source cell's CURRENT material decides what its footprint blocks, so a scaled crate that
+    // breaks to floor stops projecting — the prop's visual is gone, so its collision goes with it.
+    // Damage stays routed to real cells only: DamageCell on an overlapped-but-floor cell is a no-op.
+    private bool OverlappedBy(int x, int y, bool forShots)
+    {
+        if (_overlapSources is null || !_overlapSources.TryGetValue((x, y), out var sources))
+        {
+            return false;
+        }
+
+        foreach (var (sourceX, sourceY) in sources)
+        {
+            var material = _cells[sourceX, sourceY].Material;
+            if (forShots ? CellMaterials.BlocksShots(material) : CellMaterials.BlocksMovement(material))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
 
     /// <summary>Overwrites a cell with an authoritative state and raises <see cref="CellChanged"/>
     /// if it differs. Unlike <see cref="DamageCell"/> (relative, local damage) this is absolute —
