@@ -222,10 +222,15 @@ public partial class MapEditorScene : Node3D
         _gizmos?.Free();
         _gizmos = new Node3D { Name = "Gizmos" };
         AddChild(_gizmos);
-        AddMarker(_editor.PlayerSpawn.X, _editor.PlayerSpawn.Y, "P", new Color(0.4f, 1f, 0.4f));
+        // Numbered spawn markers (owner feedback 2026-06-11): the player is "1", each enemy takes
+        // the next number, so a creator can track which of the up-to-8 tank spawns is which.
+        AddMarker(_editor.PlayerSpawn.X, _editor.PlayerSpawn.Y, "1", new Color(0.4f, 1f, 0.4f));
+        var spawnNumber = 2;
         foreach (var (x, y) in _editor.EnemySpawns)
         {
-            AddMarker(x, y, "E", new Color(1f, 0.4f, 0.4f));
+            AddMarker(x, y, spawnNumber.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                new Color(1f, 0.4f, 0.4f));
+            spawnNumber++;
         }
 
         foreach (var spawn in _editor.PowerupSpawns)

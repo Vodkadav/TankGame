@@ -53,6 +53,37 @@ public class MapEditorSceneTests : TestClass
         }
     }
 
+    // Spawn markers are numbered (owner feedback 2026-06-11): the player is "1", each enemy gets the
+    // next number, so a creator can track which of the up-to-8 tank spawns is which.
+    [Test]
+    public void SpawnMarkers_AreNumbered_PlayerFirst()
+    {
+        _editor.NewMap(28, 16);
+        _editor.SelectAction(EditorAction.ToggleEnemySpawn);
+        _editor.Paint(20, 12);
+        _editor.Paint(21, 12);
+
+        var labels = new System.Collections.Generic.HashSet<string>();
+        var gizmos = _editor.FindChild("Gizmos", recursive: true, owned: false)
+            ?? throw new System.Exception("The editor must render its spawn gizmos.");
+        foreach (var child in gizmos.GetChildren())
+        {
+            if (child is Label3D label)
+            {
+                labels.Add(label.Text);
+            }
+        }
+
+        foreach (var expected in new[] { "1", "2", "3" })
+        {
+            if (!labels.Contains(expected))
+            {
+                throw new System.Exception(
+                    $"Spawn markers must be numbered; missing '{expected}' among [{string.Join(", ", labels)}].");
+            }
+        }
+    }
+
     // The Floor button expands a picker of whole-arena ground themes (owner feedback 2026-06-11):
     // jungle, mars, parking lot, plus the sandy default. Choosing one stamps it on the map.
     [Test]

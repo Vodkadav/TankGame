@@ -19,6 +19,7 @@ public enum MapValidationCode
     TeleportPadEndpointsCoincide,
     LayerOutOfRange,
     RampNotOnFloor,
+    TooManyTankSpawns,
 }
 
 /// <summary>One validation problem, with the cell it concerns (or (-1, -1) when it is not about a
@@ -48,6 +49,10 @@ public static class MapValidator
     /// (0–3) is plenty of verticality for an arena this size and keeps the editor palette small.</summary>
     public const int MaxLayer = 3;
 
+    /// <summary>The most tanks any mode fields — 4v4 (owner feedback 2026-06-11). The player spawn
+    /// plus the enemy spawns may not exceed it.</summary>
+    public const int MaxTankSpawns = 8;
+
     public static MapValidationResult Validate(MapDefinition map)
     {
         var errors = new List<MapValidationError>();
@@ -66,6 +71,11 @@ public static class MapValidator
         if (map.EnemySpawns.Count == 0)
         {
             errors.Add(new MapValidationError(MapValidationCode.NoEnemySpawns, -1, -1));
+        }
+
+        if (1 + map.EnemySpawns.Count > MaxTankSpawns)
+        {
+            errors.Add(new MapValidationError(MapValidationCode.TooManyTankSpawns, -1, -1));
         }
 
         foreach (var (x, y) in map.EnemySpawns)

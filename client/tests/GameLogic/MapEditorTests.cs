@@ -120,6 +120,25 @@ public class MapEditorTests
     }
 
     [Fact]
+    public void ToggleEnemySpawn_RefusesANinthTankSpawn()
+    {
+        var editor = Medium();
+        editor.Action = EditorAction.ToggleEnemySpawn;
+        for (var i = 0; i < 7; i++)
+        {
+            editor.ApplyAt(2 + i, 3); // player spawn + 7 enemies = the 8-tank cap
+        }
+
+        Assert.Equal(7, editor.EnemySpawns.Count);
+
+        editor.ApplyAt(12, 3); // a ninth tank — refused
+        Assert.Equal(7, editor.EnemySpawns.Count);
+
+        editor.ApplyAt(2, 3); // removal always works
+        Assert.Equal(6, editor.EnemySpawns.Count);
+    }
+
+    [Fact]
     public void ToMap_CarriesTheGroundTheme()
     {
         var editor = new MapEditor("Themed", 8, 6) { GroundTheme = GroundTheme.ParkingLot };

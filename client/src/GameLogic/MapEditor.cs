@@ -119,7 +119,8 @@ public sealed class MapEditor
                 break;
 
             case EditorAction.ToggleEnemySpawn when IsFloor(x, y):
-                if (!_enemySpawns.Remove((x, y)))
+                // Removal always works; adding stops at the 4v4 cap (player + 7 enemies = 8 tanks).
+                if (!_enemySpawns.Remove((x, y)) && 1 + _enemySpawns.Count < MapValidator.MaxTankSpawns)
                 {
                     _enemySpawns.Add((x, y));
                 }
