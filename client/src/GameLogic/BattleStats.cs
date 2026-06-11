@@ -25,10 +25,15 @@ public sealed class BattleStats
         public int Deaths { get; set; }
         public int DamageDealt { get; set; }
         public int DamageTaken { get; set; }
+        public int HealingTaken { get; set; }
+        public int Assists { get; set; }
     }
 
     private readonly Dictionary<Guid, TankTally> _byTank = new();
     private readonly List<TankTally> _ordered = new(); // registration order = the scene's spawn order
+
+    // Who has damaged each victim since its last death — the kill assist pool (the killer excluded).
+    private readonly Dictionary<Guid, HashSet<Guid>> _damagers = new();
 
     public BattleStats(IWorld world, CombatResolver combat)
     {
@@ -51,6 +56,11 @@ public sealed class BattleStats
                 var tally = GetOrCreate(tank.Id);
                 tally.Name = tank.DisplayName;
                 tally.Team = tank.Team;
+                if (tank is Tank healable)
+                {
+                    healable.Healed += restored => GetOrCreate(healable.Id).HealingTaken += restored;
+                }
+
                 break;
             case Projectile shot:
                 GetOrCreate(shot.Owner).ShotsFired++;
@@ -75,10 +85,30 @@ public sealed class BattleStats
         var taken = GetOrCreate(hit.Victim);
         taken.DamageTaken += hit.Amount;
 
+        if (!_damagers.TryGetValue(hit.Victim, out var contributors))
+        {
+            contributors = new HashSet<Guid>();
+            _damagers[hit.Victim] = contributors;
+        }
+
+        contributors.Add(hit.Shooter);
+
         if (hit.Killed)
         {
             dealt.Kills++;
             taken.Deaths++;
+
+            // Everyone who chipped in on this life — except the killer — earns the assist; the
+            // pool resets with the death, so a respawned victim starts a clean slate.
+            foreach (var contributor in contributors)
+            {
+                if (contributor != hit.Shooter)
+                {
+                    GetOrCreate(contributor).Assists++;
+                }
+            }
+
+            _damagers.Remove(hit.Victim);
         }
     }
 
