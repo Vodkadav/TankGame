@@ -54,21 +54,28 @@ public sealed class AssetLibrary
 
     /// <summary>Builds the catalogue from paths (pure — tests feed fake lists). The pack is the
     /// path's first folder under the root; excluded packs are dropped; ids are
-    /// <c>pack/filename-without-extension</c>, unique by first sighting.</summary>
+    /// <c>pack/filename-without-extension</c>, unique by first sighting. Separator handling is
+    /// plain string work, NOT <see cref="Path"/> — the tests feed Windows paths and CI runs on
+    /// Linux, where a backslash is not a separator (the #209 red-main lesson).</summary>
     public static IReadOnlyList<AssetEntry> Catalogue(IEnumerable<string> glbPaths, string root)
     {
         var entries = new List<AssetEntry>();
         var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var normalizedRoot = root.Replace('\\', '/').TrimEnd('/') + "/";
         foreach (var path in glbPaths)
         {
-            var relative = Path.GetRelativePath(root, path);
-            var pack = relative.Split(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)[0];
+            var normalized = path.Replace('\\', '/');
+            var relative = normalized.StartsWith(normalizedRoot, StringComparison.OrdinalIgnoreCase)
+                ? normalized[normalizedRoot.Length..]
+                : normalized;
+            var pack = relative.Split('/')[0];
             if (ExcludedPacks.Any(excluded => string.Equals(excluded, pack, StringComparison.OrdinalIgnoreCase)))
             {
                 continue;
             }
 
-            var model = Path.GetFileNameWithoutExtension(path);
+            var file = relative.Split('/')[^1];
+            var model = file.EndsWith(".glb", StringComparison.OrdinalIgnoreCase) ? file[..^4] : file;
             var id = $"{pack}/{model}";
             if (!seen.Add(id))
             {
