@@ -53,6 +53,43 @@ public class MapEditorSceneTests : TestClass
         }
     }
 
+    // The Floor button expands a picker of whole-arena ground themes (owner feedback 2026-06-11):
+    // jungle, mars, parking lot, plus the sandy default. Choosing one stamps it on the map.
+    [Test]
+    public void FloorButton_ExpandsTheThemePicker_AndChoosingOneThemesTheMap()
+    {
+        var themes = _editor.FindChild("FloorThemes", recursive: true, owned: false) as Control
+            ?? throw new System.Exception("The editor must hold a 'FloorThemes' picker.");
+        if (themes.Visible)
+        {
+            throw new System.Exception("The theme picker should stay collapsed until Floor is pressed.");
+        }
+
+        Press("Floor");
+        if (!themes.Visible)
+        {
+            throw new System.Exception("Pressing Floor must expand the theme picker.");
+        }
+
+        Press("ThemeMars");
+        if (_editor.CurrentMap().GroundTheme != GroundTheme.Mars)
+        {
+            throw new System.Exception("Choosing Mars must stamp the theme on the map.");
+        }
+
+        if (themes.Visible)
+        {
+            throw new System.Exception("Choosing a theme should collapse the picker again.");
+        }
+    }
+
+    private void Press(string buttonName)
+    {
+        var button = _editor.FindChild(buttonName, recursive: true, owned: false) as Button
+            ?? throw new System.Exception($"Missing '{buttonName}' button.");
+        button.EmitSignal(BaseButton.SignalName.Pressed);
+    }
+
     // The 3D build renders Brick as a fence and sandbags as oil spills — the tool labels must say what
     // the player actually sees (owner feedback 2026-06-11).
     [Test]

@@ -159,6 +159,9 @@ public sealed class MapEditor
         }
     }
 
+    /// <summary>The whole-arena ground tileset the author picked (owner feedback 2026-06-11).</summary>
+    public GroundTheme GroundTheme { get; set; } = GroundTheme.Sand;
+
     public MapDefinition ToMap() => new(
         Name,
         (CellMaterial[,])_materials.Clone(),
@@ -169,7 +172,8 @@ public sealed class MapEditor
         _powerupSpawns.ToList(),
         _teleportPads.ToList(),
         HasElevation() ? (int[,])_layers.Clone() : null,
-        HasElevation() ? (bool[,])_ramps.Clone() : null);
+        HasElevation() ? (bool[,])_ramps.Clone() : null,
+        GroundTheme);
 
     // An untouched (flat) map keeps the lean pre-elevation document: no layers/ramps keys at all.
     private bool HasElevation()

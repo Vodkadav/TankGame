@@ -573,36 +573,21 @@ public partial class Arena3DScene : Node3D
         var w = widthCells * TileSize;
         var h = heightCells * TileSize;
 
-        // A noise-mottled sand so the ground reads dusty rather than a flat shiny slab.
-        var noise = new FastNoiseLite { NoiseType = FastNoiseLite.NoiseTypeEnum.SimplexSmooth, Frequency = 0.05f };
-        // A patchwork of brown, yellow, grey and green so the ground reads as varied dusty terrain.
-        var ramp = new Gradient();
-        ramp.Offsets = new[] { 0f, 0.34f, 0.67f, 1f };
-        ramp.Colors = new[]
-        {
-            new Color(0.40f, 0.47f, 0.30f), // green
-            new Color(0.52f, 0.40f, 0.26f), // brown
-            new Color(0.78f, 0.67f, 0.42f), // yellow sand
-            new Color(0.54f, 0.54f, 0.52f), // grey
-        };
-        var sand = new NoiseTexture2D { Noise = noise, Width = 256, Height = 256, Seamless = true, ColorRamp = ramp };
-
+        // A custom map brings its authored ground tileset; the built-in arenas keep the sandy look.
+        var theme = GameSetup.CustomMap?.GroundTheme ?? GroundTheme.Sand;
         var ground = new MeshInstance3D
         {
             Name = "Ground",
             Mesh = new PlaneMesh { Size = new Vector2(w, h) },
             Position = new Vector3(w / 2f, 0f, h / 2f),
-            MaterialOverride = new StandardMaterial3D
-            {
-                AlbedoTexture = sand,
-                Uv1Scale = new Vector3(widthCells / 4f, heightCells / 4f, 1f), // tile every ~4 cells
-                Roughness = 1f,
-                SpecularMode = BaseMaterial3D.SpecularModeEnum.Disabled,
-            },
+            MaterialOverride = GroundThemes.Material(theme, widthCells, heightCells),
         };
         AddChild(ground);
 
-        ScatterDirt(w, h);
+        if (theme == GroundTheme.Sand)
+        {
+            ScatterDirt(w, h); // the dirt patches belong to the dusty look only
+        }
     }
 
     // A sprinkle of darker dirt patches across the field for extra texture. Deterministic positions.

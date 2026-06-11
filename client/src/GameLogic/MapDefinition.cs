@@ -39,8 +39,10 @@ public sealed class MapDefinition
         IReadOnlyList<PowerupSpawn> powerupSpawns,
         IReadOnlyList<TeleportPadLink>? teleportPads = null,
         int[,]? layers = null,
-        bool[,]? ramps = null)
+        bool[,]? ramps = null,
+        GroundTheme groundTheme = GroundTheme.Sand)
     {
+        GroundTheme = groundTheme;
         Name = name ?? throw new ArgumentNullException(nameof(name));
         Materials = materials ?? throw new ArgumentNullException(nameof(materials));
         Width = materials.GetLength(0);
@@ -102,6 +104,10 @@ public sealed class MapDefinition
     /// <summary>Which cells are ramps joining their layer to the one above (ADR-0018), indexed
     /// <c>[x, y]</c>; <c>null</c> on a flat map.</summary>
     public bool[,]? Ramps { get; }
+
+    /// <summary>The whole-arena ground tileset; <see cref="GroundTheme.Sand"/> (the launch look)
+    /// when the author never picked one.</summary>
+    public GroundTheme GroundTheme { get; }
 
     /// <summary>A fresh arena of the given size: a steel-walled border around an all-floor interior,
     /// with the player spawn seated at the top-left interior corner and no enemies or powerups yet.

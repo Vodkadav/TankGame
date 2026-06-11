@@ -65,6 +65,23 @@ public class MapCodecTests
     }
 
     [Fact]
+    public void GroundTheme_RoundTrips_AndAMissingField_MeansSand()
+    {
+        var themed = new MapDefinition(
+            "Mars Base", MapDefinition.CreateBlank("x", 4, 4).Materials,
+            new bool[4, 4], new bool[4, 4], (1, 1),
+            new (int X, int Y)[] { (2, 2) }, System.Array.Empty<PowerupSpawn>(),
+            groundTheme: GroundTheme.Mars);
+
+        Assert.Equal(GroundTheme.Mars, MapCodec.Decode(MapCodec.Encode(themed)).GroundTheme);
+
+        // A pre-theme document has no "groundTheme" key — it must decode as the sandy default.
+        var sandy = MapCodec.Decode(MapCodec.Encode(MapDefinition.CreateBlank("Plain", 4, 4)));
+        Assert.Equal(GroundTheme.Sand, sandy.GroundTheme);
+        Assert.DoesNotContain("groundTheme", MapCodec.Encode(MapDefinition.CreateBlank("Plain", 4, 4)));
+    }
+
+    [Fact]
     public void Decode_TreatsAMissingTeleportPadsField_AsNoPads()
     {
         // A pre-teleport document has no "teleportPads" key — it must still decode (backward-compatible).
