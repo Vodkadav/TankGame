@@ -89,10 +89,6 @@ public partial class MapSelectScene : Control
 
         left.AddChild(new Label { Name = "MyMapsHeading", Text = "map.my_maps" });
 
-        var create = new Button { Name = "CreateMap", Text = "map.create" };
-        create.Pressed += () => Go(MapEditorScene.MapEditorScenePath);
-        left.AddChild(create);
-
         foreach (var stored in _maps.List())
         {
             var id = stored.Id;

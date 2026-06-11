@@ -38,6 +38,17 @@ public class MapSelectSceneTests : TestClass
         }
     }
 
+    // The editor moved to its own main-menu entry (owner feedback 2026-06-11) — the map browser is
+    // for choosing what to play, not for authoring.
+    [Test]
+    public void MapSelect_NoLongerOffersTheEditorEntry()
+    {
+        if (_scene.FindChild("CreateMap", recursive: true, owned: false) is Button)
+        {
+            throw new System.Exception("The editor entry belongs on the title menu now, not in map select.");
+        }
+    }
+
     [Test]
     public void DesertWar_IsPlayable_ByDefault()
     {

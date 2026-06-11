@@ -15,7 +15,7 @@ namespace TankGame.Presentation;
 public partial class MapEditorScene : Node3D
 {
     public const string MapEditorScenePath = "res://src/Presentation/MapEditor.tscn";
-    private const string MapSelectScenePath = "res://src/Presentation/MapSelect.tscn";
+    private const string TitleScenePath = "res://src/Presentation/Title.tscn";
     private const string MapsDir = "user://maps";
 
     private const float TileSize = 64f;
@@ -289,9 +289,27 @@ public partial class MapEditorScene : Node3D
         var layer = new CanvasLayer { Name = "EditorUi" };
         AddChild(layer);
 
-        var palette = new VBoxContainer { Name = "Palette" };
+        // The palette outgrew small windows, so it lives in a full-height scrolling strip on the left —
+        // every tool stays reachable at any window size (owner feedback 2026-06-11).
+        var scroll = new ScrollContainer
+        {
+            Name = "PaletteScroll",
+            HorizontalScrollMode = ScrollContainer.ScrollMode.Disabled,
+        };
+        scroll.AnchorTop = 0f;
+        scroll.AnchorBottom = 1f;
+        scroll.OffsetLeft = 12f;
+        scroll.OffsetTop = 12f;
+        scroll.OffsetRight = 212f;
+        scroll.OffsetBottom = -56f; // stops above the bottom action bar
+        layer.AddChild(scroll);
+
+        var palette = new VBoxContainer
+        {
+            Name = "Palette",
+            SizeFlagsHorizontal = Control.SizeFlags.ExpandFill,
+        };
         palette.AddThemeConstantOverride("separation", 4);
-        palette.Position = new Vector2(12f, 12f);
         palette.AddChild(new Label { Text = "editor.heading" });
 
         var sizes = new HBoxContainer { Name = "Sizes" };
@@ -331,7 +349,7 @@ public partial class MapEditorScene : Node3D
         powerups.ItemSelected += index => SelectPowerup(PowerupKinds[index]);
         palette.AddChild(ToolButton("Powerup", "editor.powerup", () => SelectPowerup(PowerupKinds[Mathf.Max(0, powerups.Selected)])));
         palette.AddChild(powerups);
-        layer.AddChild(palette);
+        scroll.AddChild(palette);
 
         var bottom = new HBoxContainer { Name = "Actions" };
         bottom.AddThemeConstantOverride("separation", 8);
@@ -343,7 +361,7 @@ public partial class MapEditorScene : Node3D
         bottom.AddChild(ActionButton("Validate", "editor.validate", () => ShowValidation()));
         bottom.AddChild(ActionButton("TestPlay", "editor.test_play", TestPlay));
         bottom.AddChild(ActionButton("Save", "editor.save", () => Save()));
-        bottom.AddChild(ActionButton("Back", "editor.back", () => Go(MapSelectScenePath)));
+        bottom.AddChild(ActionButton("Back", "editor.back", () => Go(TitleScenePath)));
         _status = new Label { Name = "Status" };
         bottom.AddChild(_status);
         layer.AddChild(bottom);
