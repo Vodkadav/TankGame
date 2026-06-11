@@ -52,13 +52,13 @@ public class TitleSceneTests : TestClass
     }
 
     [Test]
-    public void Title_DisablesTeamVsTeam_UntilTwoPlayerLands()
+    public void Title_EnablesTeamVsTeam_LeadingToTheLobby()
     {
         var team = _title.FindChild("TeamVsTeam", recursive: true, owned: false) as Button
             ?? throw new System.Exception("Missing 'TeamVsTeam' button.");
-        if (!team.Disabled)
+        if (team.Disabled)
         {
-            throw new System.Exception("Team vs Team should be disabled until two-player is wired.");
+            throw new System.Exception("Team vs Team should be enabled now that the lobby flow exists (ADR-0019 step 2).");
         }
     }
 

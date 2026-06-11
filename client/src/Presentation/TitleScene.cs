@@ -2,13 +2,14 @@ using Godot;
 
 namespace TankGame.Presentation;
 
-/// <summary>The start screen. Offers the two play modes (Solo now; Team vs Team is wired in the next
-/// step, so its button is shown disabled), a Select Map browser, and Exit. Solo launches the 3D arena —
-/// the game's main presentation (ADR-0017). Button labels are translation keys (Godot auto-translates).</summary>
+/// <summary>The start screen. Offers the two play modes (Solo, and Team vs Team via the networked
+/// lobby — ADR-0019 step 2), a Select Map browser, and Exit. Solo launches the 3D arena — the game's
+/// main presentation (ADR-0017). Button labels are translation keys (Godot auto-translates).</summary>
 public partial class TitleScene : Control
 {
     public const string ArenaScenePath = "res://src/Presentation/Arena/Arena3D.tscn";
     public const string MapSelectScenePath = "res://src/Presentation/MapSelect.tscn";
+    public const string LobbyScenePath = "res://src/Presentation/Lobby.tscn";
 
     public override void _Ready()
     {
@@ -29,10 +30,8 @@ public partial class TitleScene : Control
         solo.Pressed += () => StartSolo();
         menu.AddChild(solo);
 
-        // Team vs Team needs local two-player in the 3D arena, which lands in the next step; the button is
-        // present (so the menu reads complete) but disabled until then.
         var team = Button("TeamVsTeam", "title.team_vs_team");
-        team.Disabled = true;
+        team.Pressed += () => Go(LobbyScenePath);
         menu.AddChild(team);
 
         var selectMap = Button("SelectMap", "title.select_map");
