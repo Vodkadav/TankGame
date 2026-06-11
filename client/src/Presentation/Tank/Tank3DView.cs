@@ -56,7 +56,9 @@ public partial class Tank3DView : Node3D
     }
 
     // The tank's battle name floats above its bars. A child of this view, so concealment — which hides
-    // the whole view — hides the name with it: a bush-lurker's name never gives it away.
+    // the whole view — hides the name with it: a bush-lurker's name never gives it away. The label uses
+    // the editor markers' proven-visible recipe (owner feedback 2026-06-11: the first cut's small font
+    // was unreadable at this world scale) — big font, heavy outline, depth-test off.
     private void BuildNameTag()
     {
         var name = _tank?.DisplayName ?? string.Empty;
@@ -65,13 +67,13 @@ public partial class Tank3DView : Node3D
             Name = "NameTag",
             Text = name,
             Visible = name.Length > 0,
-            FontSize = 40,
-            Modulate = new Color(0.95f, 0.95f, 0.9f),
+            FontSize = 88,
+            Modulate = new Color(0.98f, 0.96f, 0.88f),
             OutlineModulate = new Color(0f, 0f, 0f),
-            OutlineSize = 10,
+            OutlineSize = 14,
             Billboard = BaseMaterial3D.BillboardModeEnum.Enabled,
             NoDepthTest = true,
-            Position = new Vector3(0f, NameTagY, 0f),
+            Position = new Vector3(0f, NameTagY + 22f, 0f),
         });
     }
 

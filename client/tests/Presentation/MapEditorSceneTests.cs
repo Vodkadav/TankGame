@@ -278,6 +278,11 @@ public class MapEditorSceneTests : TestClass
             throw new System.Exception("A half-placed pad must not draw a link line yet.");
         }
 
+        if (_editor.FindChild("PadPending", recursive: true, owned: false) is not PadMarker3D)
+        {
+            throw new System.Exception("The half-placed pad must show its ringed-disc gizmo.");
+        }
+
         _editor.Paint(10, 8); // the partner — the pair forms
 
         var link = _editor.FindChild("PadLink0", recursive: true, owned: false) as TeleportLinkLine
@@ -285,6 +290,20 @@ public class MapEditorSceneTests : TestClass
         if (link.DotCount < 3)
         {
             throw new System.Exception($"The link must be dotted along the span; saw {link.DotCount} dots.");
+        }
+
+        // Pads read like the spawn markers now: ringed discs above the tileset, numbered per link.
+        foreach (var name in new[] { "PadMarker0A", "PadMarker0B" })
+        {
+            if (_editor.FindChild(name, recursive: true, owned: false) is not PadMarker3D)
+            {
+                throw new System.Exception($"Both pad ends must show the ringed-disc gizmo; missing '{name}'.");
+            }
+        }
+
+        if (_editor.FindChild("PadPending", recursive: true, owned: false) is not null)
+        {
+            throw new System.Exception("The pending gizmo must clear once the pair completes.");
         }
     }
 
