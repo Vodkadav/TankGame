@@ -25,20 +25,25 @@ public sealed class WallGrid : IWallGrid
     // Cells that are ramps (connecting LayerAt and LayerAt+1), or null for a flat grid.
     private readonly bool[,]? _ramps;
 
-    public WallGrid(WallCell[,] cells, int[,]? layers = null, bool[,]? ramps = null)
+    // Per-cell facing in quarter turns (cosmetic, owner feedback 2026-06-11), or null when unrotated.
+    private readonly int[,]? _orientations;
+
+    public WallGrid(WallCell[,] cells, int[,]? layers = null, bool[,]? ramps = null, int[,]? orientations = null)
     {
         _cells = cells;
         Width = cells.GetLength(0);
         Height = cells.GetLength(1);
         _layers = layers;
         _ramps = ramps;
+        _orientations = orientations;
     }
 
     /// <summary>Builds a grid from a material map, filling each brick cell with
     /// <see cref="DefaultBrickHp"/> and leaving floor/steel at 0 hp. An optional
     /// <paramref name="layers"/> map (same shape) raises cells onto elevation layers; omit it for a
     /// flat, single-layer grid (ADR-0018).</summary>
-    public static WallGrid FromMaterials(CellMaterial[,] materials, int[,]? layers = null, bool[,]? ramps = null)
+    public static WallGrid FromMaterials(
+        CellMaterial[,] materials, int[,]? layers = null, bool[,]? ramps = null, int[,]? orientations = null)
     {
         var width = materials.GetLength(0);
         var height = materials.GetLength(1);
@@ -59,7 +64,7 @@ public sealed class WallGrid : IWallGrid
             }
         }
 
-        return new WallGrid(cells, layers, ramps);
+        return new WallGrid(cells, layers, ramps, orientations);
     }
 
     public int Width { get; }
@@ -73,6 +78,9 @@ public sealed class WallGrid : IWallGrid
     public int LayerAt(int x, int y) => _layers is not null && InBounds(x, y) ? _layers[x, y] : 0;
 
     public bool IsRamp(int x, int y) => _ramps is not null && InBounds(x, y) && _ramps[x, y];
+
+    public int OrientationAt(int x, int y) =>
+        _orientations is not null && InBounds(x, y) ? _orientations[x, y] : 0;
 
     public bool IsBlocked(int x, int y) => CellMaterials.BlocksMovement(GetCell(x, y).Material);
 

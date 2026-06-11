@@ -79,6 +79,12 @@ public static class MapCodec
                 WriteRows(writer, "ramps", map.Width, map.Height, (x, y) => ramps[x, y] ? RampOn : OverlayOff);
             }
 
+            // Facings only when authored — an unrotated map keeps the lean document shape.
+            if (map.Orientations is { } orientations)
+            {
+                WriteRows(writer, "orientations", map.Width, map.Height, (x, y) => (char)('0' + orientations[x, y]));
+            }
+
             WriteCell(writer, "playerSpawn", map.PlayerSpawn.X, map.PlayerSpawn.Y);
 
             writer.WriteStartArray("enemySpawns");
@@ -191,7 +197,7 @@ public static class MapCodec
 
                 return new MapDefinition(
                     name, materials, bushes, sandbags, playerSpawn, enemySpawns, powerupSpawns,
-                    teleportPads, layers, ramps, groundTheme);
+                    teleportPads, layers, ramps, groundTheme, ReadOrientations(root, width, height));
             }
             catch (KeyNotFoundException ex)
             {
@@ -283,6 +289,33 @@ public static class MapCodec
         }
 
         return layers;
+    }
+
+    // Facing rows are optional: a document without them is an unrotated map.
+    private static int[,]? ReadOrientations(JsonElement root, int width, int height)
+    {
+        if (!root.TryGetProperty("orientations", out _))
+        {
+            return null;
+        }
+
+        var rows = ReadRowStrings(root, "orientations", width, height);
+        var orientations = new int[width, height];
+        for (var y = 0; y < height; y++)
+        {
+            for (var x = 0; x < width; x++)
+            {
+                var glyph = rows[y][x];
+                if (glyph is < '0' or > '3')
+                {
+                    throw new MapFormatException($"unknown orientation glyph '{glyph}' at ({x},{y})");
+                }
+
+                orientations[x, y] = glyph - '0';
+            }
+        }
+
+        return orientations;
     }
 
     private static bool[,] ReadRampOverlay(JsonElement root, int width, int height)

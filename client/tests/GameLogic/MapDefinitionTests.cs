@@ -79,6 +79,26 @@ public class MapDefinitionTests
     }
 
     [Fact]
+    public void Orientations_DefaultToNull_AndAreCarried()
+    {
+        var plain = MapDefinition.CreateBlank("Plain", 5, 5);
+        Assert.Null(plain.Orientations);
+
+        var orientations = new int[5, 5];
+        orientations[2, 2] = 1;
+        var rotated = new MapDefinition(
+            plain.Name, plain.Materials, plain.Bushes, plain.Sandbags,
+            plain.PlayerSpawn, plain.EnemySpawns, plain.PowerupSpawns,
+            orientations: orientations);
+        Assert.Equal(1, rotated.Orientations![2, 2]);
+
+        Assert.Throws<ArgumentException>(() => new MapDefinition(
+            plain.Name, plain.Materials, plain.Bushes, plain.Sandbags,
+            plain.PlayerSpawn, plain.EnemySpawns, plain.PowerupSpawns,
+            orientations: new int[3, 3]));
+    }
+
+    [Fact]
     public void GroundTheme_DefaultsToSand_AndIsCarried()
     {
         var plain = MapDefinition.CreateBlank("Plain", 5, 5);

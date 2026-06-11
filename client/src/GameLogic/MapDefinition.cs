@@ -40,9 +40,17 @@ public sealed class MapDefinition
         IReadOnlyList<TeleportPadLink>? teleportPads = null,
         int[,]? layers = null,
         bool[,]? ramps = null,
-        GroundTheme groundTheme = GroundTheme.Sand)
+        GroundTheme groundTheme = GroundTheme.Sand,
+        int[,]? orientations = null)
     {
         GroundTheme = groundTheme;
+        if (orientations is not null
+            && (orientations.GetLength(0) != materials.GetLength(0) || orientations.GetLength(1) != materials.GetLength(1)))
+        {
+            throw new ArgumentException("orientations must match the materials' dimensions", nameof(orientations));
+        }
+
+        Orientations = orientations;
         Name = name ?? throw new ArgumentNullException(nameof(name));
         Materials = materials ?? throw new ArgumentNullException(nameof(materials));
         Width = materials.GetLength(0);
@@ -108,6 +116,11 @@ public sealed class MapDefinition
     /// <summary>The whole-arena ground tileset; <see cref="GroundTheme.Sand"/> (the launch look)
     /// when the author never picked one.</summary>
     public GroundTheme GroundTheme { get; }
+
+    /// <summary>Per-cell facing in clockwise quarter turns (0–3), indexed <c>[x, y]</c> — cosmetic,
+    /// the view turns the prop's mesh (owner feedback 2026-06-11). Null when nothing is rotated,
+    /// keeping the lean document shape.</summary>
+    public int[,]? Orientations { get; }
 
     /// <summary>A fresh arena of the given size: a steel-walled border around an all-floor interior,
     /// with the player spawn seated at the top-left interior corner and no enemies or powerups yet.

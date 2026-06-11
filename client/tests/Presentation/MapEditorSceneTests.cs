@@ -1,5 +1,6 @@
 using Godot;
 using Chickensoft.GoDotTest;
+using TankGame.Domain;
 using TankGame.GameLogic;
 using TankGame.Infrastructure;
 using TankGame.Presentation;
@@ -31,7 +32,7 @@ public class MapEditorSceneTests : TestClass
     [Test]
     public void Editor_BuildsThePaletteAndTheActionButtons()
     {
-        foreach (var name in new[] { "Steel", "Bush", "Player", "Enemy", "TeleportPad", "RaiseLayer", "LowerLayer", "Ramp", "Erase", "SizeMedium", "Validate", "TestPlay", "Save", "Back" })
+        foreach (var name in new[] { "Steel", "Bush", "Player", "Enemy", "TeleportPad", "RaiseLayer", "LowerLayer", "Ramp", "Rotate", "Erase", "SizeMedium", "Validate", "TestPlay", "Save", "Back" })
         {
             if (_editor.FindChild(name, recursive: true, owned: false) is not Button)
             {
@@ -50,6 +51,26 @@ public class MapEditorSceneTests : TestClass
         if (scroll.FindChild("Palette", recursive: true, owned: false) is null)
         {
             throw new System.Exception("The palette must be the scroll container's content.");
+        }
+    }
+
+    // Rotation is WYSIWYG (owner feedback 2026-06-11): rotating a placed fence turns its real mesh
+    // a quarter turn in the editor preview, exactly as it will stand in play.
+    [Test]
+    public void RotatingAPlacedFence_TurnsItsMesh_AQuarterTurn()
+    {
+        _editor.NewMap(28, 16);
+        _editor.SelectMaterial(CellMaterial.Brick);
+        _editor.Paint(5, 5);
+        _editor.SelectAction(EditorAction.RotateCell);
+        _editor.Paint(5, 5);
+
+        var wall = _editor.FindChild("Wall_5_5", recursive: true, owned: false) as Node3D
+            ?? throw new System.Exception("The painted fence must render as a wall node.");
+        var quarter = Mathf.Abs(Mathf.Wrap(wall.Rotation.Y, -Mathf.Pi, Mathf.Pi));
+        if (Mathf.Abs(quarter - (Mathf.Pi / 2f)) > 0.01f)
+        {
+            throw new System.Exception($"One rotate must turn the mesh 90°; yaw was {Mathf.RadToDeg(wall.Rotation.Y)}°.");
         }
     }
 
