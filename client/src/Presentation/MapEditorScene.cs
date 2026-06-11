@@ -239,10 +239,19 @@ public partial class MapEditorScene : Node3D
         }
 
         var padColour = new Color(0.3f, 0.85f, 1f); // teleport cyan, mirrors TeleportPad3DView
+        var linkIndex = 0;
         foreach (var pad in _editor.TeleportPads)
         {
             AddMarker(pad.AX, pad.AY, "T", padColour);
             AddMarker(pad.BX, pad.BY, "T", padColour);
+
+            // The pairing reads as a live connection: a pulsing dotted line between the two ends.
+            var link = new TeleportLinkLine { Name = $"PadLink{linkIndex}" };
+            link.Configure(
+                new Vector3((pad.AX + 0.5f) * TileSize, 0f, (pad.AY + 0.5f) * TileSize),
+                new Vector3((pad.BX + 0.5f) * TileSize, 0f, (pad.BY + 0.5f) * TileSize));
+            _gizmos!.AddChild(link);
+            linkIndex++;
         }
 
         if (_editor.PendingTeleportPad is { } pending)
