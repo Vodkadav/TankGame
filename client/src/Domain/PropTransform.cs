@@ -1,8 +1,9 @@
 namespace TankGame.Domain;
 
 /// <summary>The authored pose of a placed prop (owner follow-up 2026-06-11): free rotation on all
-/// three axes plus a uniform size — what the editor's selection gizmo edits. Cosmetic only: the
-/// view poses the mesh; blocking and damage never change. Pure data, no Godot.</summary>
+/// three axes plus a uniform size — what the editor's selection gizmo edits. Rotation is cosmetic
+/// (the view poses the mesh); scale also grows a solid cell's collision footprint so the prop
+/// blocks what it shows, while damage stays routed to real cells. Pure data, no Godot.</summary>
 /// <param name="YawDeg">Turn around the vertical axis, degrees.</param>
 /// <param name="PitchDeg">Tilt around the world X axis, degrees.</param>
 /// <param name="RollDeg">Tilt around the world Z axis, degrees.</param>
