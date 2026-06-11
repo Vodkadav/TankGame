@@ -32,3 +32,7 @@ dist/
 # Art working area + extracted source asset packs (only processed outputs are committed)
 art-wip/
 kenney_*
+
+# …but asset-browser imports are processed outputs: pack-named folders under imported/ DO commit
+!client/src/Presentation/Arena/models/imported/kenney_*/
+!client/src/Presentation/Arena/models/imported/kenney_*/**
