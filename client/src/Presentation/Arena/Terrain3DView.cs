@@ -110,8 +110,15 @@ public partial class Terrain3DView : Node3D
             case CellMaterial.Mountain:
                 // Each mountain cell is one enlarged rock spun to a per-cell angle, so adjacent cells'
                 // rocks overlap and vary into one cohesive rocky mass instead of separate tidy lumps.
+                // The authored pose composes with the spin (its yaw adds), so mountains scale and
+                // rotate under the gizmo like any other placed prop (owner feedback 2026-06-11).
                 var rock = Place(cell.Material, centre, MountainFootprint, $"Mountain_{x}_{y}", baseY);
-                rock.RotateY(Mathf.DegToRad(((x * 71) + (y * 137)) % 360));
+                var rockPose = _grid.TransformAt(x, y);
+                rock.RotationDegrees = new Vector3(
+                    rockPose.PitchDeg,
+                    rockPose.YawDeg + (((x * 71) + (y * 137)) % 360),
+                    rockPose.RollDeg);
+                rock.Scale = Vector3.One * rockPose.Scale;
                 return;
             default:
                 var node = Place(cell.Material, centre, WallFootprint, $"Wall_{x}_{y}", baseY);

@@ -149,6 +149,25 @@ public class MapEditorSceneTests : TestClass
         return null;
     }
 
+    // Every placed prop obeys the gizmo (owner feedback 2026-06-11): mountains had an early-return
+    // render branch that skipped the pose, so size scaling "worked on steel but not mountains".
+    [Test]
+    public void ScalingAMountain_ScalesItsMesh_LikeAnyOtherProp()
+    {
+        _editor.NewMap(28, 16);
+        _editor.SelectMaterial(CellMaterial.Mountain);
+        _editor.Paint(5, 5);
+        _editor.SelectCell(5, 5);
+        _editor.ScaleSelected(2f);
+
+        var rock = _editor.FindChild("Mountain_5_5", recursive: true, owned: false) as Node3D
+            ?? throw new System.Exception("The painted mountain must render.");
+        if (Mathf.Abs(rock.Scale.X - 2f) > 0.01f)
+        {
+            throw new System.Exception($"The size bar must scale the mountain; scale was {rock.Scale.X}.");
+        }
+    }
+
     // The editor views the map from the game's ¾ isometric angle (owner follow-up 2026-06-11) —
     // straight-down made walls read as flat squares and placed items near-impossible to tell apart.
     [Test]
