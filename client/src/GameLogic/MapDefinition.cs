@@ -10,6 +10,15 @@ namespace TankGame.GameLogic;
 /// <param name="Y">Row.</param>
 public readonly record struct PowerupSpawn(PowerupKind Kind, int X, int Y);
 
+/// <summary>A decorative 3D prop placed from the asset browser (owner ask 2026-06-11): purely
+/// cosmetic scenery — no collision, no gameplay. <paramref name="AssetId"/> is the stable
+/// <c>pack/model</c> id of an imported library asset (e.g. <c>kenney_nature-kit/tree_oak</c>);
+/// its pose, if any, lives in <see cref="MapDefinition.Transforms"/> under the same cell.</summary>
+/// <param name="AssetId">The imported asset's <c>pack/model</c> id.</param>
+/// <param name="X">Column.</param>
+/// <param name="Y">Row.</param>
+public readonly record struct Decoration(string AssetId, int X, int Y);
+
 /// <summary>A linked pair of teleport pads on an authored map, given by the two cells they sit on. Driving
 /// onto one pad warps a tank to its partner — across elevation layers too (teleport pads T3): each end's
 /// layer is derived from the cell it sits on in the map's layer grid, never stored here, so the link can
@@ -41,10 +50,12 @@ public sealed class MapDefinition
         int[,]? layers = null,
         bool[,]? ramps = null,
         GroundTheme groundTheme = GroundTheme.Sand,
-        IReadOnlyDictionary<(int X, int Y), PropTransform>? transforms = null)
+        IReadOnlyDictionary<(int X, int Y), PropTransform>? transforms = null,
+        IReadOnlyList<Decoration>? decorations = null)
     {
         GroundTheme = groundTheme;
         Transforms = transforms;
+        Decorations = decorations ?? Array.Empty<Decoration>();
         Name = name ?? throw new ArgumentNullException(nameof(name));
         Materials = materials ?? throw new ArgumentNullException(nameof(materials));
         Width = materials.GetLength(0);
@@ -115,6 +126,10 @@ public sealed class MapDefinition
     /// rotation plus uniform scale, edited by the selection gizmo. Cosmetic — the view poses the
     /// mesh. Null when nothing is posed, keeping the lean document shape.</summary>
     public IReadOnlyDictionary<(int X, int Y), PropTransform>? Transforms { get; }
+
+    /// <summary>Decorative props placed from the asset browser (owner ask 2026-06-11); empty when
+    /// the map has none. Cosmetic scenery only — no collision.</summary>
+    public IReadOnlyList<Decoration> Decorations { get; }
 
     /// <summary>A fresh arena of the given size: a steel-walled border around an all-floor interior,
     /// with the player spawn seated at the top-left interior corner and no enemies or powerups yet.

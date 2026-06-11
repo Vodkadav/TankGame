@@ -120,6 +120,22 @@ public static class MapCodec
 
             writer.WriteEndArray();
 
+            // Decorations only when placed — a prop-free map keeps the lean document shape.
+            if (map.Decorations.Count > 0)
+            {
+                writer.WriteStartArray("decorations");
+                foreach (var decoration in map.Decorations)
+                {
+                    writer.WriteStartObject();
+                    writer.WriteString("asset", decoration.AssetId);
+                    writer.WriteNumber("x", decoration.X);
+                    writer.WriteNumber("y", decoration.Y);
+                    writer.WriteEndObject();
+                }
+
+                writer.WriteEndArray();
+            }
+
             writer.WriteStartArray("teleportPads");
             foreach (var pad in map.TeleportPads)
             {
@@ -208,9 +224,23 @@ public static class MapCodec
                     }
                 }
 
+                var decorations = new List<Decoration>();
+                if (root.TryGetProperty("decorations", out var decorationsElement))
+                {
+                    foreach (var entry in decorationsElement.EnumerateArray())
+                    {
+                        decorations.Add(new Decoration(
+                            entry.GetProperty("asset").GetString()
+                                ?? throw new MapFormatException("decoration is missing 'asset'"),
+                            entry.GetProperty("x").GetInt32(),
+                            entry.GetProperty("y").GetInt32()));
+                    }
+                }
+
                 return new MapDefinition(
                     name, materials, bushes, sandbags, playerSpawn, enemySpawns, powerupSpawns,
-                    teleportPads, layers, ramps, groundTheme, ReadTransforms(root, width, height));
+                    teleportPads, layers, ramps, groundTheme, ReadTransforms(root, width, height),
+                    decorations);
             }
             catch (KeyNotFoundException ex)
             {
