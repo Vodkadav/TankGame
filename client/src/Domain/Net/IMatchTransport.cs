@@ -26,4 +26,21 @@ public interface IMatchTransport
 
     /// <summary>Raised when an authoritative snapshot arrives from the server.</summary>
     event Action<SnapshotFrame> SnapshotReceived;
+
+    // ── Host side (ADR-0019 step 3): under the host-authoritative relay, the authority is the host
+    // CLIENT — it broadcasts the snapshots and receives the guests' relayed inputs over this same
+    // transport. Default members so the many guest-only fakes in tests stay untouched.
+
+    /// <summary>Broadcasts an authoritative snapshot to every guest (host only; the relay routes
+    /// host bytes to all guests).</summary>
+    void SendSnapshot(SnapshotFrame snapshot)
+    {
+    }
+
+    /// <summary>Raised when a guest's relayed input arrives (host only).</summary>
+    event Action<InputFrame> InputReceived
+    {
+        add { }
+        remove { }
+    }
 }

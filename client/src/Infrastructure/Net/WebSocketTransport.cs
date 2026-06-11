@@ -17,8 +17,18 @@ public sealed class WebSocketTransport : IMatchTransport
 
     public event Action<byte>? WelcomeReceived;
     public event Action<SnapshotFrame>? SnapshotReceived;
+    public event Action<InputFrame>? InputReceived;
 
-    public void SendInput(InputFrame input) => _socket.Send(ProtocolCodec.EncodeInput(input));
+    public void SendInput(InputFrame input) => _socket.Send(ProtocolCodec.EncodeInputMessage(input));
+
+    public void SendSnapshot(SnapshotFrame snapshot)
+    {
+        var payload = ProtocolCodec.EncodeSnapshot(snapshot);
+        var message = new byte[payload.Length + 1];
+        message[0] = ProtocolCodec.MsgSnapshot;
+        payload.CopyTo(message, 1);
+        _socket.Send(message);
+    }
 
     /// <summary>Pumps the socket and raises the matching event for every server message that arrived
     /// since the last call, dispatching on its leading kind byte (welcome vs snapshot). Drive it from
@@ -40,6 +50,9 @@ public sealed class WebSocketTransport : IMatchTransport
                     break;
                 case ProtocolCodec.MsgSnapshot:
                     SnapshotReceived?.Invoke(ProtocolCodec.DecodeSnapshot(message.AsSpan(1)));
+                    break;
+                case ProtocolCodec.MsgInput:
+                    InputReceived?.Invoke(ProtocolCodec.DecodeInput(message.AsSpan(1)));
                     break;
             }
         }

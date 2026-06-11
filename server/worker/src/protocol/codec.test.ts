@@ -6,8 +6,10 @@ import {
   decodeSnapshot,
   encodeWelcome,
   encodeSnapshotMessage,
+  encodeInputMessage,
   MSG_WELCOME,
   MSG_SNAPSHOT,
+  MSG_INPUT,
   FIRE_BIT,
   type SnapshotFrame,
 } from "./codec";
@@ -52,6 +54,20 @@ describe("protocol codec", () => {
     const message = encodeSnapshotMessage(frame);
     expect(message[0]).toBe(MSG_SNAPSHOT);
     expect(decodeSnapshot(message.subarray(1))).toEqual(frame);
+  });
+
+  // ADR-0019 step 3: inputs gained a kind tag — the relay forwards guest bytes to the host CLIENT,
+  // whose one socket also carries the welcome, so every message must self-identify.
+  it("encodes an input message to the tagged canonical byte vector", () => {
+    const bytes = [...encodeInputMessage({ seq: 1, moveX: 1, moveY: -1, aim: 0.5, buttons: 1 })];
+    expect(bytes).toEqual([
+      MSG_INPUT, // 0x03
+      0x01, 0x00, 0x00, 0x00, // seq = 1
+      0x00, 0x00, 0x80, 0x3f, // moveX = 1.0
+      0x00, 0x00, 0x80, 0xbf, // moveY = -1.0
+      0x00, 0x00, 0x00, 0x3f, // aim = 0.5
+      0x01, // buttons = fire
+    ]);
   });
 
   it("encodes an InputFrame to the canonical byte vector", () => {

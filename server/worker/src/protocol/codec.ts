@@ -39,16 +39,27 @@ export const TANK_STATE_SIZE = 19;
 export const WALL_DELTA_SIZE = 6;
 export const FIRE_BIT = 1 << 0;
 
-// Server→client messages share one socket, so each is tagged with a leading kind byte: a Welcome
-// (sent once on connect, carrying the player's assigned slot) or a Snapshot. Inputs (client→server)
-// are untagged — the server only ever receives that one kind. The C# client mirrors these tags
-// (TankGame.Domain.Net.ProtocolCodec) and the welcome byte vector is a cross-language parity anchor.
+// Every message is tagged with a leading kind byte: a Welcome (sent once on connect, carrying the
+// player's assigned slot), a Snapshot, or an Input. Inputs are tagged too (ADR-0019 step 3) — the
+// relay forwards guest bytes to the HOST CLIENT, whose one socket also carries the welcome, so each
+// message must self-identify. The C# client mirrors these tags (TankGame.Domain.Net.ProtocolCodec)
+// and the byte vectors in codec.test.ts are cross-language parity anchors.
 export const MSG_WELCOME = 1;
 export const MSG_SNAPSHOT = 2;
+export const MSG_INPUT = 3;
 
 /** A welcome message: `[MSG_WELCOME, slot]`. Tells a freshly-joined client which slot it controls. */
 export function encodeWelcome(slot: number): Uint8Array {
   return new Uint8Array([MSG_WELCOME, slot & 0xff]);
+}
+
+/** An input message: `[MSG_INPUT, ...encodeInput(frame)]` — what a guest puts on the socket. */
+export function encodeInputMessage(frame: InputFrame): Uint8Array {
+  const payload = encodeInput(frame);
+  const message = new Uint8Array(payload.length + 1);
+  message[0] = MSG_INPUT;
+  message.set(payload, 1);
+  return message;
 }
 
 /** A snapshot message: `[MSG_SNAPSHOT, ...encodeSnapshot(frame)]`. */
