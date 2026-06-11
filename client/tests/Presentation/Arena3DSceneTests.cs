@@ -42,10 +42,11 @@ public class Arena3DSceneTests : TestClass
         System.GC.Collect();
     }
 
-    // The match-over screen (owner feedback 2026-06-11): a banner, New Game / Back to Menu / Exit
-    // buttons, a per-tank stats table, and award tags beside the relevant tanks.
+    // Victory screen v2 (owner ask 2026-06-11): the celebration banner artwork with the champion's
+    // name over its ribbon (a team win names the top-killer member), a scrollable leaderboard over
+    // the art's plaque, and arrows panning between ranking views.
     [Test]
-    public void ShowMatchOver_PresentsTheBanner_StatsTable_AndAwards()
+    public void ShowMatchOver_PresentsTheBannerArt_Champion_AndPannableLeaderboard()
     {
         var scene = (Arena3DScene)_arena;
         scene.ShowMatchOver(new MatchResult(Decided: true, WinningTeam: 0)); // the player team survived
@@ -55,14 +56,22 @@ public class Arena3DSceneTests : TestClass
             throw new System.Exception("Showing match-over must freeze the match.");
         }
 
-        var outcome = _arena.FindChild("Outcome", recursive: true, owned: false) as Label
-            ?? throw new System.Exception("The match-over screen must show an outcome banner.");
-        if (outcome.Text != "hud.you_win")
+        var banner = _arena.FindChild("Banner", recursive: true, owned: false) as TextureRect;
+        if (banner?.Texture is null)
         {
-            throw new System.Exception($"The player team won, so the banner must be the victory key; got '{outcome.Text}'.");
+            throw new System.Exception("The match-over screen must show the victory banner artwork.");
         }
 
-        foreach (var name in new[] { "NewGame", "BackToMenu", "ExitGame" })
+        // A fresh match has no kills — the tie-break lands on the first winning-team member, the
+        // player, whose chosen name is "Tester" (set in Setup).
+        var winner = _arena.FindChild("WinnerName", recursive: true, owned: false) as Label
+            ?? throw new System.Exception("The banner must carry the champion's name.");
+        if (winner.Text != "Tester")
+        {
+            throw new System.Exception($"The winning team's top member must headline; got '{winner.Text}'.");
+        }
+
+        foreach (var name in new[] { "NewGame", "BackToMenu", "ExitGame", "PrevView", "NextView" })
         {
             if (_arena.FindChild(name, recursive: true, owned: false) is not Button)
             {
@@ -70,30 +79,35 @@ public class Arena3DSceneTests : TestClass
             }
         }
 
-        var table = _arena.FindChild("StatsTable", recursive: true, owned: false) as GridContainer
-            ?? throw new System.Exception("The match-over screen must show the per-tank stats table.");
-        var expectedRows = 1 + 4; // header + the player and three AI tanks
-        if (table.GetChildCount() != table.Columns * expectedRows)
+        var rows = _arena.FindChild("LeaderboardRows", recursive: true, owned: false) as VBoxContainer
+            ?? throw new System.Exception("The match-over screen must show the leaderboard rows.");
+        if (rows.GetChildCount() != 4)
         {
-            throw new System.Exception(
-                $"Expected {expectedRows} rows of {table.Columns} cells, got {table.GetChildCount()} cells.");
+            throw new System.Exception($"All four tanks must rank on the board; saw {rows.GetChildCount()} rows.");
         }
 
-        // A fresh match has no kills, but Most Evasive is always awardable — at least one award
-        // tag must appear in the awards column.
-        var anyAward = false;
-        for (var i = 0; i < table.GetChildCount(); i++)
+        if (rows.GetParent() is not ScrollContainer)
         {
-            if (table.GetChild(i) is Label { Name: var n } label && n.ToString().StartsWith("Award") &&
-                label.Text.Length > 0)
-            {
-                anyAward = true;
-            }
+            throw new System.Exception("The leaderboard must scroll, so any tank count fits the plaque.");
         }
 
-        if (!anyAward)
+        var title = _arena.FindChild("ViewTitle", recursive: true, owned: false) as Label
+            ?? throw new System.Exception("The leaderboard must name its current view.");
+        if (title.Text != "stats.kills")
         {
-            throw new System.Exception("At least one tank must wear an award tag.");
+            throw new System.Exception($"The board opens on kills; got '{title.Text}'.");
+        }
+
+        scene.SwitchView(1);
+        if (title.Text != "stats.deaths")
+        {
+            throw new System.Exception($"The arrows must pan to the next ranking view; got '{title.Text}'.");
+        }
+
+        scene.SwitchView(-2); // wraps backward past the first view
+        if (title.Text != "stats.assists")
+        {
+            throw new System.Exception($"Panning must wrap around the view ring; got '{title.Text}'.");
         }
     }
 

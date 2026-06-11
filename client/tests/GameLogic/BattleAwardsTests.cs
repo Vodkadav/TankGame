@@ -101,6 +101,30 @@ public class BattleAwardsTests
         Assert.Equal("Kevin", awards.Single(a => a.Kind == AwardKind.BulletSponge).Winner.Name);
     }
 
+    // ── The banner's champion (victory screen v2): the winning team's top killer ──
+
+    [Fact]
+    public void Champion_IsTheWinningTeamsTopKiller_DamageBreaksTies()
+    {
+        var tallies = new[]
+        {
+            Tally("Greg", kills: 5, dealt: 9),   // not on the winning team — irrelevant
+            Tally("Kevin", kills: 2, dealt: 3),
+            Tally("Crouton", kills: 2, dealt: 7),
+        };
+        tallies[0].Team = 1;
+        tallies[1].Team = 0;
+        tallies[2].Team = 0;
+
+        Assert.Equal("Crouton", BattleAwards.Champion(tallies, winningTeam: 0)!.Name);
+    }
+
+    [Fact]
+    public void Champion_IsNull_OnADraw()
+    {
+        Assert.Null(BattleAwards.Champion(new[] { Tally("Greg") }, winningTeam: null));
+    }
+
     [Fact]
     public void OneTank_CanSweepSeveralAwards()
     {

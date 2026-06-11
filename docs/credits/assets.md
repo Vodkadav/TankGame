@@ -21,3 +21,4 @@
 
 When a Kenney pack is integrated, snapshot its license into `docs/licenses/` and
 update the affected row (Kenney license ≈ CC0, no attribution required).
+| `client/src/Presentation/Arena/ui/victory_banner.png` | Owner-supplied AI-generated template ("victory template", from the local asset library `Assets/visual/ui`) | Owner-generated placeholder art (project-internal) | The victory screen v2 backdrop: a cartoon celebration banner with a wood ribbon and a five-row plaque frame. The baked "[PLACEHOLDER]" ribbon text is covered at runtime by a wood-toned backing carrying the real champion name, and the leaderboard scrolls over the plaque region, so the art needs no per-locale variants. To be re-exported text-free for a cleaner look. |

@@ -29,6 +29,23 @@ public static class BattleAwards
     /// single lucky pellet is not marksmanship.</summary>
     public const int SharpshooterMinShots = 3;
 
+    /// <summary>The banner's headliner (victory screen v2): the winning team's top killer, damage
+    /// dealt breaking ties and spawn order after that. Null on a draw — nobody is victorious.</summary>
+    public static BattleStats.TankTally? Champion(
+        IReadOnlyList<BattleStats.TankTally> tallies, int? winningTeam)
+    {
+        if (winningTeam is not int team)
+        {
+            return null;
+        }
+
+        return tallies
+            .Where(t => t.Team == team)
+            .OrderByDescending(t => t.Kills)
+            .ThenByDescending(t => t.DamageDealt)
+            .FirstOrDefault();
+    }
+
     public static IReadOnlyList<(AwardKind Kind, BattleStats.TankTally Winner)> Compute(
         IReadOnlyList<BattleStats.TankTally> tallies)
     {
