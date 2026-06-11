@@ -38,6 +38,12 @@ public partial class TitleScene : Control
         selectMap.Pressed += () => Go(MapSelectScenePath);
         menu.AddChild(selectMap);
 
+        // Authoring is its own activity, not a step of choosing what to play — the editor gets its
+        // own menu entry (owner feedback 2026-06-11).
+        var editor = Button("Editor", "title.editor");
+        editor.Pressed += () => Go(MapEditorScene.MapEditorScenePath);
+        menu.AddChild(editor);
+
         var exit = Button("Exit", "title.exit");
         exit.Pressed += () => GetTree().Quit();
         menu.AddChild(exit);

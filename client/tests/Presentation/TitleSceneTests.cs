@@ -30,7 +30,7 @@ public class TitleSceneTests : TestClass
     [Test]
     public void Title_OffersTheSlimmedMenu()
     {
-        foreach (var name in new[] { "Solo", "TeamVsTeam", "SelectMap", "Exit" })
+        foreach (var name in new[] { "Solo", "TeamVsTeam", "SelectMap", "Editor", "Exit" })
         {
             if (_title.FindChild(name, recursive: true, owned: false) is not Button)
             {
@@ -68,6 +68,7 @@ public class TitleSceneTests : TestClass
         TranslationServer.SetLocale("dk");
         AssertButton("Solo", "Solo");
         AssertButton("SelectMap", "Vælg bane");
+        AssertButton("Editor", "Baneeditor");
         AssertButton("Exit", "Afslut");
     }
 

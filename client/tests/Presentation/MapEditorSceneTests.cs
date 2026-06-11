@@ -40,6 +40,48 @@ public class MapEditorSceneTests : TestClass
         }
     }
 
+    // The palette outgrew the screen (owner feedback 2026-06-11): it must live in a scroll container so
+    // every tool stays reachable on any window size.
+    [Test]
+    public void Editor_PaletteScrolls_SoEveryToolStaysReachable()
+    {
+        var scroll = _editor.FindChild("PaletteScroll", recursive: true, owned: false) as ScrollContainer
+            ?? throw new System.Exception("The tool palette must sit inside a 'PaletteScroll' ScrollContainer.");
+        if (scroll.FindChild("Palette", recursive: true, owned: false) is null)
+        {
+            throw new System.Exception("The palette must be the scroll container's content.");
+        }
+    }
+
+    // The 3D build renders Brick as a fence and sandbags as oil spills — the tool labels must say what
+    // the player actually sees (owner feedback 2026-06-11).
+    [Test]
+    public void Editor_LabelsTheTools_AsTheyRender()
+    {
+        var original = TranslationServer.GetLocale();
+        try
+        {
+            TranslationServer.SetLocale("en");
+            AssertToolLabel("Brick", "Fence");
+            AssertToolLabel("Sandbag", "Oil Spill");
+        }
+        finally
+        {
+            TranslationServer.SetLocale(original);
+        }
+    }
+
+    private void AssertToolLabel(string buttonName, string expected)
+    {
+        var button = _editor.FindChild(buttonName, recursive: true, owned: false) as Button
+            ?? throw new System.Exception($"Missing '{buttonName}' button.");
+        var rendered = button.Tr(button.Text).ToString();
+        if (rendered != expected)
+        {
+            throw new System.Exception($"Tool '{buttonName}' must be labelled '{expected}'; rendered '{rendered}'.");
+        }
+    }
+
     [Test]
     public void PaintingAnEnemySpawn_MakesTheMapSaveableAndPlayable()
     {
