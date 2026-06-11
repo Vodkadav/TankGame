@@ -76,6 +76,10 @@ public sealed class Projectile : IProjectile
     /// a piercing shot lingering over the same tank does not damage it every tick.</summary>
     public bool HasHit(Guid tankId) => _state.HitTanks.Contains(tankId);
 
+    /// <summary>How many tanks this shot has damaged — 0 when it dies on a wall means a miss
+    /// (<see cref="BattleStats"/> reads it at despawn).</summary>
+    public int TanksHit => _state.HitTanks.Count;
+
     /// <summary>Records a tank hit and spends one unit of the shared pierce budget: a shot with
     /// budget left passes through (stays alive); one with none stops here. The combat resolver
     /// calls this after applying the damage.</summary>

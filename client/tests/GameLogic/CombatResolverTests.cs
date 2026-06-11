@@ -135,6 +135,25 @@ public class CombatResolverTests
     }
 
     [Fact]
+    public void Hit_CarriesTheShooterAndVictimIdentities()
+    {
+        // Per-tank stats (BattleStats) need who shot whom, not just the teams.
+        var shooter = TankAt(new Vector2(200f, 0f), team: 0);
+        var victim = TankAt(Vector2.Zero, team: 1);
+        var shot = new Projectile(new OpenArena(), victim.Position, new Vector2(1f, 0f),
+            speed: 600f, damage: 1, team: shooter.Team, owner: shooter.Id);
+        var resolver = new CombatResolver(HitRadius);
+        CombatResolver.CombatHit? captured = null;
+        resolver.Hit += hit => captured = hit;
+
+        resolver.Resolve(new List<IEntity> { shooter, victim, shot });
+
+        Assert.NotNull(captured);
+        Assert.Equal(shooter.Id, captured!.Value.Shooter);
+        Assert.Equal(victim.Id, captured.Value.Victim);
+    }
+
+    [Fact]
     public void AFatalHit_RaisesTankKilled_WithTheShootersTeam()
     {
         var tank = TankAt(Vector2.Zero, team: 0);
