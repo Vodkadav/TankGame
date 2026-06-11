@@ -21,6 +21,7 @@ public partial class Tank3DView : Node3D
     private const float BarHeight = 6f;
     private const float HealthBarY = 84f;
     private const float ShieldBarY = HealthBarY + BarHeight + 2f;
+    private const float NameTagY = ShieldBarY + BarHeight + 8f;
 
     private ITank? _tank;
     private Node3D _hull = null!;
@@ -49,8 +50,29 @@ public partial class Tank3DView : Node3D
         ApplyStealthTint(); // apply any team/stealth tint set before the tree entry
 
         BuildBars();
+        BuildNameTag();
         BuildSmoke();
         BuildLandingDust();
+    }
+
+    // The tank's battle name floats above its bars. A child of this view, so concealment — which hides
+    // the whole view — hides the name with it: a bush-lurker's name never gives it away.
+    private void BuildNameTag()
+    {
+        var name = _tank?.DisplayName ?? string.Empty;
+        AddChild(new Label3D
+        {
+            Name = "NameTag",
+            Text = name,
+            Visible = name.Length > 0,
+            FontSize = 40,
+            Modulate = new Color(0.95f, 0.95f, 0.9f),
+            OutlineModulate = new Color(0f, 0f, 0f),
+            OutlineSize = 10,
+            Billboard = BaseMaterial3D.BillboardModeEnum.Enabled,
+            NoDepthTest = true,
+            Position = new Vector3(0f, NameTagY, 0f),
+        });
     }
 
     public void Bind(ITank tank) => _tank = tank;

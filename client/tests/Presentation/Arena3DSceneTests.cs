@@ -13,9 +13,13 @@ public class Arena3DSceneTests : TestClass
 
     public Arena3DSceneTests(Node testScene) : base(testScene) { }
 
+    private string _previousPlayerName = "";
+
     [Setup]
     public void Setup()
     {
+        _previousPlayerName = GameSetup.PlayerName;
+        GameSetup.PlayerName = "Tester";
         _arena = GD.Load<PackedScene>("res://src/Presentation/Arena/Arena3D.tscn").Instantiate();
         TestScene.AddChild(_arena); // runs Arena3DScene._Ready
     }
@@ -27,6 +31,7 @@ public class Arena3DSceneTests : TestClass
     [Cleanup]
     public void Cleanup()
     {
+        GameSetup.PlayerName = _previousPlayerName;
         if (GodotObject.IsInstanceValid(_arena))
         {
             _arena.Free();
@@ -35,6 +40,43 @@ public class Arena3DSceneTests : TestClass
         System.GC.Collect();
         System.GC.WaitForPendingFinalizers();
         System.GC.Collect();
+    }
+
+    // Every tank carries a name tag above its bars (owner feedback 2026-06-11): the player's chosen
+    // name, derpy generated ones for the AI. The tag is a child of the view, so concealment (which
+    // hides the whole view) hides the name too — a bush-lurker's name never floats over the bush.
+    [Test]
+    public void Arena3D_NamesEveryTank_PlayerFromSetup_EnemiesFromTheGenerator()
+    {
+        var names = new System.Collections.Generic.List<string>();
+        var sawPlayerName = false;
+        foreach (var child in _arena.GetChildren())
+        {
+            if (child is not Tank3DView view)
+            {
+                continue;
+            }
+
+            var tag = view.FindChild("NameTag", recursive: true, owned: false) as Label3D
+                ?? throw new System.Exception("Every tank view must carry a 'NameTag' label.");
+            if (string.IsNullOrWhiteSpace(tag.Text))
+            {
+                throw new System.Exception("Every tank in a solo match must be named.");
+            }
+
+            names.Add(tag.Text);
+            sawPlayerName |= tag.Text == "Tester";
+        }
+
+        if (!sawPlayerName)
+        {
+            throw new System.Exception("The player's tank must wear the name chosen at the title screen.");
+        }
+
+        if (names.Count != new System.Collections.Generic.HashSet<string>(names).Count)
+        {
+            throw new System.Exception("Tank names must be unique within a match.");
+        }
     }
 
     [Test]

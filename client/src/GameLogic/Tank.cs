@@ -45,6 +45,8 @@ public sealed class Tank : ITank
     /// <param name="layer">The elevation layer the tank fights on (ADR-0018): it only hits and is hit
     /// by tanks on the same layer, and changes layer only by crossing a ramp. Default 0 = the ground
     /// layer (a flat, single-layer arena).</param>
+    /// <param name="displayName">The name shown above the tank (the player's chosen name or an AI's
+    /// generated one). Blank = no name tag.</param>
     public Tank(
         IInputSource input,
         IWorld world,
@@ -58,13 +60,15 @@ public sealed class Tank : ITank
         int lives = 1,
         ITerrain? terrain = null,
         int layer = 0,
-        ITeleporter? teleporter = null)
+        ITeleporter? teleporter = null,
+        string displayName = "")
     {
         Id = Guid.NewGuid();
         MaxHp = maxHp;
         Hp = maxHp;
         Team = team;
         Layer = layer;
+        DisplayName = displayName;
         _livesRemaining = lives;
         _input = input;
         _world = world;
@@ -124,6 +128,7 @@ public sealed class Tank : ITank
     public int MaxHp { get; }
     public int Team { get; }
     public int Shield { get; private set; }
+    public string DisplayName { get; }
 
     /// <summary>The elevation layer this tank fights on (ADR-0018): combat and (later) collision act
     /// only within a layer, and it changes only by crossing a ramp. 0 is the ground layer.</summary>

@@ -38,6 +38,11 @@ public static class GameSetup
 
     public static GameMode Mode { get; set; } = GameMode.OnePlayer;
 
+    /// <summary>The player's chosen battle name (the title screen prompts for it before any game and
+    /// remembers it in <c>user://settings.cfg</c>). Blank only when no prompt has run — the play
+    /// scenes fall back to "Player".</summary>
+    public static string PlayerName { get; set; } = "";
+
     /// <summary>The chosen battle arena (the Select Map screen sets it). Only <see cref="ArenaId.DesertWar"/>
     /// is playable today; it is the map the 3D play scene builds.</summary>
     public static ArenaId Arena { get; set; } = ArenaId.DesertWar;

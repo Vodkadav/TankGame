@@ -498,13 +498,16 @@ public partial class Arena3DScene : Node3D
     private void SpawnTanks()
     {
         var p1Input = new KeyboardMouse3DInputSource(_camera, fireOnClick: true);
+        var playerName = GameSetup.PlayerName.Length > 0 ? GameSetup.PlayerName : "Player";
         var player = new Tank(p1Input, _world, _arena, CellCentre(_playerSpawn.X, _playerSpawn.Y),
             TankSpeed, FireInterval, ProjectileSpeed, maxHp: TankMaxHp, team: PlayerTeam, lives: StartingLives,
-            terrain: _sandbags, teleporter: _teleporter);
+            terrain: _sandbags, teleporter: _teleporter, displayName: playerName);
         _player = player;
         _viewers.Add(player); // the player's sight reveals the field; co-op allies would join this list
         SpawnTank(player);
 
+        // Seeded by the arena so a best-of-N series keeps its cast of derpy adversaries.
+        var names = new TankNameGenerator(GameSetup.ArenaSeed);
         var enemyIndex = 0;
         foreach (var (ex, ey) in _enemySpawns)
         {
@@ -512,7 +515,7 @@ public partial class Arena3DScene : Node3D
             var ai = new AiInputSource(_world, _arena, _bushes, ambusher, _grid, TileSize, GridOrigin);
             var enemy = new Tank(ai, _world, _arena, CellCentre(ex, ey),
                 EnemySpeed, FireInterval, ProjectileSpeed, maxHp: TankMaxHp, team: EnemyTeam, lives: StartingLives,
-                terrain: _sandbags, teleporter: _teleporter);
+                terrain: _sandbags, teleporter: _teleporter, displayName: names.Next());
             ai.Bind(enemy);
             SpawnTank(enemy);
             enemyIndex++;
