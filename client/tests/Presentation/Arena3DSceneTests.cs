@@ -42,6 +42,61 @@ public class Arena3DSceneTests : TestClass
         System.GC.Collect();
     }
 
+    // The match-over screen (owner feedback 2026-06-11): a banner, New Game / Back to Menu / Exit
+    // buttons, a per-tank stats table, and award tags beside the relevant tanks.
+    [Test]
+    public void ShowMatchOver_PresentsTheBanner_StatsTable_AndAwards()
+    {
+        var scene = (Arena3DScene)_arena;
+        scene.ShowMatchOver(new MatchResult(Decided: true, WinningTeam: 0)); // the player team survived
+
+        if (!scene.IsMatchOver)
+        {
+            throw new System.Exception("Showing match-over must freeze the match.");
+        }
+
+        var outcome = _arena.FindChild("Outcome", recursive: true, owned: false) as Label
+            ?? throw new System.Exception("The match-over screen must show an outcome banner.");
+        if (outcome.Text != "hud.you_win")
+        {
+            throw new System.Exception($"The player team won, so the banner must be the victory key; got '{outcome.Text}'.");
+        }
+
+        foreach (var name in new[] { "NewGame", "BackToMenu", "ExitGame" })
+        {
+            if (_arena.FindChild(name, recursive: true, owned: false) is not Button)
+            {
+                throw new System.Exception($"The match-over screen must offer a '{name}' button.");
+            }
+        }
+
+        var table = _arena.FindChild("StatsTable", recursive: true, owned: false) as GridContainer
+            ?? throw new System.Exception("The match-over screen must show the per-tank stats table.");
+        var expectedRows = 1 + 4; // header + the player and three AI tanks
+        if (table.GetChildCount() != table.Columns * expectedRows)
+        {
+            throw new System.Exception(
+                $"Expected {expectedRows} rows of {table.Columns} cells, got {table.GetChildCount()} cells.");
+        }
+
+        // A fresh match has no kills, but Most Evasive is always awardable — at least one award
+        // tag must appear in the awards column.
+        var anyAward = false;
+        for (var i = 0; i < table.GetChildCount(); i++)
+        {
+            if (table.GetChild(i) is Label { Name: var n } label && n.ToString().StartsWith("Award") &&
+                label.Text.Length > 0)
+            {
+                anyAward = true;
+            }
+        }
+
+        if (!anyAward)
+        {
+            throw new System.Exception("At least one tank must wear an award tag.");
+        }
+    }
+
     // Every tank carries a name tag above its bars (owner feedback 2026-06-11): the player's chosen
     // name, derpy generated ones for the AI. The tag is a child of the view, so concealment (which
     // hides the whole view) hides the name too — a bush-lurker's name never floats over the bush.

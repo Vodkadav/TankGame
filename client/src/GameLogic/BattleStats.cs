@@ -12,18 +12,19 @@ namespace TankGame.GameLogic;
 /// Deaths count lethal shot hits only; an airstrike kill is currently untallied. Pure C#.</summary>
 public sealed class BattleStats
 {
-    /// <summary>One tank's running tally. Mutable — the screen reads it once at match end.</summary>
+    /// <summary>One tank's running tally. A dumb mutable record — the screen reads it at match end,
+    /// and award/test code may construct them directly.</summary>
     public sealed class TankTally
     {
-        public string Name { get; internal set; } = string.Empty;
-        public int Team { get; internal set; }
-        public int ShotsFired { get; internal set; }
-        public int Hits { get; internal set; }
-        public int Misses { get; internal set; }
-        public int Kills { get; internal set; }
-        public int Deaths { get; internal set; }
-        public int DamageDealt { get; internal set; }
-        public int DamageTaken { get; internal set; }
+        public string Name { get; set; } = string.Empty;
+        public int Team { get; set; }
+        public int ShotsFired { get; set; }
+        public int Hits { get; set; }
+        public int Misses { get; set; }
+        public int Kills { get; set; }
+        public int Deaths { get; set; }
+        public int DamageDealt { get; set; }
+        public int DamageTaken { get; set; }
     }
 
     private readonly Dictionary<Guid, TankTally> _byTank = new();
