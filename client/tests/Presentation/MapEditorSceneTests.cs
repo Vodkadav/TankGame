@@ -54,6 +54,51 @@ public class MapEditorSceneTests : TestClass
         }
     }
 
+    // The editor views the map from the game's ¾ isometric angle (owner follow-up 2026-06-11) —
+    // straight-down made walls read as flat squares and placed items near-impossible to tell apart.
+    [Test]
+    public void EditorCamera_UsesTheIsometricAngle_NotTopDown()
+    {
+        var camera = _editor.FindChild("EditorCamera", recursive: true, owned: false) as Camera3D
+            ?? throw new System.Exception("Missing the editor camera.");
+        var pitch = Mathf.RadToDeg(camera.Rotation.X);
+        if (pitch <= -80f)
+        {
+            throw new System.Exception($"The editor must use the ¾ view, not top-down; pitch was {pitch}°.");
+        }
+
+        if (Mathf.Abs(Mathf.RadToDeg(camera.Rotation.Y)) < 5f)
+        {
+            throw new System.Exception("The ¾ view must be turned to the isometric yaw, not facing flat north.");
+        }
+    }
+
+    // The theme picker flies out BESIDE the palette (owner follow-up 2026-06-11), not inline where
+    // it shoves every tool below it down.
+    [Test]
+    public void FloorThemes_FlyOutBesideThePalette_NotInsideIt()
+    {
+        var themes = _editor.FindChild("FloorThemes", recursive: true, owned: false) as Control
+            ?? throw new System.Exception("Missing the 'FloorThemes' picker.");
+        if (themes.GetParent()?.Name.ToString() == "Palette")
+        {
+            throw new System.Exception("The theme picker must fly out beside the palette, not expand inside it.");
+        }
+    }
+
+    // The bottom action bar grew DOWN from the bottom edge, so its buttons stuck outside the window
+    // (owner follow-up 2026-06-11) — it must grow upward instead.
+    [Test]
+    public void BottomActionBar_GrowsUpward_SoItStaysOnScreen()
+    {
+        var bar = _editor.FindChild("Actions", recursive: true, owned: false) as Control
+            ?? throw new System.Exception("Missing the bottom action bar.");
+        if (bar.GrowVertical != Control.GrowDirection.Begin)
+        {
+            throw new System.Exception("The bottom bar must grow upward from the bottom edge.");
+        }
+    }
+
     // Rotation is WYSIWYG (owner feedback 2026-06-11): rotating a placed fence turns its real mesh
     // a quarter turn in the editor preview, exactly as it will stand in play.
     [Test]
