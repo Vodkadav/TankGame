@@ -12,6 +12,10 @@ public enum EditorAction
     ToggleSandbag,
     SetPlayerSpawn,
     ToggleEnemySpawn,
+
+    /// <summary>The unified spawn tool (owner follow-up 2026-06-11): one numbered pool of up to
+    /// eight markers; marker 1 doubles as the format's player slot.</summary>
+    ToggleSpawn,
     TogglePowerup,
     PlaceTeleportPad,
     RaiseLayer,
@@ -125,6 +129,45 @@ public sealed class MapEditor
 
     public IReadOnlyList<(int X, int Y)> EnemySpawns => _enemySpawns;
 
+    /// <summary>The unified spawn pool in marker order: marker 1 (the format's player slot) first,
+    /// then the rest. The editor draws these as the numbered ringed discs.</summary>
+    public IReadOnlyList<(int X, int Y)> Spawns
+    {
+        get
+        {
+            var spawns = new List<(int X, int Y)>(1 + _enemySpawns.Count) { _playerSpawn };
+            spawns.AddRange(_enemySpawns);
+            return spawns;
+        }
+    }
+
+    // Toggle a marker on the unified pool: clicking marker 1 removes it by promoting marker 2 into
+    // the player slot (the last marker can never be removed — a map always has a spawn); clicking
+    // any other marker removes it; clicking empty floor adds one up to the 4v4 cap.
+    private void ToggleSpawn(int x, int y)
+    {
+        if (_playerSpawn == (x, y))
+        {
+            if (_enemySpawns.Count > 0)
+            {
+                _playerSpawn = _enemySpawns[0];
+                _enemySpawns.RemoveAt(0);
+            }
+
+            return;
+        }
+
+        if (_enemySpawns.Remove((x, y)))
+        {
+            return;
+        }
+
+        if (1 + _enemySpawns.Count < MapValidator.MaxTankSpawns)
+        {
+            _enemySpawns.Add((x, y));
+        }
+    }
+
     public IReadOnlyList<PowerupSpawn> PowerupSpawns => _powerupSpawns;
 
     public IReadOnlyList<TeleportPadLink> TeleportPads => _teleportPads;
@@ -184,6 +227,10 @@ public sealed class MapEditor
                     _enemySpawns.Add((x, y));
                 }
 
+                break;
+
+            case EditorAction.ToggleSpawn when IsFloor(x, y):
+                ToggleSpawn(x, y);
                 break;
 
             case EditorAction.TogglePowerup when IsFloor(x, y):

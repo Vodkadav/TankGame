@@ -119,6 +119,53 @@ public class MapEditorTests
         Assert.Equal("Test Map", editor.ToMap().Name);
     }
 
+    // ── Unified spawn markers (owner follow-up 2026-06-11): one Spawn tool, one numbered pool ──
+
+    [Fact]
+    public void ToggleSpawn_GrowsThePool_AndMarkerOneIsTheFirst()
+    {
+        var editor = Medium();
+        editor.Action = EditorAction.ToggleSpawn;
+        editor.ApplyAt(5, 5);
+        editor.ApplyAt(9, 9);
+
+        Assert.Equal(3, editor.Spawns.Count); // the default (1,1) plus the two placed
+        Assert.Equal((1, 1), editor.Spawns[0]);
+        Assert.Equal((5, 5), editor.Spawns[1]);
+        Assert.Equal((9, 9), editor.Spawns[2]);
+    }
+
+    [Fact]
+    public void ToggleSpawn_RemovingMarkerOne_PromotesTheNext()
+    {
+        var editor = Medium();
+        editor.Action = EditorAction.ToggleSpawn;
+        editor.ApplyAt(5, 5);
+
+        editor.ApplyAt(1, 1); // toggle the default first marker away
+
+        Assert.Single(editor.Spawns);
+        Assert.Equal((5, 5), editor.Spawns[0]); // promoted to marker 1
+        Assert.Equal((5, 5), editor.PlayerSpawn); // the format's player slot follows
+    }
+
+    [Fact]
+    public void ToggleSpawn_NeverRemovesTheLastMarker_AndCapsAtEight()
+    {
+        var editor = Medium();
+        editor.Action = EditorAction.ToggleSpawn;
+
+        editor.ApplyAt(1, 1); // the only marker — removal refused
+        Assert.Single(editor.Spawns);
+
+        for (var i = 0; i < 9; i++)
+        {
+            editor.ApplyAt(3 + i, 4);
+        }
+
+        Assert.Equal(MapValidator.MaxTankSpawns, editor.Spawns.Count); // the ninth was refused
+    }
+
     [Fact]
     public void ToggleEnemySpawn_RefusesANinthTankSpawn()
     {

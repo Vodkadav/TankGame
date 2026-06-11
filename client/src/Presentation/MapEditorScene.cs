@@ -284,14 +284,15 @@ public partial class MapEditorScene : Node3D
         _gizmos?.Free();
         _gizmos = new Node3D { Name = "Gizmos" };
         AddChild(_gizmos);
-        // Numbered spawn markers (owner feedback 2026-06-11): the player is "1", each enemy takes
-        // the next number, so a creator can track which of the up-to-8 tank spawns is which.
-        AddMarker(_editor.PlayerSpawn.X, _editor.PlayerSpawn.Y, "1", new Color(0.4f, 1f, 0.4f));
-        var spawnNumber = 2;
-        foreach (var (x, y) in _editor.EnemySpawns)
+        // The unified numbered spawn pool (owner follow-up 2026-06-11), drawn as the ringed-disc
+        // gizmo so every marker is unmissable while authoring.
+        var spawnNumber = 1;
+        foreach (var (x, y) in _editor.Spawns)
         {
-            AddMarker(x, y, spawnNumber.ToString(System.Globalization.CultureInfo.InvariantCulture),
-                new Color(1f, 0.4f, 0.4f));
+            var marker = new SpawnMarker3D { Name = $"Spawn{spawnNumber}" };
+            marker.Configure(spawnNumber);
+            marker.Position = new Vector3((x + 0.5f) * TileSize, 0f, (y + 0.5f) * TileSize);
+            _gizmos.AddChild(marker);
             spawnNumber++;
         }
 
@@ -469,8 +470,7 @@ public partial class MapEditorScene : Node3D
 
         palette.AddChild(ToolButton("Bush", "editor.bush", () => SelectAction(EditorAction.ToggleBush)));
         palette.AddChild(ToolButton("Sandbag", "editor.sandbag", () => SelectAction(EditorAction.ToggleSandbag)));
-        palette.AddChild(ToolButton("Player", "editor.player", () => SelectAction(EditorAction.SetPlayerSpawn)));
-        palette.AddChild(ToolButton("Enemy", "editor.enemy", () => SelectAction(EditorAction.ToggleEnemySpawn)));
+        palette.AddChild(ToolButton("Spawn", "editor.spawn", () => SelectAction(EditorAction.ToggleSpawn)));
         palette.AddChild(ToolButton("TeleportPad", "editor.teleport", () => SelectAction(EditorAction.PlaceTeleportPad)));
         palette.AddChild(ToolButton("RaiseLayer", "editor.raise", () => SelectAction(EditorAction.RaiseLayer)));
         palette.AddChild(ToolButton("LowerLayer", "editor.lower", () => SelectAction(EditorAction.LowerLayer)));
