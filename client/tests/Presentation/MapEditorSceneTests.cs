@@ -53,6 +53,30 @@ public class MapEditorSceneTests : TestClass
         }
     }
 
+    // A placed teleport pair shows a pulsing dotted line between its two ends (owner feedback
+    // 2026-06-11); a half-placed pad (awaiting its partner) has no line yet.
+    [Test]
+    public void TeleportPadPair_DrawsAFadingDottedLink_OnceBothEndsExist()
+    {
+        _editor.NewMap(28, 16);
+        _editor.SelectAction(EditorAction.PlaceTeleportPad);
+        _editor.Paint(5, 5); // first end — pending, no link line yet
+
+        if (_editor.FindChild("PadLink0", recursive: true, owned: false) is not null)
+        {
+            throw new System.Exception("A half-placed pad must not draw a link line yet.");
+        }
+
+        _editor.Paint(10, 8); // the partner — the pair forms
+
+        var link = _editor.FindChild("PadLink0", recursive: true, owned: false) as TeleportLinkLine
+            ?? throw new System.Exception("A completed pad pair must draw its dotted link line.");
+        if (link.DotCount < 3)
+        {
+            throw new System.Exception($"The link must be dotted along the span; saw {link.DotCount} dots.");
+        }
+    }
+
     // Spawn markers are numbered (owner feedback 2026-06-11): the player is "1", each enemy gets the
     // next number, so a creator can track which of the up-to-8 tank spawns is which.
     [Test]
