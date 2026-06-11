@@ -149,6 +149,10 @@ public sealed class Tank : ITank
     // it is a tangible, fightable tank right now).
     public bool IsAlive => Hp > 0 || _livesRemaining > 0;
 
+    /// <summary>Raised with the hit points actually restored by a heal (never the over-heal excess)
+    /// — <see cref="BattleStats"/> tallies it for the victory screen.</summary>
+    public event Action<int>? Healed;
+
     /// <summary>Restores hit points up to <see cref="MaxHp"/> (a repair pickup). A no-op on a
     /// downed tank — repair cannot revive; only the respawn timer does.</summary>
     public void Heal(int amount)
@@ -158,7 +162,12 @@ public sealed class Tank : ITank
             return;
         }
 
-        Hp = Math.Min(MaxHp, Hp + amount);
+        var restored = Math.Min(MaxHp - Hp, amount);
+        Hp += restored;
+        if (restored > 0)
+        {
+            Healed?.Invoke(restored);
+        }
     }
 
     /// <summary>Adds over-shield points (a shield pickup): a buffer that incoming damage spends

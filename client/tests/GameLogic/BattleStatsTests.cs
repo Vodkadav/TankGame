@@ -45,11 +45,12 @@ public class BattleStatsTests
             Stats = new BattleStats(World, Combat);
         }
 
-        public Tank AddTank(string name, Vector2 position, int team, float aim, bool fire, int maxHp = 3)
+        public Tank AddTank(string name, Vector2 position, int team, float aim, bool fire,
+            int maxHp = 3, int lives = 1)
         {
             var input = new ScriptedInput(new TankInput(Vector2.Zero, aim, fire));
             var tank = new Tank(input, World, Arena, position, speed: 100f, fireInterval: 10f,
-                projectileSpeed: 600f, maxHp: maxHp, team: team, displayName: name);
+                projectileSpeed: 600f, maxHp: maxHp, team: team, lives: lives, displayName: name);
             World.Spawn(tank);
             return tank;
         }
@@ -60,6 +61,15 @@ public class BattleStatsTests
             {
                 World.Step(0.05f);
             }
+        }
+
+        // One point of damage from a specific shooter, landed this step: a shot owned by the
+        // shooter spawned right on the victim resolves on the next world step.
+        public void ShootAt(Tank victim, Tank from)
+        {
+            World.Spawn(new Projectile(Arena, victim.Position, new Vector2(1f, 0f),
+                speed: 0f, damage: 1, team: from.Team, owner: from.Id));
+            World.Step(0.05f);
         }
     }
 
@@ -104,6 +114,60 @@ public class BattleStatsTests
 
         Assert.Equal(1, rig.Stats.For(shooter.Id).Misses);
         Assert.Equal(0, rig.Stats.For(shooter.Id).Hits);
+    }
+
+    // ── Victory screen v2 (owner ask 2026-06-11): healing taken and kill assists ──
+
+    [Fact]
+    public void Healing_CountsTheEffectiveAmountRestored()
+    {
+        var rig = new Rig();
+        var tank = rig.AddTank("Greg", new Vector2(96f, 96f), team: 0, aim: 0f, fire: false, maxHp: 8);
+        var enemy = rig.AddTank("Kevin", new Vector2(160f, 96f), team: 1, aim: 0f, fire: false);
+        rig.ShootAt(tank, from: enemy); // one point of damage to heal back
+
+        Assert.Equal(1, rig.Stats.For(tank.Id).DamageTaken);
+
+        tank.Heal(100); // a repair pickup over-heals: only the missing point actually restores
+        Assert.Equal(1, rig.Stats.For(tank.Id).HealingTaken);
+
+        tank.Heal(100); // already full — nothing restored, nothing counted
+        Assert.Equal(1, rig.Stats.For(tank.Id).HealingTaken);
+    }
+
+    [Fact]
+    public void AnAssist_GoesToEveryDamager_ExceptTheKiller()
+    {
+        var rig = new Rig();
+        var victim = rig.AddTank("Victim", new Vector2(416f, 96f), team: 2, aim: 0f, fire: false, maxHp: 2);
+        var helper = rig.AddTank("Helper", new Vector2(96f, 96f), team: 0, aim: 0f, fire: false);
+        var killer = rig.AddTank("Killer", new Vector2(96f, 160f), team: 1, aim: 0f, fire: false);
+
+        rig.ShootAt(victim, from: helper); // wounds
+        rig.ShootAt(victim, from: killer); // kills
+
+        Assert.Equal(1, rig.Stats.For(helper.Id).Assists);
+        Assert.Equal(0, rig.Stats.For(killer.Id).Assists); // the kill is not also an assist
+        Assert.Equal(1, rig.Stats.For(killer.Id).Kills);
+    }
+
+    [Fact]
+    public void Assists_ResetWithTheVictimsDeath()
+    {
+        var rig = new Rig();
+        var victim = rig.AddTank("Victim", new Vector2(416f, 96f), team: 2, aim: 0f, fire: false,
+            maxHp: 2, lives: 2);
+        var helper = rig.AddTank("Helper", new Vector2(96f, 96f), team: 0, aim: 0f, fire: false);
+        var killer = rig.AddTank("Killer", new Vector2(96f, 160f), team: 1, aim: 0f, fire: false);
+
+        rig.ShootAt(victim, from: helper);
+        rig.ShootAt(victim, from: killer); // first death: helper assisted
+        rig.Run(50); // the victim revives (2 lives)
+        rig.ShootAt(victim, from: killer);
+        rig.ShootAt(victim, from: killer); // second death: killer alone — no stale assist
+
+        Assert.Equal(1, rig.Stats.For(helper.Id).Assists);
+        Assert.Equal(2, rig.Stats.For(killer.Id).Kills);
     }
 
     [Fact]
