@@ -47,6 +47,17 @@ public class TankTests
     }
 
     [Fact]
+    public void Tank_CarriesItsDisplayName()
+    {
+        var input = new ScriptedInput(new TankInput(Vector2.Zero, Aim: 0f, Fire: false));
+        var named = new Tank(input, new World(), new OpenArena(), Vector2.Zero, Speed, FireInterval,
+            ProjectileSpeed, displayName: "Sir Honkalot");
+
+        Assert.Equal("Sir Honkalot", named.DisplayName);
+        Assert.Equal(string.Empty, NewTank(input).DisplayName); // unnamed stays blank, not null
+    }
+
+    [Fact]
     public void Step_DrivingOntoATeleportPad_WarpsToTheLinkedPad_AndDoesNotBounceBack()
     {
         var teleporter = new Teleporter(

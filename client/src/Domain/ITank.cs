@@ -22,6 +22,10 @@ public interface ITank : IEntity, IDamageable
     /// The view renders it above the health bar.</summary>
     int Shield { get; }
 
+    /// <summary>The name shown above the tank in battle — the player's chosen name, or an AI's
+    /// generated one. Blank (the default) means no name tag.</summary>
+    string DisplayName => "";
+
     /// <summary>Continuous elevation in layer units (ADR-0020 Wave B): a grounded tank sits exactly
     /// on its <see cref="IEntity.Layer"/>; while airborne it sweeps down toward the lower layer. The
     /// 3D view renders the tank at this height × the world layer height. Default: grounded.</summary>

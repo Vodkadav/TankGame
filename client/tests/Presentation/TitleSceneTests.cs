@@ -1,6 +1,7 @@
 using Godot;
 using Chickensoft.GoDotTest;
 using TankGame.Infrastructure;
+using TankGame.Presentation;
 
 namespace TankGame.Tests.Presentation;
 
@@ -60,6 +61,50 @@ public class TitleSceneTests : TestClass
         {
             throw new System.Exception("Team vs Team should be enabled now that the lobby flow exists (ADR-0019 step 2).");
         }
+    }
+
+    // Every way into a game asks for the player's name first (owner feedback 2026-06-11): pressing a
+    // play mode opens the prompt instead of starting, and confirming stores the name for the match.
+    [Test]
+    public void PressingSolo_OpensTheNamePrompt_AndConfirmingStoresTheName()
+    {
+        var previous = GameSetup.PlayerName;
+        try
+        {
+            var prompt = _title.FindChild("NamePrompt", recursive: true, owned: false) as Control
+                ?? throw new System.Exception("The title must hold a 'NamePrompt' panel.");
+            if (prompt.Visible)
+            {
+                throw new System.Exception("The name prompt should stay hidden until a play mode is chosen.");
+            }
+
+            Press("Solo");
+            if (!prompt.Visible)
+            {
+                throw new System.Exception("Choosing Solo must ask for the player's name first.");
+            }
+
+            var entry = _title.FindChild("NameEntry", recursive: true, owned: false) as LineEdit
+                ?? throw new System.Exception("The name prompt must offer a 'NameEntry' field.");
+            entry.Text = "  General Fluff  ";
+            Press("NameOk");
+
+            if (GameSetup.PlayerName != "General Fluff")
+            {
+                throw new System.Exception($"Confirming must store the trimmed name; got '{GameSetup.PlayerName}'.");
+            }
+        }
+        finally
+        {
+            GameSetup.PlayerName = previous;
+        }
+    }
+
+    private void Press(string buttonName)
+    {
+        var button = _title.FindChild(buttonName, recursive: true, owned: false) as Button
+            ?? throw new System.Exception($"Missing '{buttonName}' button.");
+        button.EmitSignal(BaseButton.SignalName.Pressed);
     }
 
     [Test]
