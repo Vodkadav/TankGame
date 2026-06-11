@@ -32,10 +32,26 @@ public partial class MapEditorScene : Node3D
     private MapEditor _editor = new("New Map", 28, 16);
     private MapRepository _maps = null!;
     private Camera3D _camera = null!;
+
+    // A free orbiting camera (owner follow-up 2026-06-11): defaults to the game's ¾ isometric angle
+    // (top-down made walls read as flat squares), right-drag orbits/tilts, middle-drag pans — so the
+    // author can look around the map while building it.
+    private float _camYawDeg = CamDefaultYawDeg;
+    private float _camPitchDeg = CamDefaultPitchDeg;
+    private Vector3 _camTarget;
+    private bool _orbiting;
+    private bool _panning;
+
+    private const float CamDefaultYawDeg = 45f;
+    private const float CamDefaultPitchDeg = 52f; // the match camera's angle, so editing looks like playing
+    private const float CamDistance = 5000f;
+    private const float OrbitDegreesPerPixel = 0.35f;
+    private const float MinPitchDeg = 15f;  // never flat enough to lose the ground
+    private const float MaxPitchDeg = 89f;  // and straight-down stays reachable for blocking out
     private Terrain3DView? _terrain;
     private Node3D? _gizmos;
     private MeshInstance3D? _ground;
-    private VBoxContainer _floorThemes = null!;
+    private PanelContainer _floorThemes = null!;
     private LineEdit _nameEdit = null!;
     private Label _status = null!;
     private bool _painting;
@@ -159,11 +175,46 @@ public partial class MapEditorScene : Node3D
                     PaintAtScreen(click.Position);
                 }
             }
+            else if (click.ButtonIndex == MouseButton.Right)
+            {
+                _orbiting = click.Pressed; // hold right and drag to orbit/tilt around the map
+            }
+            else if (click.ButtonIndex == MouseButton.Middle)
+            {
+                _panning = click.Pressed; // hold middle and drag to slide the view
+            }
         }
-        else if (@event is InputEventMouseMotion motion && _painting)
+        else if (@event is InputEventMouseMotion motion)
         {
-            PaintAtScreen(motion.Position);
+            if (_painting)
+            {
+                PaintAtScreen(motion.Position);
+            }
+            else if (_orbiting)
+            {
+                _camYawDeg -= motion.Relative.X * OrbitDegreesPerPixel;
+                _camPitchDeg = Mathf.Clamp(
+                    _camPitchDeg + (motion.Relative.Y * OrbitDegreesPerPixel), MinPitchDeg, MaxPitchDeg);
+                ApplyCamera();
+            }
+            else if (_panning)
+            {
+                // Slide along the camera's screen axes projected onto the ground, scaled so a pixel of
+                // mouse is about a pixel of world at the current zoom.
+                var perPixel = _camera.Size / GetViewport().GetVisibleRect().Size.Y;
+                var basis = _camera.GlobalTransform.Basis;
+                var right = Flatten(basis.X);
+                var forward = Flatten(-basis.Z);
+                _camTarget += ((right * -motion.Relative.X) + (forward * motion.Relative.Y)) * perPixel;
+                ApplyCamera();
+            }
         }
+    }
+
+    private static Vector3 Flatten(Vector3 v)
+    {
+        v.Y = 0f;
+        return v.LengthSquared() > 1e-6f ? v.Normalized() : Vector3.Zero;
     }
 
     private void PaintAtScreen(Vector2 screen)
@@ -288,10 +339,23 @@ public partial class MapEditorScene : Node3D
 
     private void FrameCamera()
     {
-        var centre = new Vector3(_editor.Width * TileSize / 2f, 0f, _editor.Height * TileSize / 2f);
-        _camera.Position = centre + new Vector3(0f, 5000f, 0f);
-        _camera.LookAt(centre, Vector3.Forward);
-        _camera.Size = Mathf.Max(_editor.Width, _editor.Height) * TileSize * 0.62f;
+        _camTarget = new Vector3(_editor.Width * TileSize / 2f, 0f, _editor.Height * TileSize / 2f);
+        _camera.Size = Mathf.Max(_editor.Width, _editor.Height) * TileSize * 0.8f; // the ¾ view needs the diagonal
+        ApplyCamera();
+    }
+
+    // Seats the camera on its orbit sphere around the target and aims it. The ortho size (zoom) is
+    // independent of the orbit, so panning/tilting never changes how much map is on screen.
+    private void ApplyCamera()
+    {
+        var pitch = Mathf.DegToRad(_camPitchDeg);
+        var yaw = Mathf.DegToRad(_camYawDeg);
+        var dir = new Vector3(
+            Mathf.Cos(pitch) * Mathf.Sin(yaw),
+            Mathf.Sin(pitch),
+            Mathf.Cos(pitch) * Mathf.Cos(yaw));
+        _camera.Position = _camTarget + (dir * CamDistance);
+        _camera.LookAt(_camTarget, Vector3.Up);
     }
 
     private void ShowInvalid(MapValidationResult result) =>
@@ -366,14 +430,18 @@ public partial class MapEditorScene : Node3D
         sizes.AddChild(SizeButton("SizeLarge", "editor.size_large", 40, 24));
         palette.AddChild(sizes);
 
-        // Floor doubles as the ground-theme picker (owner feedback 2026-06-11): pressing it expands
-        // the tileset list; choosing one stamps the whole-arena theme and selects floor painting.
+        // Floor doubles as the ground-theme picker (owner feedback 2026-06-11): pressing it opens
+        // the tileset list. The list flies out BESIDE the palette (owner follow-up) — expanding
+        // inline shoved every tool below it off the screen.
         palette.AddChild(ToolButton("Floor", "editor.floor", () =>
         {
             SelectMaterial(CellMaterial.Floor);
             _floorThemes.Visible = !_floorThemes.Visible;
         }));
-        _floorThemes = new VBoxContainer { Name = "FloorThemes", Visible = false };
+        _floorThemes = new PanelContainer { Name = "FloorThemes", Visible = false };
+        _floorThemes.Position = new Vector2(224f, 48f); // beside the palette strip, near its Floor button
+        var themeList = new VBoxContainer();
+        themeList.AddThemeConstantOverride("separation", 4);
         foreach (var (theme, key) in new[]
         {
             (GroundTheme.Sand, "editor.theme_sand"), (GroundTheme.Jungle, "editor.theme_jungle"),
@@ -381,10 +449,11 @@ public partial class MapEditorScene : Node3D
         })
         {
             var t = theme;
-            _floorThemes.AddChild(ToolButton($"Theme{theme}", key, () => SelectGroundTheme(t)));
+            themeList.AddChild(ToolButton($"Theme{theme}", key, () => SelectGroundTheme(t)));
         }
 
-        palette.AddChild(_floorThemes);
+        _floorThemes.AddChild(themeList);
+        layer.AddChild(_floorThemes);
 
         foreach (var (material, key) in new[]
         {
@@ -423,6 +492,9 @@ public partial class MapEditorScene : Node3D
         var bottom = new HBoxContainer { Name = "Actions" };
         bottom.AddThemeConstantOverride("separation", 8);
         bottom.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.BottomLeft);
+        // Grow UP from the bottom edge — the preset alone grows downward, which pushed the buttons
+        // below the window (owner follow-up 2026-06-11).
+        bottom.GrowVertical = Control.GrowDirection.Begin;
         bottom.Position += new Vector2(12f, -12f);
         _nameEdit = new LineEdit { Name = "MapName", Text = _editor.Name, CustomMinimumSize = new Vector2(180f, 0f) };
         _nameEdit.TextChanged += text => _editor.Name = text;
