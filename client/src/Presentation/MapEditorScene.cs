@@ -34,9 +34,21 @@ public partial class MapEditorScene : Node3D
     private Camera3D _camera = null!;
     private Terrain3DView? _terrain;
     private Node3D? _gizmos;
+    private MeshInstance3D? _ground;
+    private VBoxContainer _floorThemes = null!;
     private LineEdit _nameEdit = null!;
     private Label _status = null!;
     private bool _painting;
+
+    /// <summary>Stamps the whole-arena ground tileset and selects floor painting — the WYSIWYG
+    /// ground re-tints immediately. Public so tests can drive it.</summary>
+    public void SelectGroundTheme(GroundTheme theme)
+    {
+        _editor.GroundTheme = theme;
+        SelectMaterial(CellMaterial.Floor);
+        _floorThemes.Visible = false;
+        RefreshScene();
+    }
 
     public string MapName
     {
@@ -196,6 +208,17 @@ public partial class MapEditorScene : Node3D
         // (ADR-0020 Wave B) — the same WYSIWYG meshes the match renders.
         _terrain.Bind(WallGrid.FromMaterials(map.Materials, map.Layers, map.Ramps), map.Bushes, map.Sandbags, TileSize);
 
+        // The authored ground tileset under everything, sized to the map — WYSIWYG with play.
+        _ground?.Free();
+        _ground = new MeshInstance3D
+        {
+            Name = "Ground",
+            Mesh = new PlaneMesh { Size = new Vector2(_editor.Width * TileSize, _editor.Height * TileSize) },
+            Position = new Vector3(_editor.Width * TileSize / 2f, -0.5f, _editor.Height * TileSize / 2f),
+            MaterialOverride = GroundThemes.Material(_editor.GroundTheme, _editor.Width, _editor.Height),
+        };
+        AddChild(_ground);
+
         _gizmos?.Free();
         _gizmos = new Node3D { Name = "Gizmos" };
         AddChild(_gizmos);
@@ -318,9 +341,29 @@ public partial class MapEditorScene : Node3D
         sizes.AddChild(SizeButton("SizeLarge", "editor.size_large", 40, 24));
         palette.AddChild(sizes);
 
+        // Floor doubles as the ground-theme picker (owner feedback 2026-06-11): pressing it expands
+        // the tileset list; choosing one stamps the whole-arena theme and selects floor painting.
+        palette.AddChild(ToolButton("Floor", "editor.floor", () =>
+        {
+            SelectMaterial(CellMaterial.Floor);
+            _floorThemes.Visible = !_floorThemes.Visible;
+        }));
+        _floorThemes = new VBoxContainer { Name = "FloorThemes", Visible = false };
+        foreach (var (theme, key) in new[]
+        {
+            (GroundTheme.Sand, "editor.theme_sand"), (GroundTheme.Jungle, "editor.theme_jungle"),
+            (GroundTheme.Mars, "editor.theme_mars"), (GroundTheme.ParkingLot, "editor.theme_parkinglot"),
+        })
+        {
+            var t = theme;
+            _floorThemes.AddChild(ToolButton($"Theme{theme}", key, () => SelectGroundTheme(t)));
+        }
+
+        palette.AddChild(_floorThemes);
+
         foreach (var (material, key) in new[]
         {
-            (CellMaterial.Floor, "editor.floor"), (CellMaterial.Brick, "editor.brick"),
+            (CellMaterial.Brick, "editor.brick"),
             (CellMaterial.Crate, "editor.crate"), (CellMaterial.Steel, "editor.steel"),
             (CellMaterial.Water, "editor.water"), (CellMaterial.Bridge, "editor.bridge"),
             (CellMaterial.Mountain, "editor.mountain"), (CellMaterial.Building, "editor.building"),

@@ -58,6 +58,12 @@ public static class MapCodec
             writer.WriteNumber("width", map.Width);
             writer.WriteNumber("height", map.Height);
 
+            // Only when authored — the sandy default keeps the lean pre-theme document shape.
+            if (map.GroundTheme != GroundTheme.Sand)
+            {
+                writer.WriteString("groundTheme", map.GroundTheme.ToString());
+            }
+
             WriteRows(writer, "materials", map.Width, map.Height, (x, y) => MaterialGlyph[map.Materials[x, y]]);
             WriteRows(writer, "bushes", map.Width, map.Height, (x, y) => map.Bushes[x, y] ? OverlayOn : OverlayOff);
             WriteRows(writer, "sandbags", map.Width, map.Height, (x, y) => map.Sandbags[x, y] ? OverlayOn : OverlayOff);
@@ -174,9 +180,18 @@ public static class MapCodec
                     ? ReadRampOverlay(root, width, height)
                     : null;
 
+                var groundTheme = GroundTheme.Sand;
+                if (root.TryGetProperty("groundTheme", out var themeElement))
+                {
+                    if (!Enum.TryParse(themeElement.GetString(), out groundTheme))
+                    {
+                        throw new MapFormatException($"unknown ground theme '{themeElement.GetString()}'");
+                    }
+                }
+
                 return new MapDefinition(
                     name, materials, bushes, sandbags, playerSpawn, enemySpawns, powerupSpawns,
-                    teleportPads, layers, ramps);
+                    teleportPads, layers, ramps, groundTheme);
             }
             catch (KeyNotFoundException ex)
             {

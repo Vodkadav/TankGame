@@ -79,6 +79,19 @@ public class MapDefinitionTests
     }
 
     [Fact]
+    public void GroundTheme_DefaultsToSand_AndIsCarried()
+    {
+        var plain = MapDefinition.CreateBlank("Plain", 5, 5);
+        Assert.Equal(GroundTheme.Sand, plain.GroundTheme);
+
+        var themed = new MapDefinition(
+            plain.Name, plain.Materials, plain.Bushes, plain.Sandbags,
+            plain.PlayerSpawn, plain.EnemySpawns, plain.PowerupSpawns,
+            groundTheme: GroundTheme.Jungle);
+        Assert.Equal(GroundTheme.Jungle, themed.GroundTheme);
+    }
+
+    [Fact]
     public void Constructor_ExposesTeleportPadLinks()
     {
         var materials = new CellMaterial[6, 5];

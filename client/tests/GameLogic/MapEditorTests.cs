@@ -120,6 +120,14 @@ public class MapEditorTests
     }
 
     [Fact]
+    public void ToMap_CarriesTheGroundTheme()
+    {
+        var editor = new MapEditor("Themed", 8, 6) { GroundTheme = GroundTheme.ParkingLot };
+
+        Assert.Equal(GroundTheme.ParkingLot, editor.ToMap().GroundTheme);
+    }
+
+    [Fact]
     public void PlaceTeleportPad_FirstClickIsPending_SecondClickFormsALink()
     {
         var editor = Medium();
