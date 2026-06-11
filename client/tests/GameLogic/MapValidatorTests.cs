@@ -89,6 +89,27 @@ public class MapValidatorTests
         Assert.True(MapValidator.Validate(map).IsValid);
     }
 
+    // The biggest planned mode is 4v4 (owner feedback 2026-06-11) — more than 8 tank spawns
+    // (the player plus 7 enemies) is a validation error.
+    [Fact]
+    public void Validate_CapsTankSpawns_AtEight()
+    {
+        var map = MapDefinition.CreateBlank("Crowded", 14, 8);
+        var sevenEnemies = new (int X, int Y)[] { (2, 2), (3, 2), (4, 2), (5, 2), (6, 2), (7, 2), (8, 2) };
+        var okay = new MapDefinition(
+            map.Name, map.Materials, map.Bushes, map.Sandbags,
+            (1, 1), sevenEnemies, System.Array.Empty<PowerupSpawn>());
+        Assert.True(okay.EnemySpawns.Count + 1 == MapValidator.MaxTankSpawns);
+        Assert.True(MapValidator.Validate(okay).IsValid);
+
+        var eightEnemies = new (int X, int Y)[] { (2, 2), (3, 2), (4, 2), (5, 2), (6, 2), (7, 2), (8, 2), (9, 2) };
+        var crowded = new MapDefinition(
+            map.Name, map.Materials, map.Bushes, map.Sandbags,
+            (1, 1), eightEnemies, System.Array.Empty<PowerupSpawn>());
+        Assert.Contains(MapValidator.Validate(crowded).Errors,
+            e => e.Code == MapValidationCode.TooManyTankSpawns);
+    }
+
     [Fact]
     public void Validate_TreatsATeleportPadPair_AsAConnection_ToAWalledOffPocket()
     {
