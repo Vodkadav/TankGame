@@ -490,12 +490,13 @@ public partial class MapEditorScene : Node3D
             AddMarker(spawn.X, spawn.Y, "★", new Color(1f, 0.9f, 0.3f));
         }
 
-        var padColour = new Color(0.3f, 0.85f, 1f); // teleport cyan, mirrors TeleportPad3DView
+        // Teleport pads as proper gizmos (owner feedback 2026-06-11): the ringed-disc recipe in
+        // cyan, numbered per link, floating above the tileset like the spawn markers do.
         var linkIndex = 0;
         foreach (var pad in _editor.TeleportPads)
         {
-            AddMarker(pad.AX, pad.AY, "T", padColour);
-            AddMarker(pad.BX, pad.BY, "T", padColour);
+            AddPadMarker($"PadMarker{linkIndex}A", pad.AX, pad.AY, (linkIndex + 1).ToString());
+            AddPadMarker($"PadMarker{linkIndex}B", pad.BX, pad.BY, (linkIndex + 1).ToString());
 
             // The pairing reads as a live connection: a pulsing dotted line between the two ends.
             var link = new TeleportLinkLine { Name = $"PadLink{linkIndex}" };
@@ -508,7 +509,7 @@ public partial class MapEditorScene : Node3D
 
         if (_editor.PendingTeleportPad is { } pending)
         {
-            AddMarker(pending.X, pending.Y, "T?", padColour); // a half-placed pad awaiting its partner
+            AddPadMarker("PadPending", pending.X, pending.Y, "?"); // awaiting its partner
         }
 
         // Library props, WYSIWYG with the match: the real model, posed by the selection gizmo.
@@ -519,6 +520,14 @@ public partial class MapEditorScene : Node3D
             view.Position = new Vector3((decoration.X + 0.5f) * TileSize, 0f, (decoration.Y + 0.5f) * TileSize);
             _gizmos!.AddChild(view);
         }
+    }
+
+    private void AddPadMarker(string name, int x, int y, string label)
+    {
+        var marker = new PadMarker3D { Name = name };
+        marker.Configure(label);
+        marker.Position = new Vector3((x + 0.5f) * TileSize, 0f, (y + 0.5f) * TileSize);
+        _gizmos!.AddChild(marker);
     }
 
     private void AddMarker(int x, int y, string glyph, Color colour)

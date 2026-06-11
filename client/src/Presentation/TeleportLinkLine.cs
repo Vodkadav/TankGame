@@ -12,7 +12,7 @@ public partial class TeleportLinkLine : Node3D
 
     private const float DotSpacing = 28f;
     private const float DotRadius = 4.5f;
-    private const float HoverY = 30f; // floats above the floor meshes, under the pad glyphs
+    private const float HoverY = 44f; // floats above the tileset and the raised meshes, under the pad labels
 
     private Vector3 _from;
     private Vector3 _to;
@@ -38,6 +38,7 @@ public partial class TeleportLinkLine : Node3D
             Emission = LinkColour,
             ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded,
             Transparency = BaseMaterial3D.TransparencyEnum.Alpha,
+            NoDepthTest = true, // the connection must read over walls and plateaus, like the pad gizmos
         };
 
         var mesh = new CylinderMesh

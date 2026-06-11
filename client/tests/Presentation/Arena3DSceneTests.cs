@@ -133,6 +133,12 @@ public class Arena3DSceneTests : TestClass
                 throw new System.Exception("Every tank in a solo match must be named.");
             }
 
+            // The proven-visible marker recipe (owner: the first cut was invisible in battle).
+            if (tag.FontSize < 80 || !tag.NoDepthTest)
+            {
+                throw new System.Exception("Name tags must use the big depth-test-off recipe to stay readable.");
+            }
+
             names.Add(tag.Text);
             sawPlayerName |= tag.Text == "Tester";
         }
