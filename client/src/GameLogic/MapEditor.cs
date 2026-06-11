@@ -28,12 +28,13 @@ public enum EditorAction
 /// </summary>
 public sealed class MapEditor
 {
-    private readonly CellMaterial[,] _materials;
-    private readonly bool[,] _bushes;
-    private readonly bool[,] _sandbags;
-    private readonly int[,] _layers;
-    private readonly bool[,] _ramps;
-    private readonly int[,] _orientations;
+    // Not readonly: Resize swaps the grids for re-sized copies (owner follow-up 2026-06-11).
+    private CellMaterial[,] _materials;
+    private bool[,] _bushes;
+    private bool[,] _sandbags;
+    private int[,] _layers;
+    private bool[,] _ramps;
+    private int[,] _orientations;
     private readonly List<(int X, int Y)> _enemySpawns = new();
     private readonly List<PowerupSpawn> _powerupSpawns = new();
     private readonly List<TeleportPadLink> _teleportPads = new();
@@ -56,9 +57,63 @@ public sealed class MapEditor
 
     public string Name { get; set; }
 
-    public int Width { get; }
+    public int Width { get; private set; }
 
-    public int Height { get; }
+    public int Height { get; private set; }
+
+    /// <summary>Re-sizes the arena in place, keeping everything that still fits (owner follow-up
+    /// 2026-06-11 — a size change must not throw the author's work away): interior cells, overlays,
+    /// elevation, facings, the theme, and every spawn/powerup/pad that lands inside the new interior.
+    /// The steel ring is re-drawn at the new bounds; a teleport link loses both ends if either falls
+    /// out; the player spawn rehomes to (1, 1) if its cell no longer fits.</summary>
+    public void Resize(int width, int height)
+    {
+        var blank = MapDefinition.CreateBlank(Name, width, height);
+        var materials = blank.Materials;
+        var bushes = new bool[width, height];
+        var sandbags = new bool[width, height];
+        var layers = new int[width, height];
+        var ramps = new bool[width, height];
+        var orientations = new int[width, height];
+
+        // Copy the shared interior only — both rings (the old border and the new) stay out of it, so
+        // growing a map melts the old steel ring into open floor instead of leaving a stray wall.
+        for (var x = 1; x < System.Math.Min(Width, width) - 1; x++)
+        {
+            for (var y = 1; y < System.Math.Min(Height, height) - 1; y++)
+            {
+                materials[x, y] = _materials[x, y];
+                bushes[x, y] = _bushes[x, y];
+                sandbags[x, y] = _sandbags[x, y];
+                layers[x, y] = _layers[x, y];
+                ramps[x, y] = _ramps[x, y];
+                orientations[x, y] = _orientations[x, y];
+            }
+        }
+
+        _materials = materials;
+        _bushes = bushes;
+        _sandbags = sandbags;
+        _layers = layers;
+        _ramps = ramps;
+        _orientations = orientations;
+        Width = width;
+        Height = height;
+
+        bool Fits(int x, int y) => x >= 1 && y >= 1 && x < width - 1 && y < height - 1;
+        _enemySpawns.RemoveAll(s => !Fits(s.X, s.Y));
+        _powerupSpawns.RemoveAll(p => !Fits(p.X, p.Y));
+        _teleportPads.RemoveAll(p => !Fits(p.AX, p.AY) || !Fits(p.BX, p.BY));
+        if (_pendingTeleportPad is { } pending && !Fits(pending.X, pending.Y))
+        {
+            _pendingTeleportPad = null;
+        }
+
+        if (!Fits(_playerSpawn.X, _playerSpawn.Y))
+        {
+            _playerSpawn = (1, 1);
+        }
+    }
 
     public EditorAction Action { get; set; } = EditorAction.PaintMaterial;
 
