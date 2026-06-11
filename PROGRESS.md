@@ -13,7 +13,7 @@ dashboard reads — keep it in sync with the detailed sections below.
 - [x] M2 — static labyrinth + destructible walls (ADR-0004)
 - [x] Local-first combat arc — single-player vs AI, local 2-player co-op & versus (ADR-0011)
 - [~] Local polish arc — no new art, no networking
-- [~] M3 / ADR-0019 — networked multiplayer, host-authoritative relay (step 1 relay DO + step 2 Host/Join lobby UX done; step 3 underway: host-side transport landed, next the host authority loop + 3D net scene, then protocol fidelity + two-device playtest)
+- [~] M3 / ADR-0019 — networked multiplayer, host-authoritative relay (steps 1–3 done: relay DO, Host/Join lobby UX, host-side transport + HostSession + 3D net scene; next: step 4 protocol fidelity, step 5 two-device playtest — owner-gated)
 - [~] 3D arena arc (ADR-0017/0018/0020) — full-3D port shipped; elevation engine + Cliffs & Valleys map; map editor Waves A+B (elevation tools); teleport pads T1–T3 (cross-layer valley↔plateau) — all awaiting owner playtest
 
 ## Current status: **M1 + S1 + M2 + local-first combat arc complete; local polish arc in progress** (2026-06-03)
