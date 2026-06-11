@@ -93,4 +93,33 @@ public class CliffsArena3DSceneTests : TestClass
             throw new System.Exception("Cliffs arena must render ramps connecting the valley to the plateau.");
         }
     }
+
+    // Teleport pads T3: Cliffs authors a cross-layer pad pair, so one ring must sit up at plateau
+    // height and its partner down on the valley floor.
+    [Test]
+    public void Cliffs_PlacesPadRings_AtTheirLayersHeights()
+    {
+        var raised = 0;
+        var ground = 0;
+        foreach (var child in _arena.GetChildren())
+        {
+            if (child is TeleportPad3DView view)
+            {
+                if (view.Position.Y >= GroundProjection.LayerHeight - 0.5f)
+                {
+                    raised++;
+                }
+                else
+                {
+                    ground++;
+                }
+            }
+        }
+
+        if (ground == 0 || raised == 0)
+        {
+            throw new System.Exception(
+                $"Cliffs must place a cross-layer pad pair (one valley ring, one plateau ring); saw {ground} ground + {raised} raised.");
+        }
+    }
 }
