@@ -617,11 +617,38 @@ public partial class Arena3DScene : Node3D
 
     private void SpawnTanks()
     {
+        // An authored map deals its spawn markers randomly (owner feedback): the player and every AI
+        // draw a distinct cell from the combined marker pool, and each respawn re-rolls from the same
+        // pool. Seeded by the arena so a best-of-N series is reproducible; the built-in arenas keep
+        // their fixed spawns.
+        var playerCell = _playerSpawn;
+        var enemyCells = _enemySpawns;
+        Func<NVector2>? respawnPoint = null;
+        if (GameSetup.CustomMap is not null)
+        {
+            var pool = new List<(int X, int Y)> { _playerSpawn };
+            pool.AddRange(_enemySpawns);
+            var rng = new Random(GameSetup.ArenaSeed);
+            for (var i = pool.Count - 1; i > 0; i--)
+            {
+                var j = rng.Next(i + 1);
+                (pool[i], pool[j]) = (pool[j], pool[i]);
+            }
+
+            playerCell = pool[0];
+            enemyCells = pool.Skip(1).ToList();
+            respawnPoint = () =>
+            {
+                var cell = pool[rng.Next(pool.Count)];
+                return CellCentre(cell.X, cell.Y);
+            };
+        }
+
         var p1Input = new KeyboardMouse3DInputSource(_camera, fireOnClick: true);
         var playerName = GameSetup.PlayerName.Length > 0 ? GameSetup.PlayerName : "Player";
-        var player = new Tank(p1Input, _world, _arena, CellCentre(_playerSpawn.X, _playerSpawn.Y),
+        var player = new Tank(p1Input, _world, _arena, CellCentre(playerCell.X, playerCell.Y),
             TankSpeed, FireInterval, ProjectileSpeed, maxHp: TankMaxHp, team: PlayerTeam, lives: StartingLives,
-            terrain: _sandbags, teleporter: _teleporter, displayName: playerName);
+            terrain: _sandbags, teleporter: _teleporter, displayName: playerName, respawnPoint: respawnPoint);
         _player = player;
         _viewers.Add(player); // the player's sight reveals the field; co-op allies would join this list
         SpawnTank(player);
@@ -629,13 +656,13 @@ public partial class Arena3DScene : Node3D
         // Seeded by the arena so a best-of-N series keeps its cast of derpy adversaries.
         var names = new TankNameGenerator(GameSetup.ArenaSeed);
         var enemyIndex = 0;
-        foreach (var (ex, ey) in _enemySpawns)
+        foreach (var (ex, ey) in enemyCells)
         {
             var ambusher = enemyIndex % 2 == 1;
             var ai = new AiInputSource(_world, _arena, _bushes, ambusher, _grid, TileSize, GridOrigin);
             var enemy = new Tank(ai, _world, _arena, CellCentre(ex, ey),
                 EnemySpeed, FireInterval, ProjectileSpeed, maxHp: TankMaxHp, team: EnemyTeam, lives: StartingLives,
-                terrain: _sandbags, teleporter: _teleporter, displayName: names.Next());
+                terrain: _sandbags, teleporter: _teleporter, displayName: names.Next(), respawnPoint: respawnPoint);
             ai.Bind(enemy);
             SpawnTank(enemy);
             enemyIndex++;

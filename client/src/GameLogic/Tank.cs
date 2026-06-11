@@ -19,6 +19,7 @@ public sealed class Tank : ITank
     private readonly ITeleporter? _teleporter;
     private readonly Vector2 _spawnPosition;
     private readonly int _spawnLayer;
+    private readonly Func<Vector2>? _respawnPoint;
     private readonly Stats _stats;
     private readonly float _projectileSpeed;
     private float _fireCooldown;
@@ -47,6 +48,9 @@ public sealed class Tank : ITank
     /// layer (a flat, single-layer arena).</param>
     /// <param name="displayName">The name shown above the tank (the player's chosen name or an AI's
     /// generated one). Blank = no name tag.</param>
+    /// <param name="respawnPoint">Where a revive places the tank. Custom maps deal a fresh random
+    /// spawn marker per respawn, so the point is asked for anew on every revive; null (the default,
+    /// and the built-in arenas) keeps the fixed original spawn.</param>
     public Tank(
         IInputSource input,
         IWorld world,
@@ -61,7 +65,8 @@ public sealed class Tank : ITank
         ITerrain? terrain = null,
         int layer = 0,
         ITeleporter? teleporter = null,
-        string displayName = "")
+        string displayName = "",
+        Func<Vector2>? respawnPoint = null)
     {
         Id = Guid.NewGuid();
         MaxHp = maxHp;
@@ -78,6 +83,7 @@ public sealed class Tank : ITank
         Position = startPosition;
         _spawnPosition = startPosition;
         _spawnLayer = layer;
+        _respawnPoint = respawnPoint;
         _stats = new Stats(new Dictionary<StatKind, float>
         {
             [StatKind.Speed] = speed,
@@ -213,7 +219,7 @@ public sealed class Tank : ITank
                 if (_respawnTimer <= 0f)
                 {
                     Hp = MaxHp;
-                    Position = _spawnPosition;
+                    Position = _respawnPoint?.Invoke() ?? _spawnPosition;
                     Layer = _spawnLayer; // back on the spawn cell's level, grounded — even if it died mid-fall
                     _airborne = false;
                     _fallSpeed = 0f;
