@@ -12,7 +12,7 @@ namespace TankGame.Presentation;
 /// the code itself renders raw.</summary>
 public partial class LobbyScene : Control
 {
-    public const string NetArenaScenePath = "res://src/Presentation/Arena/NetArena.tscn";
+    public const string NetArenaScenePath = "res://src/Presentation/Arena/NetArena3D.tscn";
     public const string TitleScenePath = "res://src/Presentation/Title.tscn";
 
     private ILobbyClient _lobby = null!;

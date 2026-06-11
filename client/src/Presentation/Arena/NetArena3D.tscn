@@ -1,0 +1,6 @@
+[gd_scene load_steps=2 format=3 uid="uid://b000000000a"]
+
+[ext_resource type="Script" path="res://src/Presentation/Arena/NetArena3DScene.cs" id="1_netarena3d"]
+
+[node name="NetArena3D" type="Node3D"]
+script = ExtResource("1_netarena3d")
