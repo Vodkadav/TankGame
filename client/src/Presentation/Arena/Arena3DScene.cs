@@ -98,6 +98,131 @@ public partial class Arena3DScene : Node3D
     /// <summary>Per-tank combat stats for this match — the end-of-match screen reads it.</summary>
     public BattleStats Stats { get; private set; } = null!;
 
+    private readonly MatchTracker _matchTracker = new();
+
+    /// <summary>True once the victory screen is up: the world stops stepping.</summary>
+    public bool IsMatchOver { get; private set; }
+
+    /// <summary>The end of the match (owner feedback 2026-06-11): freeze the world and present the
+    /// outcome banner, the per-tank stats table with award tags, and New Game / Back to Menu / Exit.
+    /// Public so a test can drive it without fighting a whole battle.</summary>
+    public void ShowMatchOver(MatchResult result)
+    {
+        if (IsMatchOver)
+        {
+            return;
+        }
+
+        IsMatchOver = true;
+
+        var layer = new CanvasLayer { Name = "GameOverLayer" };
+        var dim = new ColorRect { Name = "Dim", Color = new Color(0f, 0f, 0f, 0.6f) };
+        dim.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect);
+        layer.AddChild(dim);
+
+        var box = new VBoxContainer { Name = "GameOver" };
+        box.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.Center);
+        box.GrowHorizontal = Control.GrowDirection.Both;
+        box.GrowVertical = Control.GrowDirection.Both;
+        box.AddThemeConstantOverride("separation", 14);
+
+        var outcome = new Label
+        {
+            Name = "Outcome",
+            Text = result.WinningTeam == PlayerTeam ? "hud.you_win"
+                : result.WinningTeam is null ? "hud.draw" : "hud.you_lose",
+            HorizontalAlignment = HorizontalAlignment.Center,
+        };
+        outcome.AddThemeFontSizeOverride("font_size", 42);
+        box.AddChild(outcome);
+
+        box.AddChild(BuildStatsTable());
+        box.AddChild(BuildGameOverButtons());
+        layer.AddChild(box);
+        AddChild(layer);
+    }
+
+    // One row per tank: name, the combat numbers, and any award tags ("Most Deadly", …) in the last
+    // column — beside the tank that earned them.
+    private GridContainer BuildStatsTable()
+    {
+        var table = new GridContainer { Name = "StatsTable", Columns = 8 };
+        table.AddThemeConstantOverride("h_separation", 18);
+        table.AddThemeConstantOverride("v_separation", 4);
+
+        foreach (var key in new[]
+        {
+            "stats.tank", "stats.kills", "stats.deaths", "stats.hits",
+            "stats.misses", "stats.dealt", "stats.taken", "stats.award",
+        })
+        {
+            table.AddChild(new Label { Text = key, Modulate = new Color(0.8f, 0.8f, 0.7f) });
+        }
+
+        var awards = BattleAwards.Compute(Stats.Tallies);
+        var row = 0;
+        foreach (var tally in Stats.Tallies)
+        {
+            table.AddChild(new Label { Name = $"Name{row}", Text = tally.Name });
+            foreach (var value in new[]
+            {
+                tally.Kills, tally.Deaths, tally.Hits, tally.Misses, tally.DamageDealt, tally.DamageTaken,
+            })
+            {
+                table.AddChild(new Label
+                {
+                    Text = value.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                    HorizontalAlignment = HorizontalAlignment.Right,
+                });
+            }
+
+            var tags = awards.Where(a => ReferenceEquals(a.Winner, tally))
+                .Select(a => TranslationServer.Translate(AwardKey(a.Kind)).ToString());
+            table.AddChild(new Label
+            {
+                Name = $"Award{row}",
+                Text = string.Join("  ", tags),
+                Modulate = new Color(1f, 0.85f, 0.35f), // gold, so the honours pop
+            });
+            row++;
+        }
+
+        return table;
+    }
+
+    private static string AwardKey(AwardKind kind) => kind switch
+    {
+        AwardKind.MostDeadly => "award.most_deadly",
+        AwardKind.MostEvasive => "award.most_evasive",
+        AwardKind.Sharpshooter => "award.sharpshooter",
+        _ => "award.bullet_sponge",
+    };
+
+    private HBoxContainer BuildGameOverButtons()
+    {
+        var buttons = new HBoxContainer { Name = "GameOverButtons", Alignment = BoxContainer.AlignmentMode.Center };
+        buttons.AddThemeConstantOverride("separation", 12);
+
+        var newGame = new Button { Name = "NewGame", Text = "gameover.new_game" };
+        newGame.Pressed += () =>
+        {
+            var custom = GameSetup.CustomMap; // StartNewMatch clears it; a custom-map rematch keeps its map
+            GameSetup.StartNewMatch(GameSetup.Mode);
+            GameSetup.CustomMap = custom;
+            GetTree().ReloadCurrentScene();
+        };
+        buttons.AddChild(newGame);
+
+        var menu = new Button { Name = "BackToMenu", Text = "pause.main_menu" };
+        menu.Pressed += () => GetTree().ChangeSceneToFile("res://src/Presentation/Title.tscn");
+        buttons.AddChild(menu);
+
+        var exit = new Button { Name = "ExitGame", Text = "pause.exit" };
+        exit.Pressed += () => GetTree().Quit();
+        buttons.AddChild(exit);
+        return buttons;
+    }
+
     private (int X, int Y) _playerSpawn;
     private IReadOnlyList<(int X, int Y)> _enemySpawns = Array.Empty<(int, int)>();
     private Camera3D _camera = null!;
@@ -287,13 +412,19 @@ public partial class Arena3DScene : Node3D
 
     public override void _Process(double delta)
     {
-        if (_paused)
+        if (_paused || IsMatchOver)
         {
-            return; // the Escape menu is up — freeze the match
+            return; // the Escape menu or the victory screen is up — freeze the match
         }
 
         _world.Step((float)delta);
         _teleporter.Step((float)delta); // age pad cooldowns once per frame (tanks warp inside world.Step)
+
+        var result = _matchTracker.Evaluate(_world.Entities);
+        if (result.Decided)
+        {
+            ShowMatchOver(result); // only the player team (or nobody) is left standing
+        }
         if (_player.Hp > 0)
         {
             var target = GroundProjection.ToWorld(_player.Position);
