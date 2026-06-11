@@ -95,6 +95,9 @@ public partial class Arena3DScene : Node3D
     private Teleporter _teleporter = null!;
     private readonly List<TeleportPad3DView> _padViews = new();
     private IReadOnlyList<TeleportPadLink> _authoredPads = Array.Empty<TeleportPadLink>();
+    /// <summary>Per-tank combat stats for this match — the end-of-match screen reads it.</summary>
+    public BattleStats Stats { get; private set; } = null!;
+
     private (int X, int Y) _playerSpawn;
     private IReadOnlyList<(int X, int Y)> _enemySpawns = Array.Empty<(int, int)>();
     private Camera3D _camera = null!;
@@ -156,6 +159,7 @@ public partial class Arena3DScene : Node3D
 
         var combat = new CombatResolver(CombatHitRadius, alliedTeam: PlayerTeam);
         _world = new World(combat);
+        Stats = new BattleStats(_world, combat); // before any spawn, so it sees every tank and shot
         _world.EntitySpawned += OnEntitySpawned;
         _world.EntityDespawned += OnEntityDespawned;
 
