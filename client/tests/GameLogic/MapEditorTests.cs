@@ -194,8 +194,7 @@ public class MapEditorTests
         editor.GroundTheme = GroundTheme.Mars;
         editor.PaintMaterial = CellMaterial.Brick;
         editor.ApplyAt(5, 5);
-        editor.Action = EditorAction.RotateCell;
-        editor.ApplyAt(5, 5);
+        editor.SetTransform(5, 5, new PropTransform(45f, 0f, 0f, 1.2f));
         editor.Action = EditorAction.ToggleBush;
         editor.ApplyAt(6, 6);
         editor.Action = EditorAction.RaiseLayer;
@@ -208,7 +207,7 @@ public class MapEditorTests
         Assert.Equal(40, editor.Width);
         Assert.Equal(GroundTheme.Mars, editor.GroundTheme);
         Assert.Equal(CellMaterial.Brick, editor.MaterialAt(5, 5));
-        Assert.Equal(1, editor.ToMap().Orientations![5, 5]);
+        Assert.Equal(45f, editor.TransformAt(5, 5).YawDeg);
         Assert.True(editor.BushAt(6, 6));
         Assert.Equal(1, editor.LayerAt(7, 7));
         Assert.Contains((20, 12), editor.EnemySpawns);
@@ -235,46 +234,40 @@ public class MapEditorTests
         Assert.Equal((1, 1), editor.PlayerSpawn); // rehomed to the safe default
     }
 
-    // ── Rotation (owner feedback 2026-06-11): any placed item can be rotated in quarter turns ──
+    // ── Posing (owner follow-up 2026-06-11): the selection gizmo rotates and scales placed items ──
 
     [Fact]
-    public void RotateCell_CyclesAPlacedItemsQuarterTurns()
+    public void SetTransform_PosesAPlacedItem_AndIdentityKeepsTheDocumentLean()
     {
         var editor = Medium();
         editor.Action = EditorAction.PaintMaterial;
         editor.PaintMaterial = CellMaterial.Brick; // the fence
         editor.ApplyAt(5, 5);
 
-        editor.Action = EditorAction.RotateCell;
-        editor.ApplyAt(5, 5);
-        Assert.Equal(1, editor.ToMap().Orientations![5, 5]);
+        editor.SetTransform(5, 5, new PropTransform(YawDeg: 37f, PitchDeg: 0f, RollDeg: -15f, Scale: 1.4f));
+        Assert.Equal(37f, editor.TransformAt(5, 5).YawDeg);
+        Assert.Equal(new PropTransform(37f, 0f, -15f, 1.4f), editor.ToMap().Transforms![(5, 5)]);
 
-        editor.ApplyAt(5, 5);
-        editor.ApplyAt(5, 5);
-        Assert.Equal(3, editor.ToMap().Orientations![5, 5]);
-
-        editor.ApplyAt(5, 5); // full circle
-        Assert.Null(editor.ToMap().Orientations); // back to unrotated → the lean document again
+        editor.SetTransform(5, 5, PropTransform.Identity); // posing back to identity removes the entry
+        Assert.Null(editor.ToMap().Transforms);
     }
 
     [Fact]
-    public void RotateCell_IgnoresFloor_AndRepaintingResets()
+    public void SetTransform_IgnoresFloor_AndRepaintingResets()
     {
         var editor = Medium();
-        editor.Action = EditorAction.RotateCell;
-        editor.ApplyAt(6, 6); // floor — nothing to rotate
-        Assert.Null(editor.ToMap().Orientations);
+        editor.SetTransform(6, 6, new PropTransform(90f, 0f, 0f, 1f)); // floor — nothing to pose
+        Assert.Null(editor.ToMap().Transforms);
 
         editor.Action = EditorAction.PaintMaterial;
         editor.PaintMaterial = CellMaterial.Crate;
         editor.ApplyAt(7, 6);
-        editor.Action = EditorAction.RotateCell;
-        editor.ApplyAt(7, 6);
-        Assert.Equal(1, editor.ToMap().Orientations![7, 6]);
+        editor.SetTransform(7, 6, new PropTransform(90f, 0f, 0f, 2f));
+        Assert.Equal(2f, editor.TransformAt(7, 6).Scale);
 
         editor.Action = EditorAction.PaintMaterial;
-        editor.ApplyAt(7, 6); // repainting the cell resets its facing
-        Assert.Null(editor.ToMap().Orientations);
+        editor.ApplyAt(7, 6); // repainting the cell resets its pose
+        Assert.Null(editor.ToMap().Transforms);
     }
 
     [Fact]

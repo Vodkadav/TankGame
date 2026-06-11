@@ -79,10 +79,23 @@ public static class MapCodec
                 WriteRows(writer, "ramps", map.Width, map.Height, (x, y) => ramps[x, y] ? RampOn : OverlayOff);
             }
 
-            // Facings only when authored — an unrotated map keeps the lean document shape.
-            if (map.Orientations is { } orientations)
+            // Poses only when authored — an untouched map keeps the lean document shape.
+            if (map.Transforms is { Count: > 0 } transforms)
             {
-                WriteRows(writer, "orientations", map.Width, map.Height, (x, y) => (char)('0' + orientations[x, y]));
+                writer.WriteStartArray("transforms");
+                foreach (var ((x, y), t) in transforms)
+                {
+                    writer.WriteStartObject();
+                    writer.WriteNumber("x", x);
+                    writer.WriteNumber("y", y);
+                    writer.WriteNumber("yaw", t.YawDeg);
+                    writer.WriteNumber("pitch", t.PitchDeg);
+                    writer.WriteNumber("roll", t.RollDeg);
+                    writer.WriteNumber("scale", t.Scale);
+                    writer.WriteEndObject();
+                }
+
+                writer.WriteEndArray();
             }
 
             WriteCell(writer, "playerSpawn", map.PlayerSpawn.X, map.PlayerSpawn.Y);
@@ -197,7 +210,7 @@ public static class MapCodec
 
                 return new MapDefinition(
                     name, materials, bushes, sandbags, playerSpawn, enemySpawns, powerupSpawns,
-                    teleportPads, layers, ramps, groundTheme, ReadOrientations(root, width, height));
+                    teleportPads, layers, ramps, groundTheme, ReadTransforms(root, width, height));
             }
             catch (KeyNotFoundException ex)
             {
@@ -291,16 +304,35 @@ public static class MapCodec
         return layers;
     }
 
-    // Facing rows are optional: a document without them is an unrotated map.
-    private static int[,]? ReadOrientations(JsonElement root, int width, int height)
+    // Poses are optional: a document without them is an untouched map. Two shapes decode — the
+    // current sparse "transforms" list, and the short-lived quarter-turn "orientations" rows
+    // (#199), whose turns become the equivalent yaw so old saves keep their look.
+    private static IReadOnlyDictionary<(int X, int Y), PropTransform>? ReadTransforms(
+        JsonElement root, int width, int height)
     {
+        if (root.TryGetProperty("transforms", out var list))
+        {
+            var transforms = new Dictionary<(int X, int Y), PropTransform>();
+            foreach (var entry in list.EnumerateArray())
+            {
+                transforms[(entry.GetProperty("x").GetInt32(), entry.GetProperty("y").GetInt32())] =
+                    new PropTransform(
+                        entry.GetProperty("yaw").GetSingle(),
+                        entry.GetProperty("pitch").GetSingle(),
+                        entry.GetProperty("roll").GetSingle(),
+                        entry.GetProperty("scale").GetSingle());
+            }
+
+            return transforms.Count > 0 ? transforms : null;
+        }
+
         if (!root.TryGetProperty("orientations", out _))
         {
             return null;
         }
 
         var rows = ReadRowStrings(root, "orientations", width, height);
-        var orientations = new int[width, height];
+        var legacy = new Dictionary<(int X, int Y), PropTransform>();
         for (var y = 0; y < height; y++)
         {
             for (var x = 0; x < width; x++)
@@ -311,11 +343,15 @@ public static class MapCodec
                     throw new MapFormatException($"unknown orientation glyph '{glyph}' at ({x},{y})");
                 }
 
-                orientations[x, y] = glyph - '0';
+                if (glyph != '0')
+                {
+                    // The quarter-turn renderer applied RotateY(-90° × turns) — reproduce as yaw.
+                    legacy[(x, y)] = new PropTransform(-90f * (glyph - '0'), 0f, 0f, 1f);
+                }
             }
         }
 
-        return orientations;
+        return legacy.Count > 0 ? legacy : null;
     }
 
     private static bool[,] ReadRampOverlay(JsonElement root, int width, int height)

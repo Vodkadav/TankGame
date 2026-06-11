@@ -32,7 +32,7 @@ public class MapEditorSceneTests : TestClass
     [Test]
     public void Editor_BuildsThePaletteAndTheActionButtons()
     {
-        foreach (var name in new[] { "Steel", "Bush", "Spawn", "TeleportPad", "RaiseLayer", "LowerLayer", "Ramp", "Rotate", "Erase", "SizeMedium", "Validate", "TestPlay", "Save", "Back" })
+        foreach (var name in new[] { "Steel", "Bush", "Spawn", "TeleportPad", "RaiseLayer", "LowerLayer", "Ramp", "Erase", "SizeMedium", "Validate", "TestPlay", "Save", "Back" })
         {
             if (_editor.FindChild(name, recursive: true, owned: false) is not Button)
             {
@@ -108,23 +108,54 @@ public class MapEditorSceneTests : TestClass
         }
     }
 
-    // Rotation is WYSIWYG (owner feedback 2026-06-11): rotating a placed fence turns its real mesh
-    // a quarter turn in the editor preview, exactly as it will stand in play.
+    // The selection gizmo (owner follow-up 2026-06-11): right-clicking a placed item selects it —
+    // three axis rings rotate it freely and the size bar scales it, WYSIWYG in the preview mesh.
     [Test]
-    public void RotatingAPlacedFence_TurnsItsMesh_AQuarterTurn()
+    public void SelectingAPlacedFence_ShowsTheGizmo_AndPosingItMovesTheMesh()
     {
         _editor.NewMap(28, 16);
         _editor.SelectMaterial(CellMaterial.Brick);
         _editor.Paint(5, 5);
-        _editor.SelectAction(EditorAction.RotateCell);
-        _editor.Paint(5, 5);
+
+        _editor.SelectCell(5, 5);
+        if (_editor.SelectedCell != (5, 5))
+        {
+            throw new System.Exception("Right-click selection must remember the picked cell.");
+        }
+
+        var gizmo = _editor.FindChild("SelectionGizmo", recursive: true, owned: false) as RotationGizmo3D
+            ?? throw new System.Exception("Selecting a placed item must show the axis-ring gizmo.");
+        if (!gizmo.Visible || gizmo.GetChildCount() < 3)
+        {
+            throw new System.Exception("The gizmo must present its three axis rings.");
+        }
+
+        var scalePanel = _editor.FindChild("ScalePanel", recursive: true, owned: false) as Control
+            ?? throw new System.Exception("Selecting must reveal the scale panel.");
+        if (!scalePanel.Visible)
+        {
+            throw new System.Exception("The size bar must appear with the selection.");
+        }
+
+        _editor.RotateSelected(RotationGizmo3D.AxisY, 90f);
+        _editor.ScaleSelected(1.5f);
 
         var wall = _editor.FindChild("Wall_5_5", recursive: true, owned: false) as Node3D
             ?? throw new System.Exception("The painted fence must render as a wall node.");
-        var quarter = Mathf.Abs(Mathf.Wrap(wall.Rotation.Y, -Mathf.Pi, Mathf.Pi));
-        if (Mathf.Abs(quarter - (Mathf.Pi / 2f)) > 0.01f)
+        if (Mathf.Abs(Mathf.Abs(Mathf.RadToDeg(wall.Rotation.Y)) - 90f) > 0.1f)
         {
-            throw new System.Exception($"One rotate must turn the mesh 90°; yaw was {Mathf.RadToDeg(wall.Rotation.Y)}°.");
+            throw new System.Exception($"The yaw ring must turn the mesh; yaw was {Mathf.RadToDeg(wall.Rotation.Y)}°.");
+        }
+
+        if (Mathf.Abs(wall.Scale.X - 1.5f) > 0.01f)
+        {
+            throw new System.Exception($"The size bar must scale the mesh; scale was {wall.Scale.X}.");
+        }
+
+        _editor.SelectCell(6, 6); // empty floor — nothing to pose
+        if (_editor.SelectedCell is not null || gizmo.Visible)
+        {
+            throw new System.Exception("Clicking empty floor must deselect and hide the gizmo.");
         }
     }
 

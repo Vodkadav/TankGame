@@ -82,23 +82,40 @@ public class MapCodecTests
     }
 
     [Fact]
-    public void Orientations_RoundTrip_AndAMissingField_MeansUnrotated()
+    public void Transforms_RoundTrip_AndAMissingField_MeansUntouched()
     {
-        var blank = MapDefinition.CreateBlank("Turny", 4, 4);
-        var orientations = new int[4, 4];
-        orientations[1, 2] = 3;
-        var rotated = new MapDefinition(
+        var blank = MapDefinition.CreateBlank("Posey", 4, 4);
+        var posed = new MapDefinition(
             blank.Name, blank.Materials, blank.Bushes, blank.Sandbags, (1, 1),
             new (int X, int Y)[] { (2, 2) }, System.Array.Empty<PowerupSpawn>(),
-            orientations: orientations);
+            transforms: new System.Collections.Generic.Dictionary<(int X, int Y), PropTransform>
+            {
+                [(1, 2)] = new(YawDeg: 37.5f, PitchDeg: -10f, RollDeg: 90f, Scale: 1.75f),
+            });
 
-        var restored = MapCodec.Decode(MapCodec.Encode(rotated));
-        Assert.NotNull(restored.Orientations);
-        Assert.Equal(3, restored.Orientations![1, 2]);
+        var restored = MapCodec.Decode(MapCodec.Encode(posed));
+        Assert.NotNull(restored.Transforms);
+        Assert.Equal(new PropTransform(37.5f, -10f, 90f, 1.75f), restored.Transforms![(1, 2)]);
 
         var plain = MapCodec.Decode(MapCodec.Encode(MapDefinition.CreateBlank("Plain", 4, 4)));
-        Assert.Null(plain.Orientations);
-        Assert.DoesNotContain("orientations", MapCodec.Encode(MapDefinition.CreateBlank("Plain", 4, 4)));
+        Assert.Null(plain.Transforms);
+        Assert.DoesNotContain("transforms", MapCodec.Encode(MapDefinition.CreateBlank("Plain", 4, 4)));
+    }
+
+    [Fact]
+    public void Decode_ConvertsLegacyQuarterTurnOrientations_ToYawTransforms()
+    {
+        // A #199-era document stored quarter turns as glyph rows; it must decode to the equivalent
+        // free-rotation pose (the renderer applied -90° per turn) so old saves keep their look.
+        var legacy = "{\"name\":\"Legacy\",\"width\":3,\"height\":3," +
+            "\"materials\":[\"###\",\"#x#\",\"###\"],\"bushes\":[\"...\",\"...\",\"...\"]," +
+            "\"sandbags\":[\"...\",\"...\",\"...\"],\"orientations\":[\"000\",\"030\",\"000\"]," +
+            "\"playerSpawn\":[1,1],\"enemySpawns\":[[1,1]],\"powerupSpawns\":[]}";
+
+        var restored = MapCodec.Decode(legacy);
+
+        Assert.NotNull(restored.Transforms);
+        Assert.Equal(new PropTransform(-270f, 0f, 0f, 1f), restored.Transforms![(1, 1)]);
     }
 
     [Fact]

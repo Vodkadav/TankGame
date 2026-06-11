@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using TankGame.Domain;
 
 namespace TankGame.GameLogic;
@@ -25,17 +26,18 @@ public sealed class WallGrid : IWallGrid
     // Cells that are ramps (connecting LayerAt and LayerAt+1), or null for a flat grid.
     private readonly bool[,]? _ramps;
 
-    // Per-cell facing in quarter turns (cosmetic, owner feedback 2026-06-11), or null when unrotated.
-    private readonly int[,]? _orientations;
+    // Per-cell authored poses (cosmetic, owner follow-up 2026-06-11), or null when nothing is posed.
+    private readonly IReadOnlyDictionary<(int X, int Y), PropTransform>? _transforms;
 
-    public WallGrid(WallCell[,] cells, int[,]? layers = null, bool[,]? ramps = null, int[,]? orientations = null)
+    public WallGrid(WallCell[,] cells, int[,]? layers = null, bool[,]? ramps = null,
+        IReadOnlyDictionary<(int X, int Y), PropTransform>? transforms = null)
     {
         _cells = cells;
         Width = cells.GetLength(0);
         Height = cells.GetLength(1);
         _layers = layers;
         _ramps = ramps;
-        _orientations = orientations;
+        _transforms = transforms;
     }
 
     /// <summary>Builds a grid from a material map, filling each brick cell with
@@ -43,7 +45,8 @@ public sealed class WallGrid : IWallGrid
     /// <paramref name="layers"/> map (same shape) raises cells onto elevation layers; omit it for a
     /// flat, single-layer grid (ADR-0018).</summary>
     public static WallGrid FromMaterials(
-        CellMaterial[,] materials, int[,]? layers = null, bool[,]? ramps = null, int[,]? orientations = null)
+        CellMaterial[,] materials, int[,]? layers = null, bool[,]? ramps = null,
+        IReadOnlyDictionary<(int X, int Y), PropTransform>? transforms = null)
     {
         var width = materials.GetLength(0);
         var height = materials.GetLength(1);
@@ -64,7 +67,7 @@ public sealed class WallGrid : IWallGrid
             }
         }
 
-        return new WallGrid(cells, layers, ramps, orientations);
+        return new WallGrid(cells, layers, ramps, transforms);
     }
 
     public int Width { get; }
@@ -79,8 +82,10 @@ public sealed class WallGrid : IWallGrid
 
     public bool IsRamp(int x, int y) => _ramps is not null && InBounds(x, y) && _ramps[x, y];
 
-    public int OrientationAt(int x, int y) =>
-        _orientations is not null && InBounds(x, y) ? _orientations[x, y] : 0;
+    public PropTransform TransformAt(int x, int y) =>
+        _transforms is not null && _transforms.TryGetValue((x, y), out var transform)
+            ? transform
+            : PropTransform.Identity;
 
     public bool IsBlocked(int x, int y) => CellMaterials.BlocksMovement(GetCell(x, y).Material);
 

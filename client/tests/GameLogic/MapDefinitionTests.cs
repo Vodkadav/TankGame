@@ -79,23 +79,19 @@ public class MapDefinitionTests
     }
 
     [Fact]
-    public void Orientations_DefaultToNull_AndAreCarried()
+    public void Transforms_DefaultToNull_AndAreCarried()
     {
         var plain = MapDefinition.CreateBlank("Plain", 5, 5);
-        Assert.Null(plain.Orientations);
+        Assert.Null(plain.Transforms);
 
-        var orientations = new int[5, 5];
-        orientations[2, 2] = 1;
-        var rotated = new MapDefinition(
+        var posed = new MapDefinition(
             plain.Name, plain.Materials, plain.Bushes, plain.Sandbags,
             plain.PlayerSpawn, plain.EnemySpawns, plain.PowerupSpawns,
-            orientations: orientations);
-        Assert.Equal(1, rotated.Orientations![2, 2]);
-
-        Assert.Throws<ArgumentException>(() => new MapDefinition(
-            plain.Name, plain.Materials, plain.Bushes, plain.Sandbags,
-            plain.PlayerSpawn, plain.EnemySpawns, plain.PowerupSpawns,
-            orientations: new int[3, 3]));
+            transforms: new System.Collections.Generic.Dictionary<(int X, int Y), PropTransform>
+            {
+                [(2, 2)] = new(90f, 0f, 0f, 1f),
+            });
+        Assert.Equal(90f, posed.Transforms![(2, 2)].YawDeg);
     }
 
     [Fact]
