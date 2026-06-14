@@ -20,6 +20,7 @@ public enum MapValidationCode
     LayerOutOfRange,
     RampNotOnFloor,
     TooManyTankSpawns,
+    SpawnBlockedByProp,
 }
 
 /// <summary>One validation problem, with the cell it concerns (or (-1, -1) when it is not about a
@@ -58,6 +59,11 @@ public static class MapValidator
         var errors = new List<MapValidationError>();
         CheckElevation(map, errors);
 
+        // The same grid the play build collides against, so a scaled prop's footprint (which blocks
+        // the cells it overhangs, #213) walls off and buries spawns for the validator exactly as it
+        // does in play — no duplicated footprint maths, no drift.
+        var grid = WallGrid.FromMaterials(map.Materials, map.Layers, map.Ramps, map.Transforms);
+
         var playerInBounds = InBounds(map, map.PlayerSpawn.X, map.PlayerSpawn.Y);
         if (!playerInBounds)
         {
@@ -66,6 +72,10 @@ public static class MapValidator
         else if (!IsFloor(map, map.PlayerSpawn.X, map.PlayerSpawn.Y))
         {
             errors.Add(new MapValidationError(MapValidationCode.PlayerSpawnNotFloor, map.PlayerSpawn.X, map.PlayerSpawn.Y));
+        }
+        else if (grid.IsBlocked(map.PlayerSpawn.X, map.PlayerSpawn.Y))
+        {
+            errors.Add(new MapValidationError(MapValidationCode.SpawnBlockedByProp, map.PlayerSpawn.X, map.PlayerSpawn.Y));
         }
 
         if (map.EnemySpawns.Count == 0)
@@ -80,31 +90,32 @@ public static class MapValidator
 
         foreach (var (x, y) in map.EnemySpawns)
         {
-            CheckSpawnCell(map, x, y, errors, MapValidationCode.EnemySpawnOutOfBounds, MapValidationCode.EnemySpawnNotFloor);
+            CheckSpawnCell(map, grid, x, y, errors, MapValidationCode.EnemySpawnOutOfBounds, MapValidationCode.EnemySpawnNotFloor);
         }
 
         foreach (var spawn in map.PowerupSpawns)
         {
-            CheckSpawnCell(map, spawn.X, spawn.Y, errors, MapValidationCode.PowerupSpawnOutOfBounds, MapValidationCode.PowerupSpawnNotFloor);
+            CheckSpawnCell(map, grid, spawn.X, spawn.Y, errors, MapValidationCode.PowerupSpawnOutOfBounds, MapValidationCode.PowerupSpawnNotFloor);
         }
 
         foreach (var pad in map.TeleportPads)
         {
-            CheckSpawnCell(map, pad.AX, pad.AY, errors, MapValidationCode.TeleportPadOutOfBounds, MapValidationCode.TeleportPadNotFloor);
-            CheckSpawnCell(map, pad.BX, pad.BY, errors, MapValidationCode.TeleportPadOutOfBounds, MapValidationCode.TeleportPadNotFloor);
+            CheckSpawnCell(map, grid, pad.AX, pad.AY, errors, MapValidationCode.TeleportPadOutOfBounds, MapValidationCode.TeleportPadNotFloor);
+            CheckSpawnCell(map, grid, pad.BX, pad.BY, errors, MapValidationCode.TeleportPadOutOfBounds, MapValidationCode.TeleportPadNotFloor);
             if (pad.AX == pad.BX && pad.AY == pad.BY)
             {
                 errors.Add(new MapValidationError(MapValidationCode.TeleportPadEndpointsCoincide, pad.AX, pad.AY));
             }
         }
 
-        // Reachability only makes sense from a real standing-room player start.
-        if (playerInBounds && !CellMaterials.BlocksMovement(map.Materials[map.PlayerSpawn.X, map.PlayerSpawn.Y]))
+        // Reachability only makes sense from a real standing-room player start (in bounds, on floor,
+        // and not buried under a prop's footprint).
+        if (playerInBounds && !grid.IsBlocked(map.PlayerSpawn.X, map.PlayerSpawn.Y))
         {
-            var reachable = FloodFill(map);
+            var reachable = FloodFill(map, grid);
             foreach (var (x, y) in map.EnemySpawns)
             {
-                if (InBounds(map, x, y) && !reachable[x, y])
+                if (InBounds(map, x, y) && !grid.IsBlocked(x, y) && !reachable[x, y])
                 {
                     errors.Add(new MapValidationError(MapValidationCode.SpawnUnreachable, x, y));
                 }
@@ -112,7 +123,7 @@ public static class MapValidator
 
             foreach (var spawn in map.PowerupSpawns)
             {
-                if (InBounds(map, spawn.X, spawn.Y) && !reachable[spawn.X, spawn.Y])
+                if (InBounds(map, spawn.X, spawn.Y) && !grid.IsBlocked(spawn.X, spawn.Y) && !reachable[spawn.X, spawn.Y])
                 {
                     errors.Add(new MapValidationError(MapValidationCode.SpawnUnreachable, spawn.X, spawn.Y));
                 }
@@ -123,7 +134,7 @@ public static class MapValidator
     }
 
     private static void CheckSpawnCell(
-        MapDefinition map, int x, int y, List<MapValidationError> errors,
+        MapDefinition map, IWallGrid grid, int x, int y, List<MapValidationError> errors,
         MapValidationCode outOfBounds, MapValidationCode notFloor)
     {
         if (!InBounds(map, x, y))
@@ -133,6 +144,10 @@ public static class MapValidator
         else if (!IsFloor(map, x, y))
         {
             errors.Add(new MapValidationError(notFloor, x, y));
+        }
+        else if (grid.IsBlocked(x, y))
+        {
+            errors.Add(new MapValidationError(MapValidationCode.SpawnBlockedByProp, x, y));
         }
     }
 
@@ -161,7 +176,7 @@ public static class MapValidator
     // high ground with no ramp up is correctly unreachable from below. Teleport pads are extra edges:
     // standing on a pad (on the pad cell's own layer) warps to its partner, so a pad pair may be the
     // only route into a pocket or up onto a plateau (teleport pads T3).
-    private static bool[,] FloodFill(MapDefinition map)
+    private static bool[,] FloodFill(MapDefinition map, IWallGrid grid)
     {
         var reachable = new bool[map.Width, map.Height];
         var visited = new HashSet<(int X, int Y, int Layer)>();
@@ -193,7 +208,8 @@ public static class MapValidator
             {
                 var nx = x + dx;
                 var ny = y + dy;
-                if (!InBounds(map, nx, ny) || CellMaterials.BlocksMovement(map.Materials[nx, ny]))
+                // IsBlocked covers solid materials AND the footprint cells a scaled prop overhangs (#213).
+                if (!InBounds(map, nx, ny) || grid.IsBlocked(nx, ny))
                 {
                     continue;
                 }
