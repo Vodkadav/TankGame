@@ -42,9 +42,9 @@ public class Arena3DSceneTests : TestClass
         System.GC.Collect();
     }
 
-    // Victory screen v2 (owner ask 2026-06-11): the celebration banner artwork with the champion's
-    // name over its ribbon (a team win names the top-killer member), a scrollable leaderboard over
-    // the art's plaque, and arrows panning between ranking views.
+    // Victory screen v3 (owner ask 2026-06-11/14): the celebration banner artwork with the champion's
+    // name carved into its ribbon (a team win names the top-killer member), a fixed eight-plate
+    // leaderboard anchored onto the art's numbered plaques, and arrows panning between ranking views.
     [Test]
     public void ShowMatchOver_PresentsTheBannerArt_Champion_AndPannableLeaderboard()
     {
@@ -79,16 +79,16 @@ public class Arena3DSceneTests : TestClass
             }
         }
 
-        var rows = _arena.FindChild("LeaderboardRows", recursive: true, owned: false) as VBoxContainer
+        var rows = _arena.FindChild("LeaderboardRows", recursive: true, owned: false) as Control
             ?? throw new System.Exception("The match-over screen must show the leaderboard rows.");
         if (rows.GetChildCount() != 4)
         {
-            throw new System.Exception($"All four tanks must rank on the board; saw {rows.GetChildCount()} rows.");
+            throw new System.Exception($"All four tanks must rank on the plates; saw {rows.GetChildCount()} rows.");
         }
 
-        if (rows.GetParent() is not ScrollContainer)
+        if (rows is ScrollContainer || rows.GetParent() is ScrollContainer)
         {
-            throw new System.Exception("The leaderboard must scroll, so any tank count fits the plaque.");
+            throw new System.Exception("v3 anchors eight fixed plates onto the art — the leaderboard must not scroll.");
         }
 
         var title = _arena.FindChild("ViewTitle", recursive: true, owned: false) as Label
