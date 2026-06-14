@@ -269,14 +269,25 @@ public partial class Arena3DScene : Node3D
         return button;
     }
 
-    // The plaque: a dark metal panel holding the ranked rows (filled by RebuildLeaderboard).
+    // The plaque: a dark metal panel holding the ranked rows (filled by RebuildLeaderboard) inside a
+    // fixed-height scroll window — about four rows show at once, and at the 4v4 cap of eight tanks the
+    // rest scroll into view (owner ask 2026-06-14).
     private Control BuildPlaque(Vector2 viewport, float cardWidth)
     {
         var plaque = new PanelContainer { Name = "Plaque", CustomMinimumSize = new Vector2(cardWidth, 0f) };
         plaque.AddThemeStyleboxOverride("panel", PlaqueStyle());
-        _leaderboardRows = new VBoxContainer { Name = "LeaderboardRows" };
+
+        var scroll = new ScrollContainer
+        {
+            Name = "LeaderboardScroll",
+            CustomMinimumSize = new Vector2(0f, (viewport.Y * 0.205f) + 44f), // ~four rows tall
+            HorizontalScrollMode = ScrollContainer.ScrollMode.Disabled,
+            VerticalScrollMode = ScrollContainer.ScrollMode.Auto,
+        };
+        _leaderboardRows = new VBoxContainer { Name = "LeaderboardRows", SizeFlagsHorizontal = Control.SizeFlags.ExpandFill };
         _leaderboardRows.AddThemeConstantOverride("separation", (int)(viewport.Y * 0.008f));
-        plaque.AddChild(_leaderboardRows);
+        scroll.AddChild(_leaderboardRows);
+        plaque.AddChild(scroll);
         return plaque;
     }
 
