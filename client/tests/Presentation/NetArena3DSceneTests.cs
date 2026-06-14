@@ -107,6 +107,29 @@ public class NetArena3DSceneTests : TestClass
     }
 
     [Test]
+    public void GuestSnapshot_MirrorsProjectiles_AndClearsThemWhenGone()
+    {
+        _transport.DeliverWelcome(1);
+        _transport.DeliverSnapshot(new SnapshotFrame(1, 0,
+            new List<TankState>(), new List<WallDelta>(),
+            new List<ProjectileState> { new(120f, 200f, 0.5f, (byte)ProjectileStyle.Normal, 0) }));
+
+        if (_scene.MirroredProjectileCount != 1)
+        {
+            throw new Exception($"The guest must mirror the snapshot's shots; saw {_scene.MirroredProjectileCount}.");
+        }
+
+        // A later snapshot with no shots clears them — the shot landed on the host.
+        _transport.DeliverSnapshot(new SnapshotFrame(2, 0,
+            new List<TankState>(), new List<WallDelta>(), new List<ProjectileState>()));
+
+        if (_scene.MirroredProjectileCount != 0)
+        {
+            throw new Exception("A snapshot with no shots must clear the mirrored projectiles.");
+        }
+    }
+
+    [Test]
     public void GuestTick_SendsOneInputFrame_PerFixedTick()
     {
         _transport.DeliverWelcome(1);

@@ -96,6 +96,7 @@ describe("MatchRoom (relay)", () => {
       ackSeq: 2,
       tanks: [{ slot: 0, x: 64, y: 128, rotation: 0, turretRotation: 0.5, hp: 8, team: 0 }],
       wallDeltas: [],
+      projectiles: [],
     };
     host.ws.send(encodeSnapshotMessage(snapshot));
 
