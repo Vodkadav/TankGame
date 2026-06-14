@@ -103,11 +103,11 @@ public partial class Arena3DScene : Node3D
     /// <summary>True once the victory screen is up: the world stops stepping.</summary>
     public bool IsMatchOver { get; private set; }
 
-    private const string BannerArtPath = "res://src/Presentation/Arena/ui/victory_banner.png";
-    private const int PlateCount = 8; // the artwork's numbered plates = the 4v4 tank cap
+    private const string BackdropPath = "res://src/Presentation/Arena/ui/victory_bg.png";
+    private const int MaxRows = 8; // the 4v4 tank cap — up to eight ranked rows, one per tank
 
-    // The leaderboard's ranking views, panned with the arrows (owner ask 2026-06-11). Victory v3 keeps
-    // the single cycling view (owner choice) and re-anchors it onto the eight-plate template2 artwork.
+    // The ranking views, switched with the nav arrows (owner ask 2026-06-11/14): each is a full
+    // ranking of every tank by one metric.
     private static readonly (string TitleKey, Func<BattleStats.TankTally, int> Value)[] LeaderboardViews =
     {
         ("stats.kills", t => t.Kills),
@@ -118,40 +118,31 @@ public partial class Arena3DScene : Node3D
         ("stats.assists", t => t.Assists),
     };
 
-    // Anchors measured from victory_banner.png (1024x1471, prepared by scripts/prep_victory_banner.py):
-    // the wood ribbon (champion name), the two header pills and the arrow buttons flanking them (view
-    // nav), the eight numbered plates (leaderboard rows), and a bottom strip for the menu buttons. All
-    // are fractions of the banner's drawn rectangle, recomputed on resize so they track the art at any
-    // window size (the portrait banner fits height on a landscape window, with dim bands at the sides).
-    private static readonly Rect2 RibbonFrac = new(0.205f, 0.150f, 0.580f, 0.082f);
-    private static readonly Rect2 ViewTitleFrac = new(0.265f, 0.436f, 0.455f, 0.050f);
-    private static readonly Rect2 PrevArrowFrac = new(0.150f, 0.432f, 0.075f, 0.058f);
-    private static readonly Rect2 NextArrowFrac = new(0.775f, 0.432f, 0.075f, 0.058f);
-    private static readonly Rect2 ButtonBarFrac = new(0.110f, 0.952f, 0.780f, 0.044f);
-    private static readonly float[] PlateMidFrac = { 0.558f, 0.611f, 0.666f, 0.718f, 0.771f, 0.823f, 0.873f, 0.926f };
-    private const float PlateLeftFrac = 0.175f; // text starts past the baked number badge
-    private const float PlateRightFrac = 0.945f;
-    private const float PlateHeightFrac = 0.046f;
-
-    private static readonly Color PlateInk = new(0.20f, 0.13f, 0.05f);   // dark text on the gold plaques
-    private static readonly Color AwardRed = new(0.55f, 0.10f, 0.08f);   // the art's deep red, for award tags
-    private static readonly Color RibbonGold = new(1f, 0.84f, 0.30f);    // the ribbon/pill gold
+    // The victory screen is composed from real UI controls over a generated celebration backdrop
+    // (owner feedback 2026-06-14: the old screen floated text over a baked mock-up, which fought the
+    // live content). These colours echo the backdrop so the built ribbon/plaque/plates/badges match it.
+    private static readonly Color RibbonWood = new(0.45f, 0.27f, 0.12f);
+    private static readonly Color Gold = new(1f, 0.82f, 0.28f);
+    private static readonly Color PlaqueMetal = new(0.15f, 0.16f, 0.19f, 0.95f);
+    private static readonly Color PlateGold = new(0.84f, 0.62f, 0.16f);
+    private static readonly Color PlateSilver = new(0.57f, 0.60f, 0.63f);
+    private static readonly Color PlateInk = new(0.13f, 0.08f, 0.02f);
+    private static readonly Color AwardRed = new(0.62f, 0.10f, 0.08f);
+    private static readonly Color[] BadgeColours = { new(0.18f, 0.45f, 0.86f), new(0.80f, 0.17f, 0.15f) };
 
     private int _viewIndex;
-    private Texture2D _bannerArt = null!;
+    private Texture2D _bgArt = null!;
     private Label _winnerName = null!;
     private Label _viewTitle = null!;
-    private Button _prevView = null!;
-    private Button _nextView = null!;
-    private Control _leaderboardRows = null!;
-    private HBoxContainer _buttonBar = null!;
+    private VBoxContainer _leaderboardRows = null!;
 
-    /// <summary>The end of the match, victory screen v3 (owner ask 2026-06-11/14): freeze the world
-    /// under the celebration banner artwork — the champion's name carved into its ribbon, a fixed
-    /// eight-plate leaderboard anchored onto the art's numbered plaques, the current ranking view
-    /// named over the header pills with the baked arrows panning it, and styled New Game / Back to
-    /// Menu / Exit on the bottom strip. Everything anchors to the banner's drawn rectangle and
-    /// re-lays-out on resize. Public so a test can drive it without fighting a whole battle.</summary>
+    /// <summary>The end of the match (owner ask 2026-06-11/14, rebuilt): freeze the world under a
+    /// generated celebration backdrop and compose the victory screen from real UI controls — a wood
+    /// ribbon with the champion's name and a big "IS VICTORIOUS!", a nav row whose arrows switch the
+    /// ranking sheet shown on a pill, a metal plaque of up to eight numbered gold/silver rows (one per
+    /// tank: badge, name, award tags, value), and styled New Game / Main Menu / Exit. Native
+    /// containers centre and resize it; nothing is anchored to baked artwork. Public so a test can
+    /// drive it without fighting a whole battle.</summary>
     public void ShowMatchOver(MatchResult result)
     {
         if (IsMatchOver)
@@ -161,181 +152,273 @@ public partial class Arena3DScene : Node3D
 
         IsMatchOver = true;
 
+        var viewport = GetViewport().GetVisibleRect().Size;
+        var cardWidth = Mathf.Min(viewport.X * 0.94f, 760f);
+
         var layer = new CanvasLayer { Name = "GameOverLayer" };
-        var dim = new ColorRect { Name = "Dim", Color = new Color(0f, 0f, 0f, 0.75f) };
-        dim.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect);
-        layer.AddChild(dim);
 
-        _bannerArt = GD.Load<Texture2D>(BannerArtPath);
-        var banner = new TextureRect
+        _bgArt = GD.Load<Texture2D>(BackdropPath);
+        var backdrop = new TextureRect
         {
-            Name = "Banner",
-            Texture = _bannerArt,
-            StretchMode = TextureRect.StretchModeEnum.KeepAspectCentered,
-            ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize,
-            MouseFilter = Control.MouseFilterEnum.Ignore, // the buttons above it take the clicks
+            Name = "Backdrop",
+            Texture = _bgArt,
+            StretchMode = TextureRect.StretchModeEnum.KeepAspectCovered,
+            MouseFilter = Control.MouseFilterEnum.Ignore,
         };
-        banner.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect);
-        layer.AddChild(banner);
+        backdrop.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect);
+        layer.AddChild(backdrop);
 
-        _winnerName = BuildWinnerName(result);
-        _viewTitle = BuildViewTitle();
-        _prevView = BuildArrowButton("PrevView", () => SwitchView(-1));
-        _nextView = BuildArrowButton("NextView", () => SwitchView(1));
-        _leaderboardRows = new Control { Name = "LeaderboardRows", MouseFilter = Control.MouseFilterEnum.Ignore };
-        _buttonBar = BuildGameOverButtons();
-        layer.AddChild(_leaderboardRows);
-        layer.AddChild(_winnerName);
-        layer.AddChild(_viewTitle);
-        layer.AddChild(_prevView);
-        layer.AddChild(_nextView);
-        layer.AddChild(_buttonBar);
+        var scrim = new ColorRect
+        {
+            Name = "Scrim",
+            Color = new Color(0f, 0f, 0f, 0.30f), // darken the busy art so the plaque text reads
+            MouseFilter = Control.MouseFilterEnum.Ignore,
+        };
+        scrim.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect);
+        layer.AddChild(scrim);
+
+        // A centred portrait card: the container hierarchy positions and re-centres everything, so a
+        // window resize needs no manual maths (the font sizes, picked from the viewport, stay put).
+        var holder = new CenterContainer { Name = "CardHolder", MouseFilter = Control.MouseFilterEnum.Ignore };
+        holder.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect);
+        layer.AddChild(holder);
+
+        var card = new VBoxContainer { Name = "VictoryCard" };
+        card.AddThemeConstantOverride("separation", (int)(viewport.Y * 0.012f));
+        holder.AddChild(card);
+
+        card.AddChild(BuildTitleBlock(result, viewport));
+        card.AddChild(BuildNavRow(viewport));
+        card.AddChild(BuildPlaque(viewport, cardWidth));
+        card.AddChild(BuildGameOverButtons(viewport));
 
         AddChild(layer);
 
         _viewIndex = 0;
-        LayoutVictory();
-        GetViewport().SizeChanged += LayoutVictory; // re-anchor when the window resizes
+        RebuildLeaderboard(viewport);
     }
 
-    // The banner's on-screen rectangle under KeepAspectCentered — the portrait art fits the smaller
-    // of the two viewport ratios and centres, so on a landscape window it fills the height with dim
-    // bands at the sides. Every overlay is a fraction of this rect.
-    private Rect2 BannerDrawnRect()
-    {
-        var viewport = GetViewport().GetVisibleRect().Size;
-        var fit = Mathf.Min(viewport.X / _bannerArt.GetWidth(), viewport.Y / _bannerArt.GetHeight());
-        var size = new Vector2(_bannerArt.GetWidth(), _bannerArt.GetHeight()) * fit;
-        return new Rect2((viewport - size) * 0.5f, size);
-    }
-
-    private static void Place(Control control, Rect2 frac, Rect2 drawn)
-    {
-        control.Position = drawn.Position + (drawn.Size * frac.Position);
-        control.Size = drawn.Size * frac.Size;
-    }
-
-    // Positions every victory overlay against the current drawn rect and (re)builds the leaderboard.
-    // Called once at show time and again on every viewport resize.
-    private void LayoutVictory()
-    {
-        var drawn = BannerDrawnRect();
-        Place(_winnerName, RibbonFrac, drawn);
-        Place(_viewTitle, ViewTitleFrac, drawn);
-        Place(_prevView, PrevArrowFrac, drawn);
-        Place(_nextView, NextArrowFrac, drawn);
-        Place(_buttonBar, ButtonBarFrac, drawn);
-        _leaderboardRows.Position = drawn.Position;
-        _leaderboardRows.Size = drawn.Size;
-
-        _winnerName.AddThemeFontSizeOverride("font_size", (int)(drawn.Size.Y * 0.036f));
-        _winnerName.AddThemeConstantOverride("outline_size", Mathf.Max(1, (int)(drawn.Size.Y * 0.0045f)));
-        _viewTitle.AddThemeFontSizeOverride("font_size", (int)(drawn.Size.Y * 0.026f));
-        RebuildLeaderboard(drawn.Size);
-    }
-
-    // The champion's name carved into the artwork's wood ribbon (the baked "[PLACEHOLDER]" is erased
-    // by the prep script). Gold with a dark outline and drop shadow so it reads on the plank. A draw
-    // shows the draw line instead.
-    private Label BuildWinnerName(MatchResult result)
+    // The wood ribbon carrying the winner's name, with a big gold "IS VICTORIOUS!" beneath it (hidden
+    // on a draw). Real controls, so the text never collides with baked art.
+    private Control BuildTitleBlock(MatchResult result, Vector2 viewport)
     {
         var champion = BattleAwards.Champion(Stats.Tallies, result.WinningTeam);
-        var label = new Label
+
+        var block = new VBoxContainer { Name = "TitleBlock", SizeFlagsHorizontal = Control.SizeFlags.ShrinkCenter };
+        block.AddThemeConstantOverride("separation", (int)(viewport.Y * 0.006f));
+
+        var ribbon = new PanelContainer { Name = "Ribbon", SizeFlagsHorizontal = Control.SizeFlags.ShrinkCenter };
+        ribbon.AddThemeStyleboxOverride("panel", RibbonStyle());
+        _winnerName = new Label
         {
             Name = "WinnerName",
             Text = champion?.Name ?? TranslationServer.Translate("hud.draw"),
             HorizontalAlignment = HorizontalAlignment.Center,
-            VerticalAlignment = VerticalAlignment.Center,
-            MouseFilter = Control.MouseFilterEnum.Ignore,
         };
-        label.AddThemeColorOverride("font_color", RibbonGold);
-        label.AddThemeColorOverride("font_outline_color", new Color(0.18f, 0.09f, 0.02f));
-        label.AddThemeColorOverride("font_shadow_color", new Color(0f, 0f, 0f, 0.5f));
-        label.AddThemeConstantOverride("shadow_offset_x", 2);
-        label.AddThemeConstantOverride("shadow_offset_y", 2);
-        return label;
+        ApplyFont(_winnerName, (int)(viewport.Y * 0.032f), Gold, outline: (int)(viewport.Y * 0.004f));
+        ribbon.AddChild(_winnerName);
+        block.AddChild(ribbon);
+
+        var victorious = new Label
+        {
+            Name = "Victorious",
+            Text = TranslationServer.Translate("hud.victorious"),
+            HorizontalAlignment = HorizontalAlignment.Center,
+            Visible = champion is not null,
+        };
+        ApplyFont(victorious, (int)(viewport.Y * 0.058f), new Color(1f, 0.78f, 0.16f), outline: (int)(viewport.Y * 0.006f));
+        block.AddChild(victorious);
+        return block;
     }
 
-    // The current ranking view's name, centred over the two header pills; the baked arrows pan it.
-    private static Label BuildViewTitle()
+    // The ranking-sheet navigator: < [current sheet name] > — the arrows switch the sheet.
+    private Control BuildNavRow(Vector2 viewport)
     {
-        var title = new Label
+        var nav = new HBoxContainer { Name = "NavRow", Alignment = BoxContainer.AlignmentMode.Center };
+        nav.AddThemeConstantOverride("separation", (int)(viewport.X * 0.02f));
+        nav.SizeFlagsHorizontal = Control.SizeFlags.ShrinkCenter;
+
+        nav.AddChild(NavButton("PrevView", "<", viewport, () => SwitchView(-1)));
+
+        var pill = new PanelContainer { Name = "ViewPill" };
+        pill.AddThemeStyleboxOverride("panel", PillStyle());
+        _viewTitle = new Label
         {
             Name = "ViewTitle",
             HorizontalAlignment = HorizontalAlignment.Center,
-            VerticalAlignment = VerticalAlignment.Center,
-            MouseFilter = Control.MouseFilterEnum.Ignore,
+            CustomMinimumSize = new Vector2(viewport.X * 0.34f, 0f), // stable width so the arrows do not shift
         };
-        title.AddThemeColorOverride("font_color", new Color(1f, 0.95f, 0.72f));
-        title.AddThemeColorOverride("font_outline_color", new Color(0.10f, 0.06f, 0.02f));
-        title.AddThemeConstantOverride("outline_size", 4);
-        return title;
+        ApplyFont(_viewTitle, (int)(viewport.Y * 0.028f), new Color(1f, 0.96f, 0.80f), outline: (int)(viewport.Y * 0.003f));
+        pill.AddChild(_viewTitle);
+        nav.AddChild(pill);
+
+        nav.AddChild(NavButton("NextView", ">", viewport, () => SwitchView(1)));
+        return nav;
     }
 
-    // A transparent clickable hotspot over one of the artwork's baked arrow buttons — no chrome of
-    // its own, the arrow is part of the art.
-    private static Button BuildArrowButton(string name, Action onPressed)
+    private static Button NavButton(string name, string glyph, Vector2 viewport, Action onPressed)
     {
-        var button = new Button { Name = name, Flat = true };
-        button.AddThemeStyleboxOverride("normal", new StyleBoxEmpty());
-        button.AddThemeStyleboxOverride("hover", new StyleBoxEmpty());
-        button.AddThemeStyleboxOverride("pressed", new StyleBoxEmpty());
+        var button = new Button { Name = name, Text = glyph };
+        button.AddThemeFontSizeOverride("font_size", (int)(viewport.Y * 0.030f));
+        button.AddThemeColorOverride("font_color", new Color(1f, 1f, 1f));
+        button.AddThemeStyleboxOverride("normal", NavStyle(new Color(0.16f, 0.40f, 0.80f)));
+        button.AddThemeStyleboxOverride("hover", NavStyle(new Color(0.24f, 0.50f, 0.92f)));
+        button.AddThemeStyleboxOverride("pressed", NavStyle(new Color(0.12f, 0.30f, 0.62f)));
         button.AddThemeStyleboxOverride("focus", new StyleBoxEmpty());
         button.Pressed += onPressed;
         return button;
     }
 
-    /// <summary>Pans the leaderboard <paramref name="delta"/> views along the ring (the arrows call
-    /// it with ±1). Public so tests can drive the panning.</summary>
+    // The plaque: a dark metal panel holding the ranked rows (filled by RebuildLeaderboard).
+    private Control BuildPlaque(Vector2 viewport, float cardWidth)
+    {
+        var plaque = new PanelContainer { Name = "Plaque", CustomMinimumSize = new Vector2(cardWidth, 0f) };
+        plaque.AddThemeStyleboxOverride("panel", PlaqueStyle());
+        _leaderboardRows = new VBoxContainer { Name = "LeaderboardRows" };
+        _leaderboardRows.AddThemeConstantOverride("separation", (int)(viewport.Y * 0.008f));
+        plaque.AddChild(_leaderboardRows);
+        return plaque;
+    }
+
+    private static void ApplyFont(Label label, int size, Color colour, int outline = 0, bool shadow = true)
+    {
+        label.AddThemeFontSizeOverride("font_size", Mathf.Max(1, size));
+        label.AddThemeColorOverride("font_color", colour);
+        if (outline > 0)
+        {
+            label.AddThemeColorOverride("font_outline_color", new Color(0.12f, 0.07f, 0.02f));
+            label.AddThemeConstantOverride("outline_size", outline);
+        }
+
+        if (shadow)
+        {
+            label.AddThemeColorOverride("font_shadow_color", new Color(0f, 0f, 0f, 0.45f));
+            label.AddThemeConstantOverride("shadow_offset_x", 2);
+            label.AddThemeConstantOverride("shadow_offset_y", 2);
+        }
+    }
+
+    private static StyleBoxFlat Rounded(Color fill, Color border, int borderWidth, int radius)
+    {
+        return new StyleBoxFlat
+        {
+            BgColor = fill,
+            BorderColor = border,
+            BorderWidthLeft = borderWidth,
+            BorderWidthRight = borderWidth,
+            BorderWidthTop = borderWidth,
+            BorderWidthBottom = borderWidth,
+            CornerRadiusTopLeft = radius,
+            CornerRadiusTopRight = radius,
+            CornerRadiusBottomLeft = radius,
+            CornerRadiusBottomRight = radius,
+        };
+    }
+
+    private static StyleBoxFlat RibbonStyle()
+    {
+        var s = Rounded(RibbonWood, new Color(0.64f, 0.41f, 0.18f), 4, 16);
+        s.ContentMarginLeft = 44;
+        s.ContentMarginRight = 44;
+        s.ContentMarginTop = 8;
+        s.ContentMarginBottom = 10;
+        s.ShadowColor = new Color(0f, 0f, 0f, 0.5f);
+        s.ShadowSize = 6;
+        return s;
+    }
+
+    private static StyleBoxFlat PillStyle()
+    {
+        var s = Rounded(new Color(0.12f, 0.30f, 0.62f), Gold, 3, 24);
+        s.ContentMarginLeft = 24;
+        s.ContentMarginRight = 24;
+        s.ContentMarginTop = 8;
+        s.ContentMarginBottom = 8;
+        return s;
+    }
+
+    private static StyleBoxFlat NavStyle(Color fill)
+    {
+        var s = Rounded(fill, Gold, 3, 14);
+        s.ContentMarginLeft = 20;
+        s.ContentMarginRight = 20;
+        s.ContentMarginTop = 4;
+        s.ContentMarginBottom = 6;
+        s.ShadowColor = new Color(0f, 0f, 0f, 0.4f);
+        s.ShadowSize = 3;
+        return s;
+    }
+
+    private static StyleBoxFlat PlaqueStyle()
+    {
+        var s = Rounded(PlaqueMetal, new Color(0.46f, 0.48f, 0.52f), 4, 16);
+        s.ContentMarginLeft = 14;
+        s.ContentMarginRight = 14;
+        s.ContentMarginTop = 14;
+        s.ContentMarginBottom = 14;
+        s.ShadowColor = new Color(0f, 0f, 0f, 0.55f);
+        s.ShadowSize = 8;
+        return s;
+    }
+
+    /// <summary>Switches the leaderboard <paramref name="delta"/> sheets along the ring (the arrows
+    /// call it with ±1). Public so tests can drive the navigation.</summary>
     public void SwitchView(int delta)
     {
         var count = LeaderboardViews.Length;
         _viewIndex = ((_viewIndex + delta) % count + count) % count;
-        RebuildLeaderboard(BannerDrawnRect().Size);
+        RebuildLeaderboard(GetViewport().GetVisibleRect().Size);
     }
 
-    // Builds one row per tank, each anchored onto its numbered plate (rank 1 = the top plate). With
-    // fewer than eight tanks the lower plates simply show as empty art. Coordinates are relative to
-    // _leaderboardRows, which spans the whole drawn rect.
-    private void RebuildLeaderboard(Vector2 drawnSize)
+    // Fills the plaque with one ranked row per tank (rank 1 at the top), up to the eight-tank cap.
+    // Each row is a gold/silver plate carrying a coloured number badge, the tank name, any award tags
+    // and the metric value — all real controls in an HBox, so names and numbers never clip.
+    private void RebuildLeaderboard(Vector2 viewport)
     {
         _viewTitle.Text = LeaderboardViews[_viewIndex].TitleKey;
         var value = LeaderboardViews[_viewIndex].Value;
 
         foreach (var child in _leaderboardRows.GetChildren())
         {
-            child.Free(); // immediate, so a re-pan in the same frame rebuilds a clean list
+            child.Free(); // immediate, so a same-frame re-switch rebuilds a clean list
         }
 
         var awards = BattleAwards.Compute(Stats.Tallies);
-        var fontSize = Mathf.Max(1, (int)(drawnSize.Y * 0.023f));
         var rank = 0;
         foreach (var tally in Stats.Tallies.OrderByDescending(value))
         {
-            if (rank >= PlateCount)
+            if (rank >= MaxRows)
             {
-                break; // only the artwork's eight plates
+                break;
             }
 
-            var row = new HBoxContainer
+            var plate = new PanelContainer { Name = $"Row{rank + 1}" };
+            plate.AddThemeStyleboxOverride("panel", PlateStyle(rank % 2 == 0 ? PlateGold : PlateSilver));
+
+            var row = new HBoxContainer();
+            row.AddThemeConstantOverride("separation", (int)(viewport.X * 0.015f));
+
+            var badge = new PanelContainer { Name = "Badge" };
+            badge.AddThemeStyleboxOverride("panel", BadgeStyle(BadgeColours[rank % 2]));
+            var badgeSize = (int)(viewport.Y * 0.044f);
+            badge.CustomMinimumSize = new Vector2(badgeSize, badgeSize);
+            var number = new Label
             {
-                Name = $"Row{rank + 1}",
-                Position = new Vector2(
-                    drawnSize.X * PlateLeftFrac,
-                    drawnSize.Y * (PlateMidFrac[rank] - (PlateHeightFrac / 2f))),
-                Size = new Vector2(drawnSize.X * (PlateRightFrac - PlateLeftFrac), drawnSize.Y * PlateHeightFrac),
-                MouseFilter = Control.MouseFilterEnum.Ignore,
+                Text = (rank + 1).ToString(System.Globalization.CultureInfo.InvariantCulture),
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center,
             };
-            row.AddThemeConstantOverride("separation", (int)(drawnSize.X * 0.01f));
+            ApplyFont(number, (int)(viewport.Y * 0.026f), new Color(1f, 1f, 1f), outline: 2);
+            badge.AddChild(number);
+            row.AddChild(badge);
 
             var name = new Label
             {
-                Text = tally.Name, // the plate carries the rank number already
-                SizeFlagsHorizontal = Control.SizeFlags.ExpandFill,
+                Text = tally.Name,
                 VerticalAlignment = VerticalAlignment.Center,
+                SizeFlagsHorizontal = Control.SizeFlags.ExpandFill,
             };
-            name.AddThemeFontSizeOverride("font_size", fontSize);
-            name.AddThemeColorOverride("font_color", PlateInk);
+            ApplyFont(name, (int)(viewport.Y * 0.024f), PlateInk, shadow: false);
             row.AddChild(name);
 
             var tags = string.Join("  ", awards
@@ -344,26 +427,38 @@ public partial class Arena3DScene : Node3D
             if (tags.Length > 0)
             {
                 var honours = new Label { Text = tags, VerticalAlignment = VerticalAlignment.Center };
-                honours.AddThemeFontSizeOverride("font_size", (int)(fontSize * 0.8f));
-                honours.AddThemeColorOverride("font_color", AwardRed);
+                ApplyFont(honours, (int)(viewport.Y * 0.019f), AwardRed, shadow: false);
                 row.AddChild(honours);
             }
 
-            var amount = new Label
+            var amountLabel = new Label
             {
                 Text = value(tally).ToString(System.Globalization.CultureInfo.InvariantCulture),
                 HorizontalAlignment = HorizontalAlignment.Right,
                 VerticalAlignment = VerticalAlignment.Center,
-                CustomMinimumSize = new Vector2(drawnSize.X * 0.10f, 0f),
+                CustomMinimumSize = new Vector2(viewport.X * 0.10f, 0f),
             };
-            amount.AddThemeFontSizeOverride("font_size", fontSize);
-            amount.AddThemeColorOverride("font_color", PlateInk);
-            row.AddChild(amount);
+            ApplyFont(amountLabel, (int)(viewport.Y * 0.024f), PlateInk, shadow: false);
+            row.AddChild(amountLabel);
 
-            _leaderboardRows.AddChild(row);
+            plate.AddChild(row);
+            _leaderboardRows.AddChild(plate);
             rank++;
         }
     }
+
+    private static StyleBoxFlat PlateStyle(Color fill)
+    {
+        var s = Rounded(fill, new Color(0f, 0f, 0f, 0.25f), 2, 8);
+        s.ContentMarginLeft = 12;
+        s.ContentMarginRight = 14;
+        s.ContentMarginTop = 5;
+        s.ContentMarginBottom = 5;
+        return s;
+    }
+
+    // A high corner radius clamps to a circle at the badge's square size.
+    private static StyleBoxFlat BadgeStyle(Color fill) => Rounded(fill, new Color(1f, 1f, 1f, 0.9f), 3, 100);
 
     private static string AwardKey(AwardKind kind) => kind switch
     {
@@ -373,12 +468,12 @@ public partial class Arena3DScene : Node3D
         _ => "award.bullet_sponge",
     };
 
-    private HBoxContainer BuildGameOverButtons()
+    private HBoxContainer BuildGameOverButtons(Vector2 viewport)
     {
         var bar = new HBoxContainer { Name = "GameOverButtons", Alignment = BoxContainer.AlignmentMode.Center };
-        bar.AddThemeConstantOverride("separation", 16);
+        bar.AddThemeConstantOverride("separation", (int)(viewport.X * 0.015f));
 
-        var newGame = StyledButton("NewGame", "gameover.new_game");
+        var newGame = StyledButton("NewGame", "gameover.new_game", viewport);
         newGame.Pressed += () =>
         {
             var custom = GameSetup.CustomMap; // StartNewMatch clears it; a custom-map rematch keeps its map
@@ -388,21 +483,22 @@ public partial class Arena3DScene : Node3D
         };
         bar.AddChild(newGame);
 
-        var menu = StyledButton("BackToMenu", "pause.main_menu");
+        var menu = StyledButton("BackToMenu", "pause.main_menu", viewport);
         menu.Pressed += () => GetTree().ChangeSceneToFile("res://src/Presentation/Title.tscn");
         bar.AddChild(menu);
 
-        var exit = StyledButton("ExitGame", "pause.exit");
+        var exit = StyledButton("ExitGame", "pause.exit", viewport);
         exit.Pressed += () => GetTree().Quit();
         bar.AddChild(exit);
         return bar;
     }
 
-    // A wood-and-gold button matching the artwork: gold border, dark fill, drop shadow. Text is a
-    // locale key — Godot's Control auto-translation resolves it through the TranslationServer.
-    private static Button StyledButton(string name, string textKey)
+    // A wood-and-gold button matching the celebration art: gold border, dark fill, drop shadow. Text
+    // is a locale key — Godot's Control auto-translation resolves it through the TranslationServer.
+    private static Button StyledButton(string name, string textKey, Vector2 viewport)
     {
-        var button = new Button { Name = name, Text = textKey };
+        var button = new Button { Name = name, Text = textKey, SizeFlagsHorizontal = Control.SizeFlags.ExpandFill };
+        button.AddThemeFontSizeOverride("font_size", (int)(viewport.Y * 0.026f));
         button.AddThemeColorOverride("font_color", new Color(1f, 0.95f, 0.80f));
         button.AddThemeColorOverride("font_hover_color", new Color(1f, 1f, 0.92f));
         button.AddThemeStyleboxOverride("normal", ButtonStyle(new Color(0.30f, 0.18f, 0.08f)));
@@ -412,25 +508,17 @@ public partial class Arena3DScene : Node3D
         return button;
     }
 
-    private static StyleBoxFlat ButtonStyle(Color fill) => new()
+    private static StyleBoxFlat ButtonStyle(Color fill)
     {
-        BgColor = fill,
-        BorderColor = RibbonGold,
-        BorderWidthLeft = 2,
-        BorderWidthRight = 2,
-        BorderWidthTop = 2,
-        BorderWidthBottom = 2,
-        CornerRadiusTopLeft = 8,
-        CornerRadiusTopRight = 8,
-        CornerRadiusBottomLeft = 8,
-        CornerRadiusBottomRight = 8,
-        ShadowColor = new Color(0f, 0f, 0f, 0.5f),
-        ShadowSize = 4,
-        ContentMarginLeft = 18,
-        ContentMarginRight = 18,
-        ContentMarginTop = 8,
-        ContentMarginBottom = 8,
-    };
+        var s = Rounded(fill, Gold, 2, 8);
+        s.ShadowColor = new Color(0f, 0f, 0f, 0.5f);
+        s.ShadowSize = 4;
+        s.ContentMarginLeft = 18;
+        s.ContentMarginRight = 18;
+        s.ContentMarginTop = 10;
+        s.ContentMarginBottom = 12;
+        return s;
+    }
 
     private (int X, int Y) _playerSpawn;
     private IReadOnlyList<(int X, int Y)> _enemySpawns = Array.Empty<(int, int)>();

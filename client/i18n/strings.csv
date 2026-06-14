@@ -5,6 +5,7 @@ m2.bricks_destroyed,"Bricks destroyed: {0}","Ladrillos destruidos: {0}","Mursten
 hud.you_win,"You win!","¡Ganaste!","Du vandt!"
 hud.you_lose,"You lose!","¡Perdiste!","Du tabte!"
 hud.draw,"Draw!","¡Empate!","Uafgjort!"
+hud.victorious,"IS VICTORIOUS!","¡ES VICTORIOSO!","ER SEJRRIG!"
 hud.restart,"Play again","Jugar de nuevo","Spil igen"
 hud.p1_wins,"Player 1 wins!","¡Jugador 1 gana!","Spiller 1 vinder!"
 hud.p2_wins,"Player 2 wins!","¡Jugador 2 gana!","Spiller 2 vinder!"
