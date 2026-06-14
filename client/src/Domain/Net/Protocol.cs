@@ -17,9 +17,21 @@ public readonly record struct InputFrame(uint Seq, float MoveX, float MoveY, flo
 }
 
 /// <summary>A single tank's authoritative state in a snapshot. <see cref="Slot"/> is the player
-/// slot (0 = host, 1 = guest) — a stable per-match id the client pairs with its view.</summary>
+/// slot (0 = host, 1 = guest) — a stable per-match id the client pairs with its view.
+/// <see cref="Shield"/> is over-shield points (a guest must see a shielded remote tank, ADR-0019
+/// step 4) and <see cref="Layer"/> is the elevation layer the tank stands on (ADR-0018), so a
+/// mirrored tank renders at the right height.</summary>
 public readonly record struct TankState(
-    byte Slot, float X, float Y, float Rotation, float TurretRotation, byte Hp, byte Team);
+    byte Slot, float X, float Y, float Rotation, float TurretRotation, byte Hp, byte Team,
+    byte Shield, byte Layer)
+{
+    /// <summary>A tank state with no shield, on the ground layer — the pre-step-4 shape, kept so the
+    /// call sites and tests that predate networked shield/elevation stay terse.</summary>
+    public TankState(byte slot, float x, float y, float rotation, float turretRotation, byte hp, byte team)
+        : this(slot, x, y, rotation, turretRotation, hp, team, 0, 0)
+    {
+    }
+}
 
 /// <summary>A change to one wall cell since the last snapshot — so a brick chipped or broken on
 /// the server appears for both clients. <see cref="Material"/> is 0 floor / 1 brick / 2 steel.</summary>

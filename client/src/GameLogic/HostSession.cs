@@ -58,7 +58,7 @@ public sealed class HostSession
         {
             states.Add(new TankState(
                 slot, tank.Position.X, tank.Position.Y, tank.Rotation, tank.TurretRotation,
-                (byte)tank.Hp, (byte)tank.Team));
+                (byte)tank.Hp, (byte)tank.Team, (byte)tank.Shield, (byte)tank.Layer));
         }
 
         var deltas = _pendingWallDeltas.Count == 0

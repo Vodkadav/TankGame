@@ -254,6 +254,8 @@ public partial class NetArena3DScene : Node3D
             tank.TurretRotation = state.TurretRotation;
             tank.Hp = state.Hp;
             tank.Team = state.Team;
+            tank.Shield = state.Shield; // a shielded remote tank shows its shield bar (ADR-0019 step 4)
+            tank.Layer = state.Layer;   // and renders at the right elevation
             _tankViews[state.Slot].ApplyTeamTint(tank.Team); // the mirrored team arrives with the snapshot
             if (firstSighting)
             {

@@ -18,6 +18,10 @@ export interface TankState {
   turretRotation: number;
   hp: number;
   team: number;
+  // Over-shield points (a guest must see a shielded remote tank, ADR-0019 step 4) and the elevation
+  // layer the tank stands on (ADR-0018), so a mirrored tank renders at the right height.
+  shield: number;
+  layer: number;
 }
 
 export interface WallDelta {
@@ -47,7 +51,7 @@ export interface SnapshotFrame {
 }
 
 export const INPUT_FRAME_SIZE = 17;
-export const TANK_STATE_SIZE = 19;
+export const TANK_STATE_SIZE = 21;
 export const WALL_DELTA_SIZE = 6;
 export const PROJECTILE_STATE_SIZE = 14;
 export const FIRE_BIT = 1 << 0;
@@ -142,6 +146,10 @@ export function encodeSnapshot(frame: SnapshotFrame): Uint8Array {
     offset += 1;
     view.setUint8(offset, tank.team);
     offset += 1;
+    view.setUint8(offset, tank.shield);
+    offset += 1;
+    view.setUint8(offset, tank.layer);
+    offset += 1;
   }
 
   view.setUint16(offset, frame.wallDeltas.length, true);
@@ -202,7 +210,11 @@ export function decodeSnapshot(data: Uint8Array): SnapshotFrame {
     offset += 1;
     const team = view.getUint8(offset);
     offset += 1;
-    tanks.push({ slot, x, y, rotation, turretRotation, hp, team });
+    const shield = view.getUint8(offset);
+    offset += 1;
+    const layer = view.getUint8(offset);
+    offset += 1;
+    tanks.push({ slot, x, y, rotation, turretRotation, hp, team, shield, layer });
   }
 
   const wallCount = view.getUint16(offset, true);

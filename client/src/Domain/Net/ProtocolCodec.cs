@@ -14,8 +14,9 @@ public static class ProtocolCodec
     /// <summary>Encoded size of an <see cref="InputFrame"/>: seq(4) + move(4+4) + aim(4) + buttons(1).</summary>
     public const int InputFrameSize = 17;
 
-    /// <summary>Encoded size of one <see cref="TankState"/>: slot(1) + 4 floats(16) + hp(1) + team(1).</summary>
-    public const int TankStateSize = 19;
+    /// <summary>Encoded size of one <see cref="TankState"/>: slot(1) + 4 floats(16) + hp(1) + team(1)
+    /// + shield(1) + layer(1).</summary>
+    public const int TankStateSize = 21;
 
     /// <summary>Encoded size of one <see cref="WallDelta"/>: cell(2+2) + material(1) + hp(1).</summary>
     public const int WallDeltaSize = 6;
@@ -115,6 +116,8 @@ public static class ProtocolCodec
             offset += 4;
             span[offset++] = tank.Hp;
             span[offset++] = tank.Team;
+            span[offset++] = tank.Shield;
+            span[offset++] = tank.Layer;
         }
 
         BinaryPrimitives.WriteUInt16LittleEndian(span[offset..], (ushort)frame.WallDeltas.Count);
@@ -169,7 +172,9 @@ public static class ProtocolCodec
             offset += 4;
             var hp = data[offset++];
             var team = data[offset++];
-            tanks.Add(new TankState(slot, x, y, rotation, turret, hp, team));
+            var shield = data[offset++];
+            var layer = data[offset++];
+            tanks.Add(new TankState(slot, x, y, rotation, turret, hp, team, shield, layer));
         }
 
         var wallCount = BinaryPrimitives.ReadUInt16LittleEndian(data[offset..]);

@@ -107,6 +107,30 @@ public class NetArena3DSceneTests : TestClass
     }
 
     [Test]
+    public void GuestSnapshot_MirrorsRemoteTankShieldAndLayer()
+    {
+        _transport.DeliverWelcome(1);
+        _transport.DeliverSnapshot(new SnapshotFrame(1, 0,
+            new List<TankState> { new(0, 96f, 160f, 0f, 0f, 8, 0, Shield: 5, Layer: 2) },
+            new List<WallDelta>()));
+
+        if (!_scene.Tanks.TryGetValue(0, out var host))
+        {
+            throw new Exception("The remote tank must be mirrored.");
+        }
+
+        if (host.Shield != 5)
+        {
+            throw new Exception($"A shielded remote tank must mirror its shield; got {host.Shield}.");
+        }
+
+        if (host.Layer != 2)
+        {
+            throw new Exception($"A remote tank on a plateau must mirror its layer; got {host.Layer}.");
+        }
+    }
+
+    [Test]
     public void GuestSnapshot_MirrorsProjectiles_AndClearsThemWhenGone()
     {
         _transport.DeliverWelcome(1);
