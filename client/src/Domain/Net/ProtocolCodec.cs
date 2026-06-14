@@ -20,6 +20,9 @@ public static class ProtocolCodec
     /// <summary>Encoded size of one <see cref="WallDelta"/>: cell(2+2) + material(1) + hp(1).</summary>
     public const int WallDeltaSize = 6;
 
+    /// <summary>Encoded size of one <see cref="ProjectileState"/>: 3 floats(12) + style(1) + layer(1).</summary>
+    public const int ProjectileStateSize = 14;
+
     /// <summary>Leading kind byte of a server→client welcome message (slot assignment).</summary>
     public const byte MsgWelcome = 1;
 
@@ -87,7 +90,8 @@ public static class ProtocolCodec
 
     public static byte[] EncodeSnapshot(SnapshotFrame frame)
     {
-        var size = 4 + 4 + 1 + (frame.Tanks.Count * TankStateSize) + 2 + (frame.WallDeltas.Count * WallDeltaSize);
+        var size = 4 + 4 + 1 + (frame.Tanks.Count * TankStateSize) + 2 + (frame.WallDeltas.Count * WallDeltaSize)
+            + 2 + (frame.Projectiles.Count * ProjectileStateSize);
         var buffer = new byte[size];
         var span = buffer.AsSpan();
         var offset = 0;
@@ -123,6 +127,20 @@ public static class ProtocolCodec
             offset += 2;
             span[offset++] = wall.Material;
             span[offset++] = wall.Hp;
+        }
+
+        BinaryPrimitives.WriteUInt16LittleEndian(span[offset..], (ushort)frame.Projectiles.Count);
+        offset += 2;
+        foreach (var shot in frame.Projectiles)
+        {
+            BinaryPrimitives.WriteSingleLittleEndian(span[offset..], shot.X);
+            offset += 4;
+            BinaryPrimitives.WriteSingleLittleEndian(span[offset..], shot.Y);
+            offset += 4;
+            BinaryPrimitives.WriteSingleLittleEndian(span[offset..], shot.Rotation);
+            offset += 4;
+            span[offset++] = shot.Style;
+            span[offset++] = shot.Layer;
         }
 
         return buffer;
@@ -168,6 +186,22 @@ public static class ProtocolCodec
             walls.Add(new WallDelta(cellX, cellY, material, hp));
         }
 
-        return new SnapshotFrame(tick, ackSeq, tanks, walls);
+        var projectileCount = BinaryPrimitives.ReadUInt16LittleEndian(data[offset..]);
+        offset += 2;
+        var projectiles = new List<ProjectileState>(projectileCount);
+        for (var i = 0; i < projectileCount; i++)
+        {
+            var x = BinaryPrimitives.ReadSingleLittleEndian(data[offset..]);
+            offset += 4;
+            var y = BinaryPrimitives.ReadSingleLittleEndian(data[offset..]);
+            offset += 4;
+            var rotation = BinaryPrimitives.ReadSingleLittleEndian(data[offset..]);
+            offset += 4;
+            var style = data[offset++];
+            var layer = data[offset++];
+            projectiles.Add(new ProjectileState(x, y, rotation, style, layer));
+        }
+
+        return new SnapshotFrame(tick, ackSeq, tanks, walls, projectiles);
     }
 }

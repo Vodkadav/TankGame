@@ -134,6 +134,21 @@ public class HostSessionTests
     }
 
     [Fact]
+    public void FiredShot_RidesTheSnapshot_SoAGuestCanSeeIt()
+    {
+        var rig = new Rig();
+        rig.HostInput.Value = new TankInput(Vector2.Zero, Aim: 0f, Fire: true);
+
+        rig.Session.Step(0.1f); // the host tank fires; the shot is now a live world entity
+
+        var snapshot = Assert.Single(rig.Transport.Broadcast);
+        var shot = Assert.Single(snapshot.Projectiles);
+        Assert.Equal((byte)ProjectileStyle.Normal, shot.Style);
+        Assert.True(rig.World.Entities.OfType<IProjectile>().Any(),
+            "the fired shot must be a live world entity the snapshot reflects");
+    }
+
+    [Fact]
     public void WallDamage_RidesTheNextSnapshot_ThenClears()
     {
         var rig = new Rig();

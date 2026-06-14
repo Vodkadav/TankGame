@@ -25,8 +25,27 @@ public readonly record struct TankState(
 /// the server appears for both clients. <see cref="Material"/> is 0 floor / 1 brick / 2 steel.</summary>
 public readonly record struct WallDelta(ushort CellX, ushort CellY, byte Material, byte Hp);
 
+/// <summary>One live shot's authoritative state in a snapshot, so a guest can see shots in flight
+/// (ADR-0019 step 4) — without this a guest only ever saw tanks teleport between hits. The full live
+/// set rides every snapshot; the guest mirrors it as throwaway view-models. <see cref="Rotation"/> is
+/// the travel heading (<c>Atan2(dir.X, dir.Y)</c>, the angle the view points a missile along);
+/// <see cref="Style"/> is 0 bullet / 1 missile; <see cref="Layer"/> is the elevation layer the shot
+/// rides (ADR-0018).</summary>
+public readonly record struct ProjectileState(float X, float Y, float Rotation, byte Style, byte Layer);
+
 /// <summary>One server→client world snapshot at <see cref="Tick"/>. <see cref="AckSeq"/> is the
 /// last <see cref="InputFrame.Seq"/> the server applied for the receiving client (the
-/// reconciliation anchor). Carries the full tank set plus any wall changes this snapshot.</summary>
+/// reconciliation anchor). Carries the full tank set, the live projectiles, plus any wall changes
+/// this snapshot.</summary>
 public sealed record SnapshotFrame(
-    uint Tick, uint AckSeq, IReadOnlyList<TankState> Tanks, IReadOnlyList<WallDelta> WallDeltas);
+    uint Tick, uint AckSeq, IReadOnlyList<TankState> Tanks, IReadOnlyList<WallDelta> WallDeltas,
+    IReadOnlyList<ProjectileState> Projectiles)
+{
+    /// <summary>A snapshot with no projectiles — the pre-step-4 shape, kept so the many call sites and
+    /// tests that predate networked shots stay terse.</summary>
+    public SnapshotFrame(
+        uint tick, uint ackSeq, IReadOnlyList<TankState> tanks, IReadOnlyList<WallDelta> wallDeltas)
+        : this(tick, ackSeq, tanks, wallDeltas, System.Array.Empty<ProjectileState>())
+    {
+    }
+}

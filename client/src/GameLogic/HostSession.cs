@@ -66,6 +66,20 @@ public sealed class HostSession
             : new List<WallDelta>(_pendingWallDeltas);
         _pendingWallDeltas.Clear();
 
-        _transport.SendSnapshot(new SnapshotFrame(Tick, _guestInput.LastAppliedSeq, states, deltas));
+        // Every live shot rides the snapshot so a guest sees it in flight (ADR-0019 step 4). The
+        // heading is the angle the view points a missile along; bullets ignore it.
+        var projectiles = new List<Domain.Net.ProjectileState>();
+        foreach (var entity in _world.Entities)
+        {
+            if (entity is IProjectile shot)
+            {
+                projectiles.Add(new Domain.Net.ProjectileState(
+                    shot.Position.X, shot.Position.Y,
+                    System.MathF.Atan2(shot.Direction.X, shot.Direction.Y),
+                    (byte)shot.Style, (byte)shot.Layer));
+            }
+        }
+
+        _transport.SendSnapshot(new SnapshotFrame(Tick, _guestInput.LastAppliedSeq, states, deltas, projectiles));
     }
 }

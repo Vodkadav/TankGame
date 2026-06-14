@@ -62,6 +62,10 @@ public partial class NetArena3DScene : Node3D
     private IInputSource? _guestLocalInput;
     private uint _inputSeq;
 
+    // Guest role: the shots mirrored from the latest snapshot (ADR-0019 step 4) — the guest has no
+    // world, so each snapshot rebuilds this set of throwaway projectile views.
+    private readonly List<Projectile3DView> _snapshotProjectiles = new();
+
     /// <summary>The slot the relay assigned this client, or null before the welcome.</summary>
     public byte? LocalSlot => _localSlot;
 
@@ -71,6 +75,10 @@ public partial class NetArena3DScene : Node3D
 
     /// <summary>The current state of a shared-grid cell — lets a test assert an applied wall delta.</summary>
     public WallCell CellAt(int x, int y) => _grid.GetCell(x, y);
+
+    /// <summary>How many shots the guest is currently mirroring from the latest snapshot (ADR-0019
+    /// step 4). Zero on the host, which renders its own shots from the world. For the tests.</summary>
+    public int MirroredProjectileCount => _snapshotProjectiles.Count;
 
     public override void _Ready()
     {
@@ -185,7 +193,8 @@ public partial class NetArena3DScene : Node3D
     }
 
     // Host-side world events: every spawned entity gets the same 3D view single-player uses, so the
-    // host's match looks identical to a local one (shots included, which snapshots don't carry yet).
+    // host's match looks identical to a local one. The host renders shots straight from its world;
+    // a guest mirrors them from the snapshot's projectile set instead (ADR-0019 step 4).
     private void OnEntitySpawned(IEntity entity)
     {
         switch (entity)
@@ -255,6 +264,36 @@ public partial class NetArena3DScene : Node3D
         foreach (var delta in snapshot.WallDeltas)
         {
             _grid.SetCell(delta.CellX, delta.CellY, new WallCell((CellMaterial)delta.Material, delta.Hp));
+        }
+
+        MirrorProjectiles(snapshot.Projectiles);
+    }
+
+    // Rebuild the guest's shot views from the snapshot's live projectile set (ADR-0019 step 4). The
+    // guest runs no world, so each snapshot replaces the lot — Free() (not deferred QueueFree) so a
+    // synchronous re-read sees the fresh set, and a heading rebuilt from the wire angle points a
+    // missile bolt along its travel exactly as the host renders it.
+    private void MirrorProjectiles(IReadOnlyList<Domain.Net.ProjectileState> shots)
+    {
+        foreach (var view in _snapshotProjectiles)
+        {
+            view.Free();
+        }
+
+        _snapshotProjectiles.Clear();
+        foreach (var shot in shots)
+        {
+            var model = new NetProjectile
+            {
+                Position = new NVector2(shot.X, shot.Y),
+                Direction = new NVector2(Mathf.Sin(shot.Rotation), Mathf.Cos(shot.Rotation)),
+                Style = (ProjectileStyle)shot.Style,
+                Layer = shot.Layer,
+            };
+            var view = new Projectile3DView { Name = "NetProjectile3DView" };
+            view.Bind(model);
+            AddChild(view);
+            _snapshotProjectiles.Add(view);
         }
     }
 

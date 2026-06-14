@@ -33,7 +33,8 @@ public class ProtocolCodecTests
             {
                 new(CellX: 5, CellY: 6, Material: 1, Hp: 2),
                 new(CellX: 12, CellY: 0, Material: 0, Hp: 0),
-            });
+            },
+            Projectiles: new List<ProjectileState>());
 
         var decoded = ProtocolCodec.DecodeSnapshot(ProtocolCodec.EncodeSnapshot(original));
 
@@ -53,6 +54,26 @@ public class ProtocolCodecTests
         Assert.Equal(7u, decoded.Tick);
         Assert.Empty(decoded.Tanks);
         Assert.Empty(decoded.WallDeltas);
+        Assert.Empty(decoded.Projectiles);
+    }
+
+    [Fact]
+    public void SnapshotFrame_RoundTrips_WithProjectiles()
+    {
+        var original = new SnapshotFrame(
+            Tick: 9,
+            AckSeq: 3,
+            Tanks: new List<TankState>(),
+            WallDeltas: new List<WallDelta>(),
+            Projectiles: new List<ProjectileState>
+            {
+                new(X: 320f, Y: 64f, Rotation: 1.25f, Style: 0, Layer: 0),
+                new(X: 96.5f, Y: 200f, Rotation: -2.5f, Style: 1, Layer: 2),
+            });
+
+        var decoded = ProtocolCodec.DecodeSnapshot(ProtocolCodec.EncodeSnapshot(original));
+
+        Assert.Equal(original.Projectiles, decoded.Projectiles);
     }
 
     // Cross-language parity anchor: the TypeScript codec MUST produce these exact bytes for the
@@ -112,7 +133,8 @@ public class ProtocolCodecTests
             Tick: 2,
             AckSeq: 1,
             Tanks: new List<TankState> { new(Slot: 0, X: 64f, Y: 128f, Rotation: 0f, TurretRotation: 0.5f, Hp: 3, Team: 1) },
-            WallDeltas: new List<WallDelta> { new(CellX: 5, CellY: 6, Material: 1, Hp: 2) });
+            WallDeltas: new List<WallDelta> { new(CellX: 5, CellY: 6, Material: 1, Hp: 2) },
+            Projectiles: new List<ProjectileState>());
 
         var bytes = ProtocolCodec.EncodeSnapshot(frame);
 
@@ -133,6 +155,7 @@ public class ProtocolCodecTests
             0x06, 0x00,             // cellY = 6
             0x01,                   // material = 1 (brick)
             0x02,                   // hp = 2
+            0x00, 0x00,             // projectileCount = 0
         }, bytes);
     }
 }

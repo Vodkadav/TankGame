@@ -32,12 +32,27 @@ describe("protocol codec", () => {
         { cellX: 5, cellY: 6, material: 1, hp: 2 },
         { cellX: 12, cellY: 0, material: 0, hp: 0 },
       ],
+      projectiles: [],
     };
     expect(decodeSnapshot(encodeSnapshot(original))).toEqual(original);
   });
 
   it("round-trips an empty snapshot", () => {
-    const original: SnapshotFrame = { tick: 7, ackSeq: 7, tanks: [], wallDeltas: [] };
+    const original: SnapshotFrame = { tick: 7, ackSeq: 7, tanks: [], wallDeltas: [], projectiles: [] };
+    expect(decodeSnapshot(encodeSnapshot(original))).toEqual(original);
+  });
+
+  it("round-trips a SnapshotFrame with projectiles", () => {
+    const original: SnapshotFrame = {
+      tick: 9,
+      ackSeq: 3,
+      tanks: [],
+      wallDeltas: [],
+      projectiles: [
+        { x: 320, y: 64, rotation: 1.25, style: 0, layer: 0 },
+        { x: 96.5, y: 200, rotation: -2.5, style: 1, layer: 2 },
+      ],
+    };
     expect(decodeSnapshot(encodeSnapshot(original))).toEqual(original);
   });
 
@@ -50,7 +65,7 @@ describe("protocol codec", () => {
   });
 
   it("tags a snapshot message with the snapshot kind byte", () => {
-    const frame: SnapshotFrame = { tick: 7, ackSeq: 7, tanks: [], wallDeltas: [] };
+    const frame: SnapshotFrame = { tick: 7, ackSeq: 7, tanks: [], wallDeltas: [], projectiles: [] };
     const message = encodeSnapshotMessage(frame);
     expect(message[0]).toBe(MSG_SNAPSHOT);
     expect(decodeSnapshot(message.subarray(1))).toEqual(frame);
@@ -88,6 +103,7 @@ describe("protocol codec", () => {
         ackSeq: 1,
         tanks: [{ slot: 0, x: 64, y: 128, rotation: 0, turretRotation: 0.5, hp: 3, team: 1 }],
         wallDeltas: [{ cellX: 5, cellY: 6, material: 1, hp: 2 }],
+        projectiles: [],
       }),
     ];
     expect(bytes).toEqual([
@@ -106,6 +122,7 @@ describe("protocol codec", () => {
       0x06, 0x00, // cellY = 6
       0x01, // material = 1 (brick)
       0x02, // hp = 2
+      0x00, 0x00, // projectileCount = 0
     ]);
   });
 });
