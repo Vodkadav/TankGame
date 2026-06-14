@@ -8,12 +8,15 @@ using Xunit;
 namespace TankGame.Tests.GameLogic;
 
 // Deterministic prediction + reconciliation (M3-T7). PredictedTank advances the local tank from
-// its own inputs immediately (no input lag), and on a server snapshot snaps to authority then
-// replays the inputs the server has not yet acknowledged. The movement model mirrors the server
-// sim (server/worker/src/sim/matchSim.ts): 200 u/s, axis-separated, 24 u leading-edge collision.
+// its own inputs immediately (no input lag), and on a host snapshot snaps to authority then replays
+// the inputs the host has not yet acknowledged. The movement model mirrors the host's real GameLogic
+// Tank (ADR-0019 step 4): move·speed·dt per tick, axis-separated, Tank.CollisionRadius leading edge.
 public class PredictedTankTests
 {
-    private const float StepDistance = 200f / 20f; // TANK_SPEED * (1/20) — one tick along a unit axis.
+    // The host's net-arena tank speed and the shared fixed tick — PredictedTank's defaults.
+    private const float TankSpeed = 200f;
+    private const float TickSeconds = 1f / 20f;
+    private const float StepDistance = TankSpeed * TickSeconds; // one tick along a unit axis.
 
     private sealed class OpenArena : IArena
     {
@@ -30,6 +33,13 @@ public class PredictedTankTests
         public RaycastHit? RaycastFirstHit(Vector2 origin, Vector2 direction, float maxDistance) => null;
         public void DamageAt(Vector2 point, Vector2 direction, int amount) { }
         public bool IsBlocked(Vector2 point) => point.X >= _x;
+    }
+
+    // Feeds the real Tank a fixed intent each Step — the authority side of the parity tests.
+    private sealed class ScriptedInput(TankInput value) : IInputSource
+    {
+        public TankInput Value { get; set; } = value;
+        public TankInput Read() => Value;
     }
 
     private static InputFrame Move(uint seq, float x, float y) => new(seq, x, y, 0f, 0);
@@ -137,6 +147,99 @@ public class PredictedTankTests
         tank.Predict(Move(1, 1f, 0f));
 
         Assert.Equal(0f, tank.Position.X, precision: 3); // blocked — leading edge 0+10+24 ≥ 24
+    }
+
+    // ── ADR-0019 step 4: PredictedTank movement parity with the host's real Tank ──
+    // The guest's PredictedTank must replay the host's authoritative Tank step-for-step, or
+    // reconciliation jitters. These drive a real Tank (the authority) and a PredictedTank from the
+    // SAME inputs against the SAME arena at the SAME spawn, stepping both at the shared 20 Hz tick,
+    // and assert the transforms stay in lock-step.
+
+    private const float ParityTolerance = 0.01f;
+
+    // Builds the host's real Tank with the net-arena's speed at a given spawn, on a shared arena.
+    private static Tank HostTank(IInputSource input, IArena arena, Vector2 spawn) =>
+        new(input, new World(), arena, spawn, TankSpeed, fireInterval: 0.3f, projectileSpeed: 600f, maxHp: 8);
+
+    private static void AssertParity(Tank host, PredictedTank guest)
+    {
+        Assert.Equal(host.Position.X, guest.Position.X, ParityTolerance);
+        Assert.Equal(host.Position.Y, guest.Position.Y, ParityTolerance);
+        Assert.Equal(host.Rotation, guest.Rotation, ParityTolerance);
+    }
+
+    [Fact]
+    public void Movement_MatchesHostTank_OverAStraightAndDiagonalRun()
+    {
+        var arena = new OpenArena();
+        var spawn = new Vector2(200f, 200f);
+        var hostInput = new ScriptedInput(new TankInput(Vector2.Zero, Aim: 0f, Fire: false));
+        var host = HostTank(hostInput, arena, spawn);
+        var guest = new PredictedTank(0, arena, spawn);
+
+        // A varied path: straight east, a (1,1) diagonal (the normalisation case), then straight south.
+        var legs = new (Vector2 Move, int Ticks)[]
+        {
+            (new Vector2(1f, 0f), 5),
+            (new Vector2(1f, 1f), 7),
+            (new Vector2(0f, 1f), 4),
+        };
+
+        uint seq = 0;
+        foreach (var (move, ticks) in legs)
+        {
+            hostInput.Value = new TankInput(move, Aim: 0f, Fire: false);
+            for (var i = 0; i < ticks; i++)
+            {
+                host.Step(TickSeconds);
+                guest.Predict(new InputFrame(++seq, move.X, move.Y, 0f, 0));
+                AssertParity(host, guest);
+            }
+        }
+
+        Assert.NotEqual(spawn, guest.Position); // sanity: the run actually moved the tank
+    }
+
+    [Fact]
+    public void Movement_MatchesHostTank_WhenSlidingIntoAWall()
+    {
+        // A wall to the east: both the host and the guest must stop their leading edge at it, and the
+        // diagonal push must still let them slide south along it — identically.
+        var arena = new WallAtX(300f);
+        var spawn = new Vector2(200f, 200f);
+        var hostInput = new ScriptedInput(new TankInput(new Vector2(1f, 1f), Aim: 0f, Fire: false));
+        var host = HostTank(hostInput, arena, spawn);
+        var guest = new PredictedTank(0, arena, spawn);
+
+        for (uint seq = 1; seq <= 40; seq++) // long enough to jam the X axis against the wall
+        {
+            host.Step(TickSeconds);
+            guest.Predict(new InputFrame(seq, 1f, 1f, 0f, 0));
+            AssertParity(host, guest);
+        }
+
+        Assert.True(guest.Position.X < 300f); // the X axis was actually blocked by the wall
+        Assert.True(guest.Position.Y > spawn.Y); // yet the Y axis kept sliding past the wall
+    }
+
+    [Fact]
+    public void Movement_MatchesHostTank_AtACustomSpeedAndTick()
+    {
+        // Parity is not tied to 200 u/s / 20 Hz: any matched speed+dt pair tracks the host Tank.
+        const float speed = 137f;
+        const float tick = 1f / 30f;
+        var arena = new OpenArena();
+        var spawn = Vector2.Zero;
+        var hostInput = new ScriptedInput(new TankInput(new Vector2(1f, 0.5f), Aim: 0f, Fire: false));
+        var host = new Tank(hostInput, new World(), arena, spawn, speed, 0.3f, 600f, maxHp: 8);
+        var guest = new PredictedTank(0, arena, spawn, speed, tick);
+
+        for (uint seq = 1; seq <= 12; seq++)
+        {
+            host.Step(tick);
+            guest.Predict(new InputFrame(seq, 1f, 0.5f, 0f, 0));
+            AssertParity(host, guest);
+        }
     }
 
     [Fact]
