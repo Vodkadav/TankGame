@@ -26,8 +26,8 @@ public class ProtocolCodecTests
             AckSeq: 41,
             Tanks: new List<TankState>
             {
-                new(Slot: 0, X: 64f, Y: 128f, Rotation: 0f, TurretRotation: 0.5f, Hp: 3, Team: 0),
-                new(Slot: 1, X: 200f, Y: 96f, Rotation: 3.14f, TurretRotation: -1f, Hp: 2, Team: 1),
+                new(Slot: 0, X: 64f, Y: 128f, Rotation: 0f, TurretRotation: 0.5f, Hp: 3, Team: 0, Shield: 4, Layer: 1),
+                new(Slot: 1, X: 200f, Y: 96f, Rotation: 3.14f, TurretRotation: -1f, Hp: 2, Team: 1, Shield: 0, Layer: 0),
             },
             WallDeltas: new List<WallDelta>
             {
@@ -132,7 +132,7 @@ public class ProtocolCodecTests
         var frame = new SnapshotFrame(
             Tick: 2,
             AckSeq: 1,
-            Tanks: new List<TankState> { new(Slot: 0, X: 64f, Y: 128f, Rotation: 0f, TurretRotation: 0.5f, Hp: 3, Team: 1) },
+            Tanks: new List<TankState> { new(Slot: 0, X: 64f, Y: 128f, Rotation: 0f, TurretRotation: 0.5f, Hp: 3, Team: 1, Shield: 0, Layer: 0) },
             WallDeltas: new List<WallDelta> { new(CellX: 5, CellY: 6, Material: 1, Hp: 2) },
             Projectiles: new List<ProjectileState>());
 
@@ -150,6 +150,8 @@ public class ProtocolCodecTests
             0x00, 0x00, 0x00, 0x3F, // turret = 0.5
             0x03,                   // hp = 3
             0x01,                   // team = 1
+            0x00,                   // shield = 0
+            0x00,                   // layer = 0
             0x01, 0x00,             // wallCount = 1
             0x05, 0x00,             // cellX = 5
             0x06, 0x00,             // cellY = 6

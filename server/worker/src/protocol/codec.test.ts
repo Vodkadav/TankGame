@@ -25,8 +25,8 @@ describe("protocol codec", () => {
       tick: 100,
       ackSeq: 41,
       tanks: [
-        { slot: 0, x: 64, y: 128, rotation: 0, turretRotation: 0.5, hp: 3, team: 0 },
-        { slot: 1, x: 200, y: 96, rotation: 0.25, turretRotation: -1, hp: 2, team: 1 },
+        { slot: 0, x: 64, y: 128, rotation: 0, turretRotation: 0.5, hp: 3, team: 0, shield: 4, layer: 1 },
+        { slot: 1, x: 200, y: 96, rotation: 0.25, turretRotation: -1, hp: 2, team: 1, shield: 0, layer: 0 },
       ],
       wallDeltas: [
         { cellX: 5, cellY: 6, material: 1, hp: 2 },
@@ -101,7 +101,7 @@ describe("protocol codec", () => {
       ...encodeSnapshot({
         tick: 2,
         ackSeq: 1,
-        tanks: [{ slot: 0, x: 64, y: 128, rotation: 0, turretRotation: 0.5, hp: 3, team: 1 }],
+        tanks: [{ slot: 0, x: 64, y: 128, rotation: 0, turretRotation: 0.5, hp: 3, team: 1, shield: 0, layer: 0 }],
         wallDeltas: [{ cellX: 5, cellY: 6, material: 1, hp: 2 }],
         projectiles: [],
       }),
@@ -117,6 +117,8 @@ describe("protocol codec", () => {
       0x00, 0x00, 0x00, 0x3f, // turret = 0.5
       0x03, // hp = 3
       0x01, // team = 1
+      0x00, // shield = 0
+      0x00, // layer = 0
       0x01, 0x00, // wallCount = 1
       0x05, 0x00, // cellX = 5
       0x06, 0x00, // cellY = 6

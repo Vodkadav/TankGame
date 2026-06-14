@@ -22,6 +22,7 @@ public sealed class NetTank : ITank
     public int MaxHp { get; }
     public int Team { get; set; }
     public int Shield { get; set; }
+    public int Layer { get; set; }
     public string DisplayName { get; set; } = string.Empty;
 
     public bool IsAlive => true;
