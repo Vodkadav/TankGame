@@ -52,7 +52,6 @@ public static class DecorationAssets
 public partial class DecorationView : Node3D
 {
     private const float Footprint = 0.95f; // of a cell, like the terrain props
-    private const long BareGeometryBytes = 20_000; // below this a Kenney .glb has no texture — tint it
 
     private string _assetId = "";
     private PropTransform _pose = PropTransform.Identity;
@@ -86,14 +85,14 @@ public partial class DecorationView : Node3D
 
         AddChild(model);
         ModelFit.Apply(model, _tileSize * Footprint, seatOnGround: true);
-        if (new FileInfo(path).Length < BareGeometryBytes)
-        {
-            // Smart multi-colour (owner feedback 2026-06-11): the biggest part wears the category's
-            // main colour, the details cycle its secondary palette — seeded by the asset id, so one
-            // asset always looks the same while its pack-mates vary.
-            var category = AssetLibrary.CategoryFor(_assetId.Split('/')[0]);
-            ModelFit.TintPalette(model, CategoryTint(category), SecondaryTints(category), StableSeed(_assetId));
-        }
+
+        // Smart multi-colour (owner feedback 2026-06-11): the biggest part wears the category's
+        // main colour, the details cycle its secondary palette — seeded by the asset id, so one
+        // asset always looks the same while its pack-mates vary. Applied unconditionally: the tint
+        // itself skips any surface that carries a real texture (file size was a poor bare-model
+        // proxy — big geometry-only files stayed white).
+        var category = AssetLibrary.CategoryFor(_assetId.Split('/')[0]);
+        ModelFit.TintPalette(model, CategoryTint(category), SecondaryTints(category), StableSeed(_assetId));
 
         RotationDegrees = new Vector3(_pose.PitchDeg, _pose.YawDeg, _pose.RollDeg);
         Scale = Vector3.One * _pose.Scale;

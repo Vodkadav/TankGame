@@ -41,6 +41,7 @@ public partial class PadMarker3D : Node3D
         {
             Name = "Number",
             Text = _label,
+            PixelSize = 0.30f, // Label3D's default renders sub-unit text — invisible at 64-unit cells
             FontSize = 96,
             Modulate = new Color(1f, 1f, 1f),
             OutlineModulate = new Color(0.03f, 0.18f, 0.24f),

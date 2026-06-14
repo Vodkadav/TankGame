@@ -55,26 +55,55 @@ public partial class Tank3DView : Node3D
         BuildLandingDust();
     }
 
-    // The tank's battle name floats above its bars. A child of this view, so concealment — which hides
-    // the whole view — hides the name with it: a bush-lurker's name never gives it away. The label uses
-    // the editor markers' proven-visible recipe (owner feedback 2026-06-11: the first cut's small font
-    // was unreadable at this world scale) — big font, heavy outline, depth-test off.
+    // Label3D's default PixelSize (0.005 world units per font pixel) renders even a 96px font about
+    // half a unit tall — microscopic against 64-unit cells, which is why the tags were "invisible"
+    // twice (owner feedback 2026-06-11). The fix is the WORLD scale, not the font: at this PixelSize
+    // an 88px font stands ~23 world units (~3% of the 820-unit ortho view ≈ 20px on a 720p window).
+    private const float NameTagPixelSize = 0.26f;
+    private const float NameTagFontPx = 88f;
+
+    // The tank's battle name floats above its bars on a dark backing panel (billboarded like the
+    // bars) with bright outlined text, so it reads against any terrain. A child of this view, so
+    // concealment — which hides the whole view — hides the name with it.
     private void BuildNameTag()
     {
         var name = _tank?.DisplayName ?? string.Empty;
-        AddChild(new Label3D
+        var textHeight = NameTagFontPx * NameTagPixelSize;
+        var textWidth = name.Length * NameTagFontPx * NameTagPixelSize * 0.52f; // ~glyph advance
+
+        var tag = new Node3D { Name = "NameTagHolder", Visible = name.Length > 0 };
+        tag.Position = new Vector3(0f, NameTagY + 22f, 0f);
+
+        tag.AddChild(new MeshInstance3D
+        {
+            Name = "NameBacking",
+            Mesh = new QuadMesh { Size = new Vector2(textWidth + (textHeight * 0.8f), textHeight * 1.45f) },
+            MaterialOverride = new StandardMaterial3D
+            {
+                AlbedoColor = new Color(0.04f, 0.04f, 0.06f, 0.62f),
+                ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded,
+                Transparency = BaseMaterial3D.TransparencyEnum.Alpha,
+                BillboardMode = BaseMaterial3D.BillboardModeEnum.Enabled,
+                NoDepthTest = true,
+                RenderPriority = 1,
+            },
+        });
+
+        tag.AddChild(new Label3D
         {
             Name = "NameTag",
             Text = name,
-            Visible = name.Length > 0,
-            FontSize = 88,
-            Modulate = new Color(0.98f, 0.96f, 0.88f),
+            PixelSize = NameTagPixelSize,
+            FontSize = (int)NameTagFontPx,
+            Modulate = new Color(1f, 0.96f, 0.78f), // warm bright against the dark panel
             OutlineModulate = new Color(0f, 0f, 0f),
-            OutlineSize = 14,
+            OutlineSize = 16,
             Billboard = BaseMaterial3D.BillboardModeEnum.Enabled,
             NoDepthTest = true,
-            Position = new Vector3(0f, NameTagY + 22f, 0f),
+            RenderPriority = 2, // over its backing within the transparent pass
         });
+
+        AddChild(tag);
     }
 
     public void Bind(ITank tank) => _tank = tank;

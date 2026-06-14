@@ -39,6 +39,7 @@ public partial class SpawnMarker3D : Node3D
         {
             Name = "Number",
             Text = _number.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            PixelSize = 0.28f, // Label3D's default renders sub-unit text — invisible at 64-unit cells
             FontSize = 110,
             Modulate = new Color(1f, 1f, 1f),
             OutlineModulate = new Color(0.45f, 0.04f, 0.04f),

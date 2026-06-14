@@ -538,6 +538,7 @@ public partial class MapEditorScene : Node3D
             Modulate = colour,
             OutlineModulate = new Color(0f, 0f, 0f),
             OutlineSize = 8,
+            PixelSize = 0.4f, // Label3D's default renders sub-unit text — invisible at 64-unit cells
             FontSize = 96,
             Billboard = BaseMaterial3D.BillboardModeEnum.Enabled,
             NoDepthTest = true,
