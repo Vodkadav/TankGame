@@ -87,9 +87,9 @@ public class Arena3DSceneTests : TestClass
             throw new System.Exception($"All four tanks must rank on the plates; saw {rows.GetChildCount()} rows.");
         }
 
-        if (rows is ScrollContainer || rows.GetParent() is ScrollContainer)
+        if (rows.GetParent() is not ScrollContainer)
         {
-            throw new System.Exception("v3 anchors eight fixed plates onto the art — the leaderboard must not scroll.");
+            throw new System.Exception("The leaderboard rows must sit in a ScrollContainer so the full eight-tank cap scrolls.");
         }
 
         var title = _arena.FindChild("ViewTitle", recursive: true, owned: false) as Label
