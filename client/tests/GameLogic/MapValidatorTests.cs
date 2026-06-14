@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Linq;
 using TankGame.Domain;
 using TankGame.GameLogic;
@@ -308,5 +309,67 @@ public class MapValidatorTests
         var result = MapValidator.Validate(map);
 
         Assert.Contains(result.Errors, e => e.Code == MapValidationCode.RampNotOnFloor && e.X == 2 && e.Y == 2);
+    }
+
+    // ── Scaled-prop footprints (owner follow-up to #213) ──
+    // A scaled solid prop blocks every cell its footprint overlaps (WallGrid), so the validator must
+    // treat those cells as walls too — otherwise a giant block could wall off or bury a spawn yet
+    // still validate, and the map would spawn a tank inside scenery or strand it.
+
+    [Fact]
+    public void Validate_FlagsAnEnemySpawn_OrphanedByAScaledPropFootprint()
+    {
+        var map = MapDefinition.CreateBlank("Overhang", 9, 5);
+        // A steel divider down column 4 with a one-cell doorway at (4,2): playable as authored.
+        map.Materials[4, 1] = CellMaterial.Steel;
+        map.Materials[4, 3] = CellMaterial.Steel;
+
+        var open = new MapDefinition(
+            map.Name, map.Materials, map.Bushes, map.Sandbags,
+            (1, 1), new (int X, int Y)[] { (7, 2) }, System.Array.Empty<PowerupSpawn>());
+        Assert.True(MapValidator.Validate(open).IsValid, "the open doorway should make the right pocket reachable");
+
+        // Scale the steel at (4,1) up: its footprint reaches one cell out and plugs the doorway (4,2).
+        var transforms = new Dictionary<(int X, int Y), PropTransform> { [(4, 1)] = new(0f, 0f, 0f, 3f) };
+        var plugged = new MapDefinition(
+            map.Name, map.Materials, map.Bushes, map.Sandbags,
+            (1, 1), new (int X, int Y)[] { (7, 2) }, System.Array.Empty<PowerupSpawn>(),
+            transforms: transforms);
+
+        Assert.Contains(MapValidator.Validate(plugged).Errors,
+            e => e.Code == MapValidationCode.SpawnUnreachable && e.X == 7 && e.Y == 2);
+    }
+
+    [Fact]
+    public void Validate_FlagsASpawn_BuriedUnderAScaledPropFootprint()
+    {
+        var map = MapDefinition.CreateBlank("Buried", 6, 5);
+        map.Materials[2, 3] = CellMaterial.Steel; // a solid prop beside the enemy spawn
+
+        var transforms = new Dictionary<(int X, int Y), PropTransform> { [(2, 3)] = new(0f, 0f, 0f, 3f) };
+        var buried = new MapDefinition(
+            map.Name, map.Materials, map.Bushes, map.Sandbags,
+            (1, 1), new (int X, int Y)[] { (3, 3) }, System.Array.Empty<PowerupSpawn>(),
+            transforms: transforms);
+
+        Assert.Contains(MapValidator.Validate(buried).Errors,
+            e => e.Code == MapValidationCode.SpawnBlockedByProp && e.X == 3 && e.Y == 3);
+    }
+
+    [Fact]
+    public void Validate_StillPasses_WhenAScaledPropLeavesThePathClear()
+    {
+        var map = MapDefinition.CreateBlank("Roomy", 9, 5);
+        map.Materials[4, 1] = CellMaterial.Steel; // a lone scaled block whose reach touches no spawn or path
+
+        var transforms = new Dictionary<(int X, int Y), PropTransform> { [(4, 1)] = new(0f, 0f, 0f, 3f) };
+        var roomy = new MapDefinition(
+            map.Name, map.Materials, map.Bushes, map.Sandbags,
+            (1, 3), new (int X, int Y)[] { (7, 3) }, System.Array.Empty<PowerupSpawn>(),
+            transforms: transforms);
+
+        var result = MapValidator.Validate(roomy);
+
+        Assert.True(result.IsValid, string.Join(", ", result.Errors));
     }
 }
