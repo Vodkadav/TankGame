@@ -42,9 +42,10 @@ public class Arena3DSceneTests : TestClass
         System.GC.Collect();
     }
 
-    // Victory screen v3 (owner ask 2026-06-11/14): the celebration banner artwork with the champion's
-    // name carved into its ribbon (a team win names the top-killer member), a fixed eight-plate
-    // leaderboard anchored onto the art's numbered plaques, and arrows panning between ranking views.
+    // Victory screen (owner ask 2026-06-11/14, rebuilt): a generated celebration backdrop with the
+    // screen composed from real UI controls — the champion's name on a wood ribbon (a team win names
+    // the top-killer member), a metal plaque of up to eight ranked rows, and nav arrows switching the
+    // ranking sheet.
     [Test]
     public void ShowMatchOver_PresentsTheBannerArt_Champion_AndPannableLeaderboard()
     {
@@ -56,10 +57,10 @@ public class Arena3DSceneTests : TestClass
             throw new System.Exception("Showing match-over must freeze the match.");
         }
 
-        var banner = _arena.FindChild("Banner", recursive: true, owned: false) as TextureRect;
+        var banner = _arena.FindChild("Backdrop", recursive: true, owned: false) as TextureRect;
         if (banner?.Texture is null)
         {
-            throw new System.Exception("The match-over screen must show the victory banner artwork.");
+            throw new System.Exception("The match-over screen must show the victory backdrop artwork.");
         }
 
         // A fresh match has no kills — the tie-break lands on the first winning-team member, the
