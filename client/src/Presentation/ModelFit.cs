@@ -57,11 +57,14 @@ public static class ModelFit
         }
     }
 
-    /// <summary>Multi-colour tint for bare kit models (owner feedback 2026-06-11): the LARGEST part
-    /// (by bounding-box surface area, so flat panels still rank) takes <paramref name="primary"/> and
+    /// <summary>Multi-colour tint for kit models (owner feedback 2026-06-11): the LARGEST part (by
+    /// bounding-box surface area, so flat panels still rank) takes <paramref name="primary"/> and
     /// every smaller part cycles the <paramref name="secondaries"/> as detail colours, starting at an
     /// offset from <paramref name="seed"/> so different assets in one category vary while any one
-    /// asset always looks the same. Per-surface overrides, so multi-material meshes split too.</summary>
+    /// asset always looks the same. Only BARE surfaces are touched — a surface whose material
+    /// carries an albedo texture keeps it (so mixed models keep their real textures); detection is
+    /// per material, not file size, because a big geometry-only .glb is still textureless. Ranking
+    /// covers every surface, so the primary/detail split is stable whether or not parts are bare.</summary>
     public static void TintPalette(Node3D model, Color primary, IReadOnlyList<Color> secondaries, int seed = 0)
     {
         var surfaces = new List<(MeshInstance3D Mi, int Surface, float Size)>();
@@ -81,6 +84,11 @@ public static class ModelFit
         var offset = System.Math.Abs(seed);
         for (var i = 0; i < ranked.Count; i++)
         {
+            if (HasAlbedoTexture(ranked[i].Mi, ranked[i].Surface))
+            {
+                continue; // genuinely textured — never paint over the real artwork
+            }
+
             var colour = i == 0 || secondaries.Count == 0
                 ? primary
                 : secondaries[(i - 1 + offset) % secondaries.Count];
@@ -92,6 +100,9 @@ public static class ModelFit
             });
         }
     }
+
+    private static bool HasAlbedoTexture(MeshInstance3D mi, int surface) =>
+        mi.GetActiveMaterial(surface) is BaseMaterial3D material && material.AlbedoTexture is not null;
 
     // Union of the model's MeshInstance3D bounding boxes in the MODEL's own local space — each mesh's
     // global transform is taken relative to the model root, so the measurement is independent of where

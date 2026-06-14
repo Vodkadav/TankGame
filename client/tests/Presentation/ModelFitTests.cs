@@ -46,6 +46,31 @@ public class ModelFitTests : TestClass
     }
 
     [Test]
+    public void TintPalette_NeverPaintsOver_AGenuinelyTexturedSurface()
+    {
+        var textured = _model.GetNode<MeshInstance3D>("DetailA");
+        var image = Image.CreateEmpty(2, 2, false, Image.Format.Rgba8);
+        textured.SetSurfaceOverrideMaterial(0, new StandardMaterial3D
+        {
+            AlbedoTexture = ImageTexture.CreateFromImage(image),
+        });
+
+        ModelFit.TintPalette(_model, new Color(0.1f, 0.5f, 0.1f),
+            new[] { new Color(0.5f, 0.3f, 0.1f) }, seed: 0);
+
+        var kept = textured.GetSurfaceOverrideMaterial(0) as StandardMaterial3D;
+        if (kept?.AlbedoTexture is null)
+        {
+            throw new System.Exception("A surface with a real texture must keep it — never tint over artwork.");
+        }
+
+        if (SurfaceColour("Body") != new Color(0.1f, 0.5f, 0.1f))
+        {
+            throw new System.Exception("Bare surfaces around a textured one must still take the palette.");
+        }
+    }
+
+    [Test]
     public void TintPalette_SeedRotatesTheDetailColours_NotThePrimary()
     {
         var primary = new Color(0.1f, 0.5f, 0.1f);

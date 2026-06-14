@@ -133,10 +133,18 @@ public class Arena3DSceneTests : TestClass
                 throw new System.Exception("Every tank in a solo match must be named.");
             }
 
-            // The proven-visible marker recipe (owner: the first cut was invisible in battle).
-            if (tag.FontSize < 80 || !tag.NoDepthTest)
+            // The real visibility recipe (owner: invisible twice): Label3D's default PixelSize makes
+            // any font sub-unit tall at this world scale — the tag must stand tens of world units —
+            // and a dark backing panel keeps the text readable against any terrain.
+            if (tag.FontSize * tag.PixelSize < 18f || !tag.NoDepthTest)
             {
-                throw new System.Exception("Name tags must use the big depth-test-off recipe to stay readable.");
+                throw new System.Exception(
+                    $"A name tag must stand tens of world units tall; this one is {tag.FontSize * tag.PixelSize:0.0}.");
+            }
+
+            if (view.FindChild("NameBacking", recursive: true, owned: false) is not MeshInstance3D)
+            {
+                throw new System.Exception("A name tag needs its dark backing panel to read against terrain.");
             }
 
             names.Add(tag.Text);
