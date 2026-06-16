@@ -1,8 +1,11 @@
 using Godot;
 using TankGame.Infrastructure;
 #if DEBUG
+using System;
+using System.Linq;
 using System.Reflection;
 using Chickensoft.GoDotTest;
+using TankGame.Domain;
 #endif
 
 namespace TankGame.Presentation;
@@ -21,6 +24,12 @@ public partial class Bootstrap : Node
     public override void _Ready()
     {
 #if DEBUG
+        if (OS.GetCmdlineArgs().Contains("--audit-assets"))
+        {
+            Callable.From(AuditAssets).CallDeferred();
+            return;
+        }
+
         _environment = TestEnvironment.From(OS.GetCmdlineArgs());
         if (_environment.ShouldRunTests)
         {
@@ -41,5 +50,55 @@ public partial class Bootstrap : Node
 #if DEBUG
     private void RunTests()
         => _ = GoTest.RunTests(Assembly.GetExecutingAssembly(), this, _environment);
+
+    private void AuditAssets()
+    {
+        var catalogue = DecorationAssets.Catalogue();
+        GD.Print($"ASSET-TINT-AUDIT START total={catalogue.Count}");
+
+        var whiteCount = 0;
+        var emptyCount = 0;
+
+        foreach (var entry in catalogue)
+        {
+            var view = new DecorationView();
+            view.Configure(entry.Id, PropTransform.Identity, 64f);
+            AddChild(view);
+
+            var meshCount = CountMeshes(view);
+            if (meshCount == 0)
+            {
+                GD.Print($"EMPTY {entry.Id}");
+                emptyCount++;
+                view.Free();
+                continue;
+            }
+
+            var whites = ModelFit.WhiteRenderingSurfaces(view);
+            if (whites.Count > 0)
+            {
+                GD.Print($"WHITE {entry.Id} [{string.Join(", ", whites)}]");
+                whiteCount++;
+            }
+
+            view.Free();
+        }
+
+        GD.Print($"ASSET-TINT-AUDIT DONE white={whiteCount} empty={emptyCount} total={catalogue.Count}");
+        GetTree().Quit(0);
+    }
+
+    // Recurse over Node, not Node3D — a GLTF scene also holds non-spatial nodes (AnimationPlayer,
+    // etc.) that would throw on a Node3D cast.
+    private static int CountMeshes(Node node)
+    {
+        var count = node is MeshInstance3D { Mesh: not null } ? 1 : 0;
+        foreach (var child in node.GetChildren())
+        {
+            count += CountMeshes(child);
+        }
+
+        return count;
+    }
 #endif
 }

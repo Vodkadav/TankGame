@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using Godot;
 
@@ -62,9 +63,9 @@ public static class ModelFit
     /// every smaller part cycles the <paramref name="secondaries"/> as detail colours, starting at an
     /// offset from <paramref name="seed"/> so different assets in one category vary while any one
     /// asset always looks the same. Only BARE surfaces are touched — a surface whose material
-    /// carries an albedo texture keeps it (so mixed models keep their real textures); detection is
-    /// per material, not file size, because a big geometry-only .glb is still textureless. Ranking
-    /// covers every surface, so the primary/detail split is stable whether or not parts are bare.</summary>
+    /// carries a meaningful albedo texture keeps it (so mixed models keep their real textures);
+    /// effectively-white textures are treated as bare and tinted. Ranking covers every surface, so
+    /// the primary/detail split is stable whether or not parts are bare.</summary>
     public static void TintPalette(Node3D model, Color primary, IReadOnlyList<Color> secondaries, int seed = 0)
     {
         var surfaces = new List<(MeshInstance3D Mi, int Surface, float Size)>();
@@ -81,10 +82,11 @@ public static class ModelFit
         var ranked = new List<(MeshInstance3D Mi, int Surface, float Size)>(surfaces);
         ranked.Sort((a, b) => b.Size.CompareTo(a.Size));
 
-        var offset = System.Math.Abs(seed);
+        var offset = Math.Abs(seed);
         for (var i = 0; i < ranked.Count; i++)
         {
-            if (HasAlbedoTexture(ranked[i].Mi, ranked[i].Surface))
+            var mat = ranked[i].Mi.GetActiveMaterial(ranked[i].Surface) as BaseMaterial3D;
+            if (HasMeaningfulTexture(mat))
             {
                 continue; // genuinely textured — never paint over the real artwork
             }
@@ -101,8 +103,88 @@ public static class ModelFit
         }
     }
 
-    private static bool HasAlbedoTexture(MeshInstance3D mi, int surface) =>
-        mi.GetActiveMaterial(surface) is BaseMaterial3D material && material.AlbedoTexture is not null;
+    /// <summary>True if the material's albedo texture is meaningful (not a white or missing texture).
+    /// Returns false for null material or null texture.</summary>
+    public static bool HasMeaningfulTexture(BaseMaterial3D? material)
+    {
+        if (material?.AlbedoTexture is not { } tex)
+        {
+            return false;
+        }
+
+        var img = tex.GetImage();
+        if (img is null)
+        {
+            return false;
+        }
+
+        if (img.IsCompressed())
+        {
+            if (img.Decompress() != Error.Ok)
+            {
+                return false;
+            }
+        }
+
+        return !IsEffectivelyWhite(img);
+    }
+
+    /// <summary>Sample a grid of pixels from the image and return true if all sampled pixels are
+    /// near-white. Returns true for empty/zero-dimension images.</summary>
+    private static bool IsEffectivelyWhite(Image img)
+    {
+        if (img.GetWidth() == 0 || img.GetHeight() == 0)
+        {
+            return true;
+        }
+
+        var gridSize = 8;
+        var stepX = Math.Max(1, img.GetWidth() / gridSize);
+        var stepY = Math.Max(1, img.GetHeight() / gridSize);
+
+        for (var y = 0; y < img.GetHeight(); y += stepY)
+        {
+            for (var x = 0; x < img.GetWidth(); x += stepX)
+            {
+                var pixel = img.GetPixel(x, y);
+                if (!IsNearWhite(pixel))
+                {
+                    return false;
+                }
+            }
+        }
+
+        return true;
+    }
+
+    /// <summary>Return true if all RGB channels are >= 0.92 (near-white).</summary>
+    private static bool IsNearWhite(Color c) => c.R >= 0.92f && c.G >= 0.92f && c.B >= 0.92f;
+
+    /// <summary>List surfaces that render white and have no meaningful texture — these are
+    /// candidates for tinting. Returns empty list if all white surfaces have been tinted.</summary>
+    public static IReadOnlyList<string> WhiteRenderingSurfaces(Node3D model)
+    {
+        var whites = new List<string>();
+        foreach (var mi in MeshInstances(model))
+        {
+            for (var s = 0; s < mi.Mesh.GetSurfaceCount(); s++)
+            {
+                var mat = mi.GetActiveMaterial(s) as BaseMaterial3D;
+                if (HasMeaningfulTexture(mat))
+                {
+                    continue; // shows a real texture
+                }
+
+                var albedo = mat?.AlbedoColor ?? Colors.White;
+                if (IsNearWhite(albedo))
+                {
+                    whites.Add($"{mi.Name}#{s}");
+                }
+            }
+        }
+
+        return whites;
+    }
 
     // Union of the model's MeshInstance3D bounding boxes in the MODEL's own local space — each mesh's
     // global transform is taken relative to the model root, so the measurement is independent of where

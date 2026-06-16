@@ -90,6 +90,68 @@ public class ModelFitTests : TestClass
         }
     }
 
+    [Test]
+    public void TintPalette_PaintsOverAnEffectivelyWhiteTexture()
+    {
+        var img = Image.CreateEmpty(2, 2, false, Image.Format.Rgba8);
+        img.Fill(new Color(1, 1, 1, 1));
+        var detailA = _model.GetNode<MeshInstance3D>("DetailA");
+        detailA.SetSurfaceOverrideMaterial(0, new StandardMaterial3D
+        {
+            AlbedoTexture = ImageTexture.CreateFromImage(img),
+        });
+
+        var primary = new Color(0.1f, 0.5f, 0.1f);
+        var detailOne = new Color(0.5f, 0.3f, 0.1f);
+
+        ModelFit.TintPalette(_model, primary, new[] { detailOne }, seed: 0);
+
+        var result = detailA.GetSurfaceOverrideMaterial(0) as StandardMaterial3D;
+        if (result?.AlbedoTexture is not null)
+        {
+            throw new System.Exception("An effectively-white texture must be treated as bare and tinted.");
+        }
+
+        if (result?.AlbedoColor != detailOne)
+        {
+            throw new System.Exception("The white-texture surface must receive the detail colour.");
+        }
+    }
+
+    [Test]
+    public void WhiteRenderingSurfaces_IsEmpty_AfterTintingBareAndWhiteSurfaces()
+    {
+        var img = Image.CreateEmpty(2, 2, false, Image.Format.Rgba8);
+        img.Fill(new Color(1, 1, 1, 1));
+        var detailA = _model.GetNode<MeshInstance3D>("DetailA");
+        detailA.SetSurfaceOverrideMaterial(0, new StandardMaterial3D
+        {
+            AlbedoTexture = ImageTexture.CreateFromImage(img),
+        });
+
+        var primary = new Color(0.1f, 0.5f, 0.1f);
+        var detailOne = new Color(0.5f, 0.3f, 0.1f);
+
+        ModelFit.TintPalette(_model, primary, new[] { detailOne }, seed: 0);
+
+        var whites = ModelFit.WhiteRenderingSurfaces(_model);
+        if (whites.Count != 0)
+        {
+            throw new System.Exception($"After tinting bare and white surfaces, WhiteRenderingSurfaces must be empty, but got {string.Join(", ", whites)}");
+        }
+    }
+
+    [Test]
+    public void WhiteRenderingSurfaces_FlagsAnUntintedWhiteSurface()
+    {
+        // Don't call TintPalette. The bare BoxMesh surfaces have no material and render white.
+        var whites = ModelFit.WhiteRenderingSurfaces(_model);
+        if (whites.Count == 0)
+        {
+            throw new System.Exception("Untinted white surfaces must be flagged by WhiteRenderingSurfaces.");
+        }
+    }
+
     private Color SurfaceColour(string meshName)
     {
         var mi = _model.GetNode<MeshInstance3D>(meshName);
