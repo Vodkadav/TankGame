@@ -3,68 +3,76 @@ using Godot;
 
 namespace TankGame.Presentation;
 
-/// <summary>A pooled one-shot SFX player for the arena and title screen. Owns a ring buffer of
-/// 16 <see cref="AudioStreamPlayer3D"/> nodes for positional sounds (tank fire, explosions, wall
-/// breaks, pickups) and one flat <see cref="AudioStreamPlayer"/> for non-positional sounds (victory
-/// sting, UI clicks). Each <see cref="SfxKind"/> maps to a FLAC under <c>res://audio/sfx/</c>;
-/// missing files are silently skipped so the pool degrades gracefully before assets are installed.
-///
-/// <para>Perf rule: no per-frame allocation — the pool is fixed-size and reused round-robin.
-/// Add this node as a child of the scene that owns it; 3D players inherit their parent's
-/// world-space origin (zero for both Arena3D and Title root nodes).</para></summary>
+/// <summary>A pooled one-shot SFX player. Owns a ring buffer of 16
+/// <see cref="AudioStreamPlayer3D"/> nodes for positional sounds and two flat
+/// <see cref="AudioStreamPlayer"/> nodes for non-positional sounds (one at full volume for
+/// clicks/victory, one at −8 dB for hover sounds). OGG files are loaded directly via
+/// <see cref="AudioStreamOggVorbis.LoadFromBuffer"/> — no Godot import step required,
+/// so a <c>git pull</c> immediately delivers working audio without opening the editor.</summary>
 public partial class SfxPool : Node
 {
     private const int Pool3DSize = 16;
     private const string SfxDir = "res://audio/sfx/";
+    private const float HoverOffsetDb = -8f;
 
-    // One filename per kind — the asset pipeline writes these names (see docs/credits/assets.md).
     private static readonly Dictionary<SfxKind, string> SfxFiles = new()
     {
-        [SfxKind.Fire]      = "fire.flac",
-        [SfxKind.Explosion] = "explosion.flac",
-        [SfxKind.WallBreak] = "wall_break.flac",
-        [SfxKind.Pickup]    = "pickup.flac",
-        [SfxKind.Victory]   = "victory.flac",
-        [SfxKind.UiClick]   = "ui_click.flac",
+        [SfxKind.Fire]      = "fire.ogg",
+        [SfxKind.Explosion] = "explosion.ogg",
+        [SfxKind.WallBreak] = "wall_break.ogg",
+        [SfxKind.Pickup]    = "pickup.ogg",
+        [SfxKind.Victory]   = "victory.ogg",
+        [SfxKind.UiClick]   = "ui_click.ogg",
+        [SfxKind.UiHover]   = "ui_hover.ogg",
     };
 
     private readonly AudioStreamPlayer3D[] _pool3D = new AudioStreamPlayer3D[Pool3DSize];
-    private AudioStreamPlayer _pool2D = null!;
+    private AudioStreamPlayer _pool2D  = null!;
+    private AudioStreamPlayer _hoverPlayer = null!;
     private readonly Dictionary<SfxKind, AudioStream?> _streams = new();
     private int _next3D;
+    private float _sfxVolumeDb;
 
     public override void _Ready()
     {
-        // Spin up the 3D pool (positional — world-space fire / explosion / wall-break / pickup).
         for (var i = 0; i < Pool3DSize; i++)
         {
-            var player = new AudioStreamPlayer3D { Name = $"Sfx3D_{i}" };
-            AddChild(player);
-            _pool3D[i] = player;
+            var p = new AudioStreamPlayer3D { Name = $"Sfx3D_{i}" };
+            AddChild(p);
+            _pool3D[i] = p;
         }
 
-        // One 2D player for non-positional sounds (victory sting, UI clicks).
         _pool2D = new AudioStreamPlayer { Name = "Sfx2D" };
         AddChild(_pool2D);
 
-        // Load each stream; null if the file is not yet installed.
+        _hoverPlayer = new AudioStreamPlayer { Name = "SfxHover", VolumeDb = HoverOffsetDb };
+        AddChild(_hoverPlayer);
+
         foreach (var (kind, file) in SfxFiles)
-        {
-            var path = SfxDir + file;
-            _streams[kind] = ResourceLoader.Exists(path) ? GD.Load<AudioStream>(path) : null;
-        }
+            _streams[kind] = LoadOgg(SfxDir + file);
+    }
+
+    // Load an OGG file via FileAccess + LoadFromBuffer — bypasses the Godot import/resource
+    // system entirely, so the file works immediately after a git pull without an editor import.
+    private static AudioStream? LoadOgg(string resPath)
+    {
+        using var file = FileAccess.Open(resPath, FileAccess.ModeFlags.Read);
+        if (file is null) return null;
+        var bytes = file.GetBuffer((long)file.GetLength());
+        return AudioStreamOggVorbis.LoadFromBuffer(bytes);
     }
 
     /// <summary>Set the SFX volume for every player in the pool (dB; 0 = full, negative = quieter).
     /// Call after loading the user's audio settings.</summary>
     public void SetVolumeDb(float db)
     {
+        _sfxVolumeDb = db;
         foreach (var p in _pool3D) p.VolumeDb = db;
         _pool2D.VolumeDb = db;
+        _hoverPlayer.VolumeDb = db + HoverOffsetDb;
     }
 
-    /// <summary>Play a positional sound at the given world position. Cycles the 3D ring buffer
-    /// so rapid-fire events overlap rather than interrupt each other.</summary>
+    /// <summary>Play a positional sound at the given world position.</summary>
     public void PlayAt(SfxKind kind, Vector3 worldPosition)
     {
         if (!_streams.TryGetValue(kind, out var stream) || stream is null) return;
@@ -75,9 +83,7 @@ public partial class SfxPool : Node
         player.Play();
     }
 
-    /// <summary>Play a non-positional sound (victory sting, menu clicks). Uses the single
-    /// 2D player; interrupts itself if called faster than the clip's length, which is
-    /// acceptable for short UI clicks.</summary>
+    /// <summary>Play a non-positional sound (victory sting, UI clicks).</summary>
     public void PlayUi(SfxKind kind)
     {
         if (!_streams.TryGetValue(kind, out var stream) || stream is null) return;
@@ -85,13 +91,20 @@ public partial class SfxPool : Node
         _pool2D.Play();
     }
 
-    // ── Settings helpers ─────────────────────────────────────────────────────────────────────────
+    /// <summary>Play a quiet hover sound (mouse-entered on a button). Uses a separate
+    /// player so it does not interrupt a simultaneous click sound.</summary>
+    public void PlayHover()
+    {
+        if (!_streams.TryGetValue(SfxKind.UiHover, out var stream) || stream is null) return;
+        _hoverPlayer.Stream = stream;
+        _hoverPlayer.Play();
+    }
 
-    private const string SettingsPath = "user://settings.cfg";
+    // ── Settings helpers ────────────────────────────────────────────────────────────────────
+
+    private const string SettingsPath  = "user://settings.cfg";
     private const string AudioSection  = "audio";
 
-    /// <summary>Read the SFX volume (dB) from <c>user://settings.cfg</c>. Returns 0 (full volume)
-    /// when the key is absent or the file does not exist yet.</summary>
     public static float LoadSfxVolumeDb()
     {
         var cfg = new ConfigFile();
@@ -100,12 +113,10 @@ public partial class SfxPool : Node
             : 0f;
     }
 
-    /// <summary>Persist the SFX volume to <c>user://settings.cfg</c>, preserving all other
-    /// sections (e.g. the player name).</summary>
     public static void SaveSfxVolumeDb(float db)
     {
         var cfg = new ConfigFile();
-        cfg.Load(SettingsPath); // keep player.name etc.; a missing file is fine
+        cfg.Load(SettingsPath);
         cfg.SetValue(AudioSection, "sfx_volume_db", db);
         cfg.Save(SettingsPath);
     }

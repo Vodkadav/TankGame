@@ -17,14 +17,16 @@ public partial class TitleScene : Control
     private LineEdit _nameEntry = null!;
     private System.Action? _afterNamePrompt;
     private SfxPool _sfx = null!;
+    private SettingsOverlay _settingsOverlay = null!;
 
     public override void _Ready()
     {
         LoadRememberedName();
+        GameSetup.LoadSettings();
 
         _sfx = new SfxPool { Name = "SfxPool" };
         AddChild(_sfx);
-        _sfx.SetVolumeDb(SfxPool.LoadSfxVolumeDb());
+        _sfx.SetVolumeDb(GameSetup.SfxVolumeDb);
 
         var menu = new VBoxContainer { Name = "Menu" };
         menu.SetAnchorsAndOffsetsPreset(LayoutPreset.Center);
@@ -43,28 +45,41 @@ public partial class TitleScene : Control
         // the prompt pre-fills the remembered name, so a returning player just confirms.
         var solo = Button("Solo", "title.solo");
         solo.Pressed += () => { _sfx.PlayUi(SfxKind.UiClick); PromptForName(StartSolo); };
+        solo.MouseEntered += () => _sfx.PlayHover();
         menu.AddChild(solo);
 
         var team = Button("TeamVsTeam", "title.team_vs_team");
         team.Pressed += () => { _sfx.PlayUi(SfxKind.UiClick); PromptForName(() => Go(LobbyScenePath)); };
+        team.MouseEntered += () => _sfx.PlayHover();
         menu.AddChild(team);
 
         var selectMap = Button("SelectMap", "title.select_map");
         selectMap.Pressed += () => { _sfx.PlayUi(SfxKind.UiClick); Go(MapSelectScenePath); };
+        selectMap.MouseEntered += () => _sfx.PlayHover();
         menu.AddChild(selectMap);
 
         // Authoring is its own activity, not a step of choosing what to play — the editor gets its
         // own menu entry (owner feedback 2026-06-11).
         var editor = Button("Editor", "title.editor");
         editor.Pressed += () => { _sfx.PlayUi(SfxKind.UiClick); Go(MapEditorScene.MapEditorScenePath); };
+        editor.MouseEntered += () => _sfx.PlayHover();
         menu.AddChild(editor);
+
+        var settings = Button("Settings", "title.settings");
+        settings.Pressed += () => { _sfx.PlayUi(SfxKind.UiClick); _settingsOverlay.Open(_sfx); };
+        settings.MouseEntered += () => _sfx.PlayHover();
+        menu.AddChild(settings);
 
         var exit = Button("Exit", "title.exit");
         exit.Pressed += () => { _sfx.PlayUi(SfxKind.UiClick); GetTree().Quit(); };
+        exit.MouseEntered += () => _sfx.PlayHover();
         menu.AddChild(exit);
 
         AddChild(menu);
         BuildNamePrompt();
+        _settingsOverlay = new SettingsOverlay { Name = "SettingsOverlay" };
+        AddChild(_settingsOverlay);
+        GameSetup.SettingsChanged += () => _sfx.SetVolumeDb(GameSetup.SfxVolumeDb);
     }
 
     private void BuildNamePrompt()
@@ -92,6 +107,7 @@ public partial class TitleScene : Control
 
         var ok = Button("NameOk", "title.name_ok");
         ok.Pressed += () => { _sfx.PlayUi(SfxKind.UiClick); ConfirmName(); };
+        ok.MouseEntered += () => _sfx.PlayHover();
         box.AddChild(ok);
         _nameEntry.TextSubmitted += _ => ConfirmName(); // Enter confirms too
 
