@@ -151,6 +151,7 @@ public partial class Arena3DScene : Node3D
         }
 
         IsMatchOver = true;
+        _sfx.PlayUi(SfxKind.Victory);
 
         var viewport = GetViewport().GetVisibleRect().Size;
         var cardWidth = Mathf.Min(viewport.X * 0.94f, 760f);
@@ -238,7 +239,7 @@ public partial class Arena3DScene : Node3D
         nav.AddThemeConstantOverride("separation", (int)(viewport.X * 0.02f));
         nav.SizeFlagsHorizontal = Control.SizeFlags.ShrinkCenter;
 
-        nav.AddChild(NavButton("PrevView", "<", viewport, () => SwitchView(-1)));
+        nav.AddChild(NavButton("PrevView", "<", viewport, () => { _sfx.PlayUi(SfxKind.UiClick); SwitchView(-1); }));
 
         var pill = new PanelContainer { Name = "ViewPill" };
         pill.AddThemeStyleboxOverride("panel", PillStyle());
@@ -252,7 +253,7 @@ public partial class Arena3DScene : Node3D
         pill.AddChild(_viewTitle);
         nav.AddChild(pill);
 
-        nav.AddChild(NavButton("NextView", ">", viewport, () => SwitchView(1)));
+        nav.AddChild(NavButton("NextView", ">", viewport, () => { _sfx.PlayUi(SfxKind.UiClick); SwitchView(1); }));
         return nav;
     }
 
@@ -487,6 +488,7 @@ public partial class Arena3DScene : Node3D
         var newGame = StyledButton("NewGame", "gameover.new_game", viewport);
         newGame.Pressed += () =>
         {
+            _sfx.PlayUi(SfxKind.UiClick);
             var custom = GameSetup.CustomMap; // StartNewMatch clears it; a custom-map rematch keeps its map
             GameSetup.StartNewMatch(GameSetup.Mode);
             GameSetup.CustomMap = custom;
@@ -495,11 +497,11 @@ public partial class Arena3DScene : Node3D
         bar.AddChild(newGame);
 
         var menu = StyledButton("BackToMenu", "pause.main_menu", viewport);
-        menu.Pressed += () => GetTree().ChangeSceneToFile("res://src/Presentation/Title.tscn");
+        menu.Pressed += () => { _sfx.PlayUi(SfxKind.UiClick); GetTree().ChangeSceneToFile("res://src/Presentation/Title.tscn"); };
         bar.AddChild(menu);
 
         var exit = StyledButton("ExitGame", "pause.exit", viewport);
-        exit.Pressed += () => GetTree().Quit();
+        exit.Pressed += () => { _sfx.PlayUi(SfxKind.UiClick); GetTree().Quit(); };
         bar.AddChild(exit);
         return bar;
     }
@@ -542,6 +544,7 @@ public partial class Arena3DScene : Node3D
     // lights cut a hole in.
     private SpotLight3D _fogLight = null!;
     private readonly List<ITank> _viewers = new();
+    private SfxPool _sfx = null!;
 
     public override void _Ready()
     {
@@ -623,6 +626,25 @@ public partial class Arena3DScene : Node3D
         SpawnTanks();
         BuildPreviewHud();
         BuildPauseMenu();
+
+        // SFX pool — must come after _grid and _world are assigned (we subscribe to their events).
+        _sfx = new SfxPool { Name = "SfxPool" };
+        AddChild(_sfx);
+        _sfx.SetVolumeDb(SfxPool.LoadSfxVolumeDb());
+        _grid.CellChanged += OnGridCellChangedSfx;
+    }
+
+    // Play a wall-break sound whenever a destructible cell crumbles to floor. Floor tiles never
+    // receive damage, so the only way CellChanged fires with Material=Floor is a brick/crate
+    // reaching HP 0.
+    private void OnGridCellChangedSfx(WallCellChanged change)
+    {
+        if (change.Cell.Material == CellMaterial.Floor)
+        {
+            _sfx.PlayAt(SfxKind.WallBreak,
+                GroundProjection.ToWorld(new NVector2(
+                    (change.X + 0.5f) * TileSize, (change.Y + 0.5f) * TileSize)));
+        }
     }
 
     // Pairs each catalogue kind with the cell the generator chose for it (one pickup per kind, in order).
@@ -671,15 +693,15 @@ public partial class Arena3DScene : Node3D
         menu.AddChild(new Label { Text = "pause.heading", HorizontalAlignment = HorizontalAlignment.Center });
 
         var resume = new Button { Name = "Resume", Text = "pause.resume" };
-        resume.Pressed += TogglePause;
+        resume.Pressed += () => { _sfx.PlayUi(SfxKind.UiClick); TogglePause(); };
         menu.AddChild(resume);
 
         var mainMenu = new Button { Name = "MainMenu", Text = "pause.main_menu" };
-        mainMenu.Pressed += () => GetTree().ChangeSceneToFile("res://src/Presentation/Title.tscn");
+        mainMenu.Pressed += () => { _sfx.PlayUi(SfxKind.UiClick); GetTree().ChangeSceneToFile("res://src/Presentation/Title.tscn"); };
         menu.AddChild(mainMenu);
 
         var exit = new Button { Name = "ExitGame", Text = "pause.exit" };
-        exit.Pressed += () => GetTree().Quit();
+        exit.Pressed += () => { _sfx.PlayUi(SfxKind.UiClick); GetTree().Quit(); };
         menu.AddChild(exit);
 
         _pauseLayer.AddChild(menu);
@@ -1145,9 +1167,16 @@ public partial class Arena3DScene : Node3D
         AddChild(view);
         _views[entity.Id] = view;
 
+        // SFX: fire sound when a projectile is born; a pick-up sound when it is collected.
+        if (entity is IProjectile proj)
+        {
+            _sfx.PlayAt(SfxKind.Fire, GroundProjection.ToWorld(proj.Position));
+        }
+
         if (entity is IPowerup pickup)
         {
             pickup.Collected += kind => ShowPickupFloater(pickup.Position, kind);
+            pickup.Collected += _ => _sfx.PlayAt(SfxKind.Pickup, GroundProjection.ToWorld(pickup.Position));
         }
     }
 
@@ -1166,11 +1195,12 @@ public partial class Arena3DScene : Node3D
         }
     }
 
-    private static Tank3DView BuildTankView(ITank tank)
+    private Tank3DView BuildTankView(ITank tank)
     {
         var view = new Tank3DView();
         view.Bind(tank);
         view.ApplyTeamTint(tank.Team);
+        view.SetSfx(_sfx); // inject pool so Tank3DView plays explosion on death
         return view;
     }
 

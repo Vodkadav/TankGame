@@ -16,10 +16,16 @@ public partial class TitleScene : Control
     private Control _namePrompt = null!;
     private LineEdit _nameEntry = null!;
     private System.Action? _afterNamePrompt;
+    private SfxPool _sfx = null!;
 
     public override void _Ready()
     {
         LoadRememberedName();
+
+        _sfx = new SfxPool { Name = "SfxPool" };
+        AddChild(_sfx);
+        _sfx.SetVolumeDb(SfxPool.LoadSfxVolumeDb());
+
         var menu = new VBoxContainer { Name = "Menu" };
         menu.SetAnchorsAndOffsetsPreset(LayoutPreset.Center);
         menu.GrowHorizontal = GrowDirection.Both;
@@ -36,25 +42,25 @@ public partial class TitleScene : Control
         // Every way into a game asks for the player's battle name first (owner feedback 2026-06-11);
         // the prompt pre-fills the remembered name, so a returning player just confirms.
         var solo = Button("Solo", "title.solo");
-        solo.Pressed += () => PromptForName(StartSolo);
+        solo.Pressed += () => { _sfx.PlayUi(SfxKind.UiClick); PromptForName(StartSolo); };
         menu.AddChild(solo);
 
         var team = Button("TeamVsTeam", "title.team_vs_team");
-        team.Pressed += () => PromptForName(() => Go(LobbyScenePath));
+        team.Pressed += () => { _sfx.PlayUi(SfxKind.UiClick); PromptForName(() => Go(LobbyScenePath)); };
         menu.AddChild(team);
 
         var selectMap = Button("SelectMap", "title.select_map");
-        selectMap.Pressed += () => Go(MapSelectScenePath);
+        selectMap.Pressed += () => { _sfx.PlayUi(SfxKind.UiClick); Go(MapSelectScenePath); };
         menu.AddChild(selectMap);
 
         // Authoring is its own activity, not a step of choosing what to play — the editor gets its
         // own menu entry (owner feedback 2026-06-11).
         var editor = Button("Editor", "title.editor");
-        editor.Pressed += () => Go(MapEditorScene.MapEditorScenePath);
+        editor.Pressed += () => { _sfx.PlayUi(SfxKind.UiClick); Go(MapEditorScene.MapEditorScenePath); };
         menu.AddChild(editor);
 
         var exit = Button("Exit", "title.exit");
-        exit.Pressed += () => GetTree().Quit();
+        exit.Pressed += () => { _sfx.PlayUi(SfxKind.UiClick); GetTree().Quit(); };
         menu.AddChild(exit);
 
         AddChild(menu);
@@ -85,7 +91,7 @@ public partial class TitleScene : Control
         box.AddChild(_nameEntry);
 
         var ok = Button("NameOk", "title.name_ok");
-        ok.Pressed += ConfirmName;
+        ok.Pressed += () => { _sfx.PlayUi(SfxKind.UiClick); ConfirmName(); };
         box.AddChild(ok);
         _nameEntry.TextSubmitted += _ => ConfirmName(); // Enter confirms too
 
