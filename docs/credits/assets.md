@@ -21,5 +21,16 @@
 
 When a Kenney pack is integrated, snapshot its license into `docs/licenses/` and
 update the affected row (Kenney license ≈ CC0, no attribution required).
+
+## Audio
+
+| Asset | Model / Tool | License | Prompt |
+|-------|-------------|---------|--------|
+| `client/audio/sfx/fire.flac` (2.0 s) | **Stable Audio Open 1.0** via ComfyUI + `scripts/comfy_audio.py`; auto-QC'd (3 candidates, CLAP-ranked, trimmed, normalised to −1 dBFS) | **Royalty-free / commercial use permitted** — Stability AI Stable Audio Open Non-Commercial Research Community License does **not** apply to the output audio; generated audio is free for any use including commercial | "military tank cannon firing, loud single gunshot boom, powerful muzzle blast" |
+| `client/audio/sfx/explosion.flac` (3.0 s) | Same pipeline | Same | "large explosion, tank destroyed, deep booming blast, fire and debris, battlefield" |
+| `client/audio/sfx/wall_break.flac` (2.0 s) | Same pipeline | Same | "brick wall crumbling and breaking apart, heavy rubble crashing to ground, destruction impact" |
+| `client/audio/sfx/pickup.flac` (2.0 s) | Same pipeline | Same | "item pickup collected, short positive electronic beep, power-up sound, retro arcade" |
+| `client/audio/sfx/victory.flac` (3.6 s) | Same pipeline | Same | "triumphant victory fanfare, short brass sting, military bugle call, winner announcement" |
+| `client/audio/sfx/ui_click.flac` (0.2 s) | Same pipeline | Same | "soft menu button click, brief UI tap, interface interaction sound, subtle click" |
 | `client/src/Presentation/Arena/ui/victory_bg.png` | AI-generated locally via the `assetfactory` MCP (model `sd_xl_base_1.0`, the commercial-safe SDXL base per `docs/ASSET_GENERATION.md`); prompt: "festive cartoon mobile-game victory scene, fireworks, balloons, confetti, golden sunburst, two cartoon army tanks, vibrant bold cartoon vector art". | **AI-generated**; SDXL-base output license permits commercial use (CreativeML OpenRAIL-M) | The victory-screen celebration backdrop only (fireworks/balloons/sunburst). The screen itself — ribbon title, nav pills + arrows, the ranked plaque, buttons — is composed from real UI controls at runtime (`Arena3DScene.ShowMatchOver`), so no text or layout is baked into the art. Replaced the earlier `victory_banner.png` mock-up-as-backdrop. |
 | `client/src/Presentation/Arena/models/imported/**` (asset-browser imports; seeded with `kenney_blaster-kit/crate-medium.glb`) | Copy-on-place imports from the local 3D library via the map editor asset browser — Kenney CC0 and KayKit CC0 packs only (the catalogue excludes every pack without a clean license; verdicts in `docs/research/asset-browser-survey.md`) | **CC0 1.0** (Kenney / KayKit, no attribution required) | The editor copies a placed library asset into this folder so saved maps keep resolving after a clone or in an export; decorations load at runtime via `GltfDocument` (`DecorationView`). The seed sample is a copy of the already-credited Blaster Kit crate. Commit newly imported files together with the map that uses them. |
