@@ -37,6 +37,11 @@ public partial class Tank3DView : Node3D
     private bool _wasAirborne;
     private bool _stealthed;
     private SfxPool? _sfx;
+    private Node3D? _nameTagHolder;
+
+    /// <summary>True when this view is for the player's own team; controls which name-tag
+    /// setting governs visibility.</summary>
+    public bool IsFriendly { get; set; }
 
     public override void _Ready()
     {
@@ -73,6 +78,7 @@ public partial class Tank3DView : Node3D
         var textWidth = name.Length * NameTagFontPx * NameTagPixelSize * 0.52f; // ~glyph advance
 
         var tag = new Node3D { Name = "NameTagHolder", Visible = name.Length > 0 };
+        _nameTagHolder = tag;
         tag.Position = new Vector3(0f, NameTagY + 22f, 0f);
 
         tag.AddChild(new MeshInstance3D
@@ -236,6 +242,12 @@ public partial class Tank3DView : Node3D
 
         _wasAlive = alive;
         Visible = alive && !Concealed; // downed/awaiting respawn, or unseen in the fog → hidden
+        if (_nameTagHolder is not null)
+        {
+            var showName = IsFriendly ? GameSetup.ShowFriendlyNames : GameSetup.ShowEnemyNames;
+            _nameTagHolder.Visible = showName && (_tank?.DisplayName.Length ?? 0) > 0;
+        }
+
         if (!alive)
         {
             _smoke.Emitting = false;

@@ -22,4 +22,7 @@ public enum SfxKind
 
     /// <summary>A menu button was pressed — non-positional.</summary>
     UiClick,
+
+    /// <summary>Mouse entered a menu button — quieter than a full click.</summary>
+    UiHover,
 }

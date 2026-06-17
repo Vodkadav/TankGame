@@ -1,4 +1,5 @@
 using System;
+using Godot;
 using TankGame.GameLogic;
 
 namespace TankGame.Presentation;
@@ -82,5 +83,51 @@ public static class GameSetup
         Series = new SeriesTracker(RoundsToWin);
         ArenaSeed = Guid.NewGuid().GetHashCode();
         CustomMap = null; // a fresh match defaults to the built-in arena; My Maps sets it back after
+    }
+
+    // ── User settings (persisted to user://settings.cfg) ──────────────────────────────
+
+    /// <summary>SFX volume in decibels (0 = full volume, −30 = nearly silent).</summary>
+    public static float SfxVolumeDb { get; set; } = 0f;
+
+    /// <summary>Brightness multiplier applied to the arena environment and sun (1 = default).</summary>
+    public static float BrightnessMultiplier { get; set; } = 1f;
+
+    /// <summary>Whether name labels are drawn above friendly (player-team) tanks.</summary>
+    public static bool ShowFriendlyNames { get; set; } = true;
+
+    /// <summary>Whether name labels are drawn above enemy tanks.</summary>
+    public static bool ShowEnemyNames { get; set; } = false;
+
+    /// <summary>Raised whenever the user saves new settings; subscribers update live.</summary>
+    public static event System.Action? SettingsChanged;
+
+    private const string SettingsPath = "user://settings.cfg";
+
+    /// <summary>Load all user settings from <c>user://settings.cfg</c> into the static
+    /// properties. Call once at startup (TitleScene._Ready).</summary>
+    public static void LoadSettings()
+    {
+        var cfg = new ConfigFile();
+        if (cfg.Load(SettingsPath) != Error.Ok) return;
+        PlayerName           = (string)cfg.GetValue("player",  "name",               "");
+        SfxVolumeDb          = (float) cfg.GetValue("audio",   "sfx_volume_db",       0f);
+        BrightnessMultiplier = (float) cfg.GetValue("display", "brightness",           1f);
+        ShowFriendlyNames    = (bool)  cfg.GetValue("display", "show_friendly_names", true);
+        ShowEnemyNames       = (bool)  cfg.GetValue("display", "show_enemy_names",    false);
+    }
+
+    /// <summary>Persist all user settings and raise <see cref="SettingsChanged"/>.</summary>
+    public static void ApplySettings()
+    {
+        var cfg = new ConfigFile();
+        cfg.Load(SettingsPath);
+        cfg.SetValue("player",  "name",               PlayerName);
+        cfg.SetValue("audio",   "sfx_volume_db",       SfxVolumeDb);
+        cfg.SetValue("display", "brightness",           BrightnessMultiplier);
+        cfg.SetValue("display", "show_friendly_names", ShowFriendlyNames);
+        cfg.SetValue("display", "show_enemy_names",    ShowEnemyNames);
+        cfg.Save(SettingsPath);
+        SettingsChanged?.Invoke();
     }
 }

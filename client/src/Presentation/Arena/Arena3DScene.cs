@@ -239,7 +239,9 @@ public partial class Arena3DScene : Node3D
         nav.AddThemeConstantOverride("separation", (int)(viewport.X * 0.02f));
         nav.SizeFlagsHorizontal = Control.SizeFlags.ShrinkCenter;
 
-        nav.AddChild(NavButton("PrevView", "<", viewport, () => { _sfx.PlayUi(SfxKind.UiClick); SwitchView(-1); }));
+        var prevBtn = NavButton("PrevView", "<", viewport, () => { _sfx.PlayUi(SfxKind.UiClick); SwitchView(-1); });
+        prevBtn.MouseEntered += () => _sfx.PlayHover();
+        nav.AddChild(prevBtn);
 
         var pill = new PanelContainer { Name = "ViewPill" };
         pill.AddThemeStyleboxOverride("panel", PillStyle());
@@ -253,7 +255,9 @@ public partial class Arena3DScene : Node3D
         pill.AddChild(_viewTitle);
         nav.AddChild(pill);
 
-        nav.AddChild(NavButton("NextView", ">", viewport, () => { _sfx.PlayUi(SfxKind.UiClick); SwitchView(1); }));
+        var nextBtn = NavButton("NextView", ">", viewport, () => { _sfx.PlayUi(SfxKind.UiClick); SwitchView(1); });
+        nextBtn.MouseEntered += () => _sfx.PlayHover();
+        nav.AddChild(nextBtn);
         return nav;
     }
 
@@ -494,14 +498,17 @@ public partial class Arena3DScene : Node3D
             GameSetup.CustomMap = custom;
             GetTree().ReloadCurrentScene();
         };
+        newGame.MouseEntered += () => _sfx.PlayHover();
         bar.AddChild(newGame);
 
         var menu = StyledButton("BackToMenu", "pause.main_menu", viewport);
         menu.Pressed += () => { _sfx.PlayUi(SfxKind.UiClick); GetTree().ChangeSceneToFile("res://src/Presentation/Title.tscn"); };
+        menu.MouseEntered += () => _sfx.PlayHover();
         bar.AddChild(menu);
 
         var exit = StyledButton("ExitGame", "pause.exit", viewport);
         exit.Pressed += () => { _sfx.PlayUi(SfxKind.UiClick); GetTree().Quit(); };
+        exit.MouseEntered += () => _sfx.PlayHover();
         bar.AddChild(exit);
         return bar;
     }
@@ -545,6 +552,9 @@ public partial class Arena3DScene : Node3D
     private SpotLight3D _fogLight = null!;
     private readonly List<ITank> _viewers = new();
     private SfxPool _sfx = null!;
+    private WorldEnvironment _worldEnv = null!;
+    private DirectionalLight3D _sun = null!;
+    private SettingsOverlay _settingsOverlay = null!;
 
     public override void _Ready()
     {
@@ -630,7 +640,11 @@ public partial class Arena3DScene : Node3D
         // SFX pool — must come after _grid and _world are assigned (we subscribe to their events).
         _sfx = new SfxPool { Name = "SfxPool" };
         AddChild(_sfx);
-        _sfx.SetVolumeDb(SfxPool.LoadSfxVolumeDb());
+        _sfx.SetVolumeDb(GameSetup.SfxVolumeDb);
+        ApplyBrightness();
+        _settingsOverlay = new SettingsOverlay { Name = "SettingsOverlay" };
+        AddChild(_settingsOverlay);
+        GameSetup.SettingsChanged += OnSettingsChanged;
         _grid.CellChanged += OnGridCellChangedSfx;
     }
 
@@ -645,6 +659,22 @@ public partial class Arena3DScene : Node3D
                 GroundProjection.ToWorld(new NVector2(
                     (change.X + 0.5f) * TileSize, (change.Y + 0.5f) * TileSize)));
         }
+    }
+
+    private void OnSettingsChanged()
+    {
+        _sfx.SetVolumeDb(GameSetup.SfxVolumeDb);
+        ApplyBrightness();
+    }
+
+    private void ApplyBrightness()
+    {
+        if (_worldEnv?.Environment is not { } env) return;
+        var b = GameSetup.BrightnessMultiplier;
+        env.AdjustmentEnabled = true;
+        env.AdjustmentBrightness = b;
+        if (_sun is not null)
+            _sun.LightEnergy = FogSunEnergy * b;
     }
 
     // Pairs each catalogue kind with the cell the generator chose for it (one pickup per kind, in order).
@@ -694,14 +724,22 @@ public partial class Arena3DScene : Node3D
 
         var resume = new Button { Name = "Resume", Text = "pause.resume" };
         resume.Pressed += () => { _sfx.PlayUi(SfxKind.UiClick); TogglePause(); };
+        resume.MouseEntered += () => _sfx.PlayHover();
         menu.AddChild(resume);
+
+        var settingsBtn = new Button { Name = "Settings", Text = "title.settings" };
+        settingsBtn.Pressed += () => { _sfx.PlayUi(SfxKind.UiClick); _settingsOverlay.Open(_sfx); };
+        settingsBtn.MouseEntered += () => _sfx.PlayHover();
+        menu.AddChild(settingsBtn);
 
         var mainMenu = new Button { Name = "MainMenu", Text = "pause.main_menu" };
         mainMenu.Pressed += () => { _sfx.PlayUi(SfxKind.UiClick); GetTree().ChangeSceneToFile("res://src/Presentation/Title.tscn"); };
+        mainMenu.MouseEntered += () => _sfx.PlayHover();
         menu.AddChild(mainMenu);
 
         var exit = new Button { Name = "ExitGame", Text = "pause.exit" };
         exit.Pressed += () => { _sfx.PlayUi(SfxKind.UiClick); GetTree().Quit(); };
+        exit.MouseEntered += () => _sfx.PlayHover();
         menu.AddChild(exit);
 
         _pauseLayer.AddChild(menu);
@@ -808,18 +846,17 @@ public partial class Arena3DScene : Node3D
 
         // Fog of war bakes the world dark at creation (single-player is always fogged): the sun is dimmed
         // to a faint dusk and the ambient/sky are near-black, so only the player's fog spotlight relights a
-        // circle. Built as locals — holding the Environment resource in a field leaks an unsafe reference
-        // at engine shutdown (Godot .NET fatal); the WorldEnvironment node owns it and frees it cleanly.
-        var sun = new DirectionalLight3D
+        // circle. Stored as fields so brightness adjustments can reach them via ApplyBrightness().
+        _sun = new DirectionalLight3D
         {
             Name = "Sun",
             RotationDegrees = new Vector3(-55f, -40f, 0f),
             LightEnergy = FogSunEnergy,
             ShadowEnabled = true,
         };
-        AddChild(sun);
+        AddChild(_sun);
 
-        AddChild(new WorldEnvironment
+        _worldEnv = new WorldEnvironment
         {
             Environment = new Godot.Environment
             {
@@ -830,7 +867,8 @@ public partial class Arena3DScene : Node3D
                 AmbientLightEnergy = 1f,
                 TonemapMode = Godot.Environment.ToneMapper.Aces, // compress highlights so light colours don't blow out to white
             },
-        });
+        };
+        AddChild(_worldEnv);
     }
 
     // Fog of war: a dark world (the sun dimmed to near-dusk, a near-black ambient and sky, baked in
@@ -1201,6 +1239,7 @@ public partial class Arena3DScene : Node3D
         view.Bind(tank);
         view.ApplyTeamTint(tank.Team);
         view.SetSfx(_sfx); // inject pool so Tank3DView plays explosion on death
+        view.IsFriendly = (tank.Team == PlayerTeam);
         return view;
     }
 
