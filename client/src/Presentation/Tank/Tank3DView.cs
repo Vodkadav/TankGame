@@ -36,6 +36,7 @@ public partial class Tank3DView : Node3D
     private bool _wasAlive = true;
     private bool _wasAirborne;
     private bool _stealthed;
+    private SfxPool? _sfx;
 
     public override void _Ready()
     {
@@ -333,12 +334,17 @@ void fragment() {
         }
     }
 
+    /// <summary>Inject the arena's SFX pool so this view can play the explosion sound when
+    /// the tank dies. Called by <see cref="Arena3DScene"/> immediately after construction.</summary>
+    public void SetSfx(SfxPool sfx) => _sfx = sfx;
+
     private void SpawnDeathExplosion()
     {
         var boom = new Explosion3D();
         boom.Init(48f);
         boom.Position = Position; // the tank's last world position
         GetParent()?.AddChild(boom);
+        _sfx?.PlayAt(SfxKind.Explosion, Position);
     }
 
     private static Node3D? FindPart(Node node, string contains)
