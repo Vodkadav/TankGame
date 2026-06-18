@@ -27,6 +27,20 @@ public partial class SettingsOverlay : Node
 
     public bool IsOpen => _layer?.Visible ?? false;
 
+    // Escape closes the panel from anywhere, and is consumed so it does not also toggle the arena's
+    // pause menu underneath. Without this the panel could only be dismissed via the small ✕, which
+    // the owner found flaky.
+    public override void _Input(InputEvent @event)
+    {
+        if (!IsOpen) return;
+        if (@event.IsActionPressed("ui_cancel"))
+        {
+            GameSetup.ApplySettings();
+            Close();
+            GetViewport().SetInputAsHandled();
+        }
+    }
+
     private void Build()
     {
         _layer = new CanvasLayer { Name = "SettingsLayer", Visible = false };
@@ -36,6 +50,16 @@ public partial class SettingsOverlay : Node
         var scrim = new ColorRect { Color = new Color(0f, 0f, 0f, 0.65f) };
         scrim.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect);
         scrim.MouseFilter = Control.MouseFilterEnum.Stop; // block clicks through
+        // Clicking the dark area outside the panel dismisses the overlay (the panel itself absorbs
+        // its own clicks, so only off-panel clicks reach the scrim).
+        scrim.GuiInput += e =>
+        {
+            if (e is InputEventMouseButton { Pressed: true })
+            {
+                GameSetup.ApplySettings();
+                Close();
+            }
+        };
         _layer.AddChild(scrim);
 
         // Centred panel
@@ -133,7 +157,7 @@ public partial class SettingsOverlay : Node
     }
 
     private static void UpdateDbLabel(Label label, float db) =>
-        label.Text = db <= -29f ? "Mute" : $"{(int)db} dB";
+        label.Text = db <= -29f ? TranslationServer.Translate("settings.mute") : $"{(int)db} dB";
 
     private static HSlider Slider(float min, float max, float step, float value)
     {

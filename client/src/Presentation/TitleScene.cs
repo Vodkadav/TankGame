@@ -28,6 +28,8 @@ public partial class TitleScene : Control
         AddChild(_sfx);
         _sfx.SetVolumeDb(GameSetup.SfxVolumeDb);
 
+        BuildBackdrop(); // behind the menu — added before it so the menu draws on top
+
         var menu = new VBoxContainer { Name = "Menu" };
         menu.SetAnchorsAndOffsetsPreset(LayoutPreset.Center);
         menu.GrowHorizontal = GrowDirection.Both;
@@ -105,14 +107,42 @@ public partial class TitleScene : Control
         };
         box.AddChild(_nameEntry);
 
+        // Cancel + OK side by side so the player can always back out to the menu (owner feedback
+        // 2026-06-18: clicking Solo trapped you in the name prompt with no way back). Escape also
+        // cancels — see _UnhandledInput.
+        var buttons = new HBoxContainer { Alignment = BoxContainer.AlignmentMode.Center };
+        buttons.AddThemeConstantOverride("separation", 12);
+
+        var cancel = Button("NameCancel", "map.back");
+        cancel.Pressed += () => { _sfx.PlayUi(SfxKind.UiClick); CancelNamePrompt(); };
+        cancel.MouseEntered += () => _sfx.PlayHover();
+        buttons.AddChild(cancel);
+
         var ok = Button("NameOk", "title.name_ok");
         ok.Pressed += () => { _sfx.PlayUi(SfxKind.UiClick); ConfirmName(); };
         ok.MouseEntered += () => _sfx.PlayHover();
-        box.AddChild(ok);
+        buttons.AddChild(ok);
+        box.AddChild(buttons);
         _nameEntry.TextSubmitted += _ => ConfirmName(); // Enter confirms too
 
         _namePrompt.AddChild(box);
         AddChild(_namePrompt);
+    }
+
+    // Escape backs out of the name prompt; consumed so it does not propagate further.
+    public override void _UnhandledInput(InputEvent @event)
+    {
+        if (_namePrompt is { Visible: true } && @event.IsActionPressed("ui_cancel"))
+        {
+            CancelNamePrompt();
+            GetViewport().SetInputAsHandled();
+        }
+    }
+
+    private void CancelNamePrompt()
+    {
+        _afterNamePrompt = null;
+        _namePrompt.Visible = false;
     }
 
     private void PromptForName(System.Action proceed)
@@ -170,6 +200,53 @@ public partial class TitleScene : Control
         {
             GetTree().ChangeSceneToFile(scenePath);
         }
+    }
+
+    private const string BackdropPath = "res://src/Presentation/Title/ui/title_bg.png";
+
+    // A cool cartoon tank-battle backdrop behind the menu (owner ask 2026-06-18). Loaded from the raw
+    // PNG at runtime — like SfxPool's audio — so it works straight after a git pull with no editor
+    // import step; absent art is simply skipped. A faint scrim keeps the menu text legible over it.
+    private void BuildBackdrop()
+    {
+        var tex = LoadPng(BackdropPath);
+        if (tex is null)
+        {
+            return;
+        }
+
+        var backdrop = new TextureRect
+        {
+            Name = "Backdrop",
+            Texture = tex,
+            StretchMode = TextureRect.StretchModeEnum.KeepAspectCovered,
+            MouseFilter = MouseFilterEnum.Ignore,
+        };
+        backdrop.SetAnchorsAndOffsetsPreset(LayoutPreset.FullRect);
+        AddChild(backdrop);
+
+        var scrim = new ColorRect
+        {
+            Name = "BackdropScrim",
+            Color = new Color(0f, 0f, 0f, 0.35f),
+            MouseFilter = MouseFilterEnum.Ignore,
+        };
+        scrim.SetAnchorsAndOffsetsPreset(LayoutPreset.FullRect);
+        AddChild(scrim);
+    }
+
+    private static Texture2D? LoadPng(string resPath)
+    {
+        using var file = FileAccess.Open(resPath, FileAccess.ModeFlags.Read);
+        if (file is null)
+        {
+            return null;
+        }
+
+        var img = new Image();
+        return img.LoadPngFromBuffer(file.GetBuffer((long)file.GetLength())) == Error.Ok
+            ? ImageTexture.CreateFromImage(img)
+            : null;
     }
 
     private static Button Button(string name, string textKey) => new() { Name = name, Text = textKey };

@@ -646,6 +646,7 @@ public partial class Arena3DScene : Node3D
         AddChild(_settingsOverlay);
         GameSetup.SettingsChanged += OnSettingsChanged;
         _grid.CellChanged += OnGridCellChangedSfx;
+        combat.Hit += OnCombatHitSfx; // announce the local player's kills + streaks
     }
 
     // Play a wall-break sound whenever a destructible cell crumbles to floor. Floor tiles never
@@ -653,13 +654,35 @@ public partial class Arena3DScene : Node3D
     // reaching HP 0.
     private void OnGridCellChangedSfx(WallCellChanged change)
     {
-        if (change.Cell.Material == CellMaterial.Floor)
-        {
-            _sfx.PlayAt(SfxKind.WallBreak,
-                GroundProjection.ToWorld(new NVector2(
-                    (change.X + 0.5f) * TileSize, (change.Y + 0.5f) * TileSize)));
-        }
+        if (change.Cell.Material != CellMaterial.Floor) return;
+        var centre = new NVector2((change.X + 0.5f) * TileSize, (change.Y + 0.5f) * TileSize);
+        if (!WithinEarshot(centre)) return; // a wall crumbling across the map is ambient noise
+        _sfx.PlayAt(SfxKind.WallBreak, GroundProjection.ToWorld(centre));
     }
+
+    // The local player's kill announcer + streak callouts (owner ask 2026-06-18). Only the player's
+    // own kills are announced; the player's own death resets their streak.
+    private void OnCombatHitSfx(CombatResolver.CombatHit hit)
+    {
+        if (!hit.Killed) return;
+        if (hit.Victim == _player.Id) _streak.Reset();
+        if (hit.Shooter != _player.Id) return;
+
+        var voice = _streak.RegisterKill(_matchClock) switch
+        {
+            StreakTier.Double => SfxKind.StreakDouble,
+            StreakTier.Triple => SfxKind.StreakTriple,
+            StreakTier.Multi  => SfxKind.StreakMulti,
+            _                 => SfxKind.KillEnemy,
+        };
+        _sfx.PlayVoice(voice);
+    }
+
+    // True when a game-coords point is close enough to the player to be worth hearing, so distant
+    // tank fire and far-off pickups are culled (~7 cells). Kept relative to the player tank, not the
+    // camera, so it matches what the player should care about.
+    private bool WithinEarshot(NVector2 gamePos) =>
+        NVector2.Distance(gamePos, _player.Position) <= EarshotRadius;
 
     private void OnSettingsChanged()
     {
@@ -691,6 +714,12 @@ public partial class Arena3DScene : Node3D
 
     private CanvasLayer _pauseLayer = null!;
     private bool _paused;
+
+    // The local player's kill-streak announcer + the monotonic match clock that feeds it (owner ask
+    // 2026-06-18). Distant tank fire / far-off pickups beyond ~7 cells of the player are not heard.
+    private readonly KillStreakTracker _streak = new();
+    private float _matchClock;
+    private const float EarshotRadius = 7f * TileSize;
 
     /// <summary>Whether the game is paused (the Escape menu is up). Exposed for tests.</summary>
     public bool IsPaused => _paused;
@@ -801,6 +830,7 @@ public partial class Arena3DScene : Node3D
         }
 
         _world.Step((float)delta);
+        _matchClock += (float)delta; // monotonic clock for the kill-streak window
         _teleporter.Step((float)delta); // age pad cooldowns once per frame (tanks warp inside world.Step)
 
         var result = _matchTracker.Evaluate(_world.Entities);
@@ -1205,8 +1235,9 @@ public partial class Arena3DScene : Node3D
         AddChild(view);
         _views[entity.Id] = view;
 
-        // SFX: fire sound when a projectile is born; a pick-up sound when it is collected.
-        if (entity is IProjectile proj)
+        // SFX: fire sound when a projectile is born; a per-kind pick-up sound when it is collected.
+        // Both are culled to the player's earshot so distant tanks firing across the map stay quiet.
+        if (entity is IProjectile proj && WithinEarshot(proj.Position))
         {
             _sfx.PlayAt(SfxKind.Fire, GroundProjection.ToWorld(proj.Position));
         }
@@ -1214,9 +1245,29 @@ public partial class Arena3DScene : Node3D
         if (entity is IPowerup pickup)
         {
             pickup.Collected += kind => ShowPickupFloater(pickup.Position, kind);
-            pickup.Collected += _ => _sfx.PlayAt(SfxKind.Pickup, GroundProjection.ToWorld(pickup.Position));
+            pickup.Collected += kind =>
+            {
+                if (WithinEarshot(pickup.Position))
+                    _sfx.PlayAt(PickupSfx(kind), GroundProjection.ToWorld(pickup.Position));
+            };
         }
     }
+
+    // Each powerup gets its own pickup cue (owner ask 2026-06-18); unmapped kinds fall back to the
+    // generic pickup chime.
+    private static SfxKind PickupSfx(PowerupKind kind) => kind switch
+    {
+        PowerupKind.SpeedBoost   => SfxKind.PowerupSpeed,
+        PowerupKind.RapidFire    => SfxKind.PowerupRapidFire,
+        PowerupKind.BouncingAmmo => SfxKind.PowerupBouncing,
+        PowerupKind.SpreadAmmo   => SfxKind.PowerupSpread,
+        PowerupKind.PiercingAmmo => SfxKind.PowerupPiercing,
+        PowerupKind.Repair       => SfxKind.PowerupRepair,
+        PowerupKind.Shield       => SfxKind.PowerupShield,
+        PowerupKind.Missile      => SfxKind.PowerupMissile,
+        PowerupKind.Telephone    => SfxKind.PowerupAirstrike,
+        _                        => SfxKind.Pickup,
+    };
 
     private void ShowPickupFloater(NVector2 position, PowerupKind kind)
     {
