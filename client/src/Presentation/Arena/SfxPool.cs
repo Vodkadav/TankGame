@@ -55,7 +55,15 @@ public partial class SfxPool : Node
     {
         for (var i = 0; i < Pool3DSize; i++)
         {
-            var p = new AudioStreamPlayer3D { Name = $"Sfx3D_{i}" };
+            // Disable distance attenuation: the orthographic battle camera sits ~2500 units back, so
+            // the default inverse-distance falloff drops every positional sound (fire, explosion,
+            // wall-break, pickup) to near silence. With it off the sound plays at the pool's set
+            // volume regardless of distance, while still panning to its world position (PR #229).
+            var p = new AudioStreamPlayer3D
+            {
+                Name = $"Sfx3D_{i}",
+                AttenuationModel = AudioStreamPlayer3D.AttenuationModelEnum.Disabled,
+            };
             AddChild(p);
             _pool3D[i] = p;
         }
@@ -80,9 +88,15 @@ public partial class SfxPool : Node
     private static AudioStream? LoadOgg(string resPath)
     {
         using var file = FileAccess.Open(resPath, FileAccess.ModeFlags.Read);
-        if (file is null) return null;
-        var bytes = file.GetBuffer((long)file.GetLength());
-        return AudioStreamOggVorbis.LoadFromBuffer(bytes);
+        if (file is not null)
+        {
+            var bytes = file.GetBuffer((long)file.GetLength());
+            return AudioStreamOggVorbis.LoadFromBuffer(bytes);
+        }
+
+        // Exported builds (e.g. web) don't ship the raw .ogg, only the imported
+        // AudioStream resource — load that instead of giving up (no sound).
+        return GD.Load<AudioStream>(resPath);
     }
 
     /// <summary>Set the SFX volume for every player in the pool (dB; 0 = full, negative = quieter).

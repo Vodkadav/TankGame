@@ -61,21 +61,29 @@ public partial class TitleScene : Control
         menu.AddChild(selectMap);
 
         // Authoring is its own activity, not a step of choosing what to play — the editor gets its
-        // own menu entry (owner feedback 2026-06-11).
-        var editor = Button("Editor", "title.editor");
-        editor.Pressed += () => { _sfx.PlayUi(SfxKind.UiClick); Go(MapEditorScene.MapEditorScenePath); };
-        editor.MouseEntered += () => _sfx.PlayHover();
-        menu.AddChild(editor);
+        // own menu entry (owner feedback 2026-06-11). It is desktop-only: the editor needs the local
+        // dev asset library, which isn't bundled in a web build, so a web build is play-only.
+        if (!OS.HasFeature("web"))
+        {
+            var editor = Button("Editor", "title.editor");
+            editor.Pressed += () => { _sfx.PlayUi(SfxKind.UiClick); Go(MapEditorScene.MapEditorScenePath); };
+            editor.MouseEntered += () => _sfx.PlayHover();
+            menu.AddChild(editor);
+        }
 
         var settings = Button("Settings", "title.settings");
         settings.Pressed += () => { _sfx.PlayUi(SfxKind.UiClick); _settingsOverlay.Open(_sfx); };
         settings.MouseEntered += () => _sfx.PlayHover();
         menu.AddChild(settings);
 
-        var exit = Button("Exit", "title.exit");
-        exit.Pressed += () => { _sfx.PlayUi(SfxKind.UiClick); GetTree().Quit(); };
-        exit.MouseEntered += () => _sfx.PlayHover();
-        menu.AddChild(exit);
+        // A browser tab can't be quit from inside the app, so Exit is desktop-only too.
+        if (!OS.HasFeature("web"))
+        {
+            var exit = Button("Exit", "title.exit");
+            exit.Pressed += () => { _sfx.PlayUi(SfxKind.UiClick); GetTree().Quit(); };
+            exit.MouseEntered += () => _sfx.PlayHover();
+            menu.AddChild(exit);
+        }
 
         AddChild(menu);
         BuildNamePrompt();
@@ -240,7 +248,9 @@ public partial class TitleScene : Control
         using var file = FileAccess.Open(resPath, FileAccess.ModeFlags.Read);
         if (file is null)
         {
-            return null;
+            // Exported builds (e.g. web) don't ship the raw PNG, only the imported
+            // texture — load that instead of dropping the backdrop.
+            return GD.Load<Texture2D>(resPath);
         }
 
         var img = new Image();

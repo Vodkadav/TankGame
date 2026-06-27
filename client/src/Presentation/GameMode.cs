@@ -81,7 +81,7 @@ public static class GameSetup
     {
         Mode = mode;
         Series = new SeriesTracker(RoundsToWin);
-        ArenaSeed = Guid.NewGuid().GetHashCode();
+        ArenaSeed = EntityId.Next().GetHashCode(); // Guid.NewGuid is constant on WASM (no crypto RNG)
         CustomMap = null; // a fresh match defaults to the built-in arena; My Maps sets it back after
     }
 
@@ -96,8 +96,9 @@ public static class GameSetup
     /// <summary>Whether name labels are drawn above friendly (player-team) tanks.</summary>
     public static bool ShowFriendlyNames { get; set; } = true;
 
-    /// <summary>Whether name labels are drawn above enemy tanks.</summary>
-    public static bool ShowEnemyNames { get; set; } = false;
+    /// <summary>Whether name labels are drawn above enemy tanks. On by default so you can see who
+    /// you're fighting; the fog still hides out-of-vision enemies (and their tags) entirely.</summary>
+    public static bool ShowEnemyNames { get; set; } = true;
 
     /// <summary>Raised whenever the user saves new settings; subscribers update live.</summary>
     public static event System.Action? SettingsChanged;
@@ -114,7 +115,7 @@ public static class GameSetup
         SfxVolumeDb          = (float) cfg.GetValue("audio",   "sfx_volume_db",       0f);
         BrightnessMultiplier = (float) cfg.GetValue("display", "brightness",           1f);
         ShowFriendlyNames    = (bool)  cfg.GetValue("display", "show_friendly_names", true);
-        ShowEnemyNames       = (bool)  cfg.GetValue("display", "show_enemy_names",    false);
+        ShowEnemyNames       = (bool)  cfg.GetValue("display", "show_enemy_names",    true);
     }
 
     /// <summary>Persist all user settings and raise <see cref="SettingsChanged"/>.</summary>

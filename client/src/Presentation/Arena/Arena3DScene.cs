@@ -30,6 +30,15 @@ public partial class Arena3DScene : Node3D
     private const int StartingLives = 3;
     private const int TankMaxHp = 8; // beefier tanks so fights last longer (below 40% HP a tank limps + smokes)
 
+    // The simulation runs on a FIXED timestep, decoupled from the render frame rate. Combat collision
+    // is discrete (a shot is "hit" only when its end-of-step position lands within CombatHitRadius of a
+    // tank), so a large frame delta would let a 600 u/s shot jump clean past a tank between samples and
+    // never register — fatal on a heavy build that renders slowly (e.g. the WASM web export). Stepping a
+    // constant 1/120 s regardless of FPS keeps shots from tunnelling and makes timing reproducible; the
+    // accumulator runs as many sub-steps as the frame's delta earned, capped so a slow frame can't spiral.
+    private const float FixedSimStep = 1f / 120f;
+    private const int MaxSimStepsPerFrame = 16;
+
     // Fog of war (the 3D port of the iso fog): the player sees only a lit circle around their tank. An
     // enemy farther than PlayerVisionRadius from every living player tank is invisible (not just dimmed);
     // an enemy lurking in grass is hidden until a player is within BushRevealRange. The same radii the iso
@@ -507,7 +516,7 @@ public partial class Arena3DScene : Node3D
         bar.AddChild(menu);
 
         var exit = StyledButton("ExitGame", "pause.exit", viewport);
-        exit.Pressed += () => { _sfx.PlayUi(SfxKind.UiClick); GetTree().Quit(); };
+        exit.Pressed += () => { _sfx.PlayUi(SfxKind.UiClick); ExitGame(); };
         exit.MouseEntered += () => _sfx.PlayHover();
         bar.AddChild(exit);
         return bar;
@@ -668,7 +677,7 @@ public partial class Arena3DScene : Node3D
         if (hit.Victim == _player.Id) _streak.Reset();
         if (hit.Shooter != _player.Id) return;
 
-        var voice = _streak.RegisterKill(_matchClock) switch
+        var voice = _streak.RegisterKill() switch
         {
             StreakTier.Double => SfxKind.StreakDouble,
             StreakTier.Triple => SfxKind.StreakTriple,
@@ -715,10 +724,10 @@ public partial class Arena3DScene : Node3D
     private CanvasLayer _pauseLayer = null!;
     private bool _paused;
 
-    // The local player's kill-streak announcer + the monotonic match clock that feeds it (owner ask
-    // 2026-06-18). Distant tank fire / far-off pickups beyond ~7 cells of the player are not heard.
+    // The local player's kill-streak announcer (owner ask 2026-06-18): counts kills since the player
+    // last died, no time limit. Distant tank fire / far-off pickups beyond ~7 cells are not heard.
     private readonly KillStreakTracker _streak = new();
-    private float _matchClock;
+    private float _simAccumulator; // leftover frame time carried into the next fixed-step batch
     private const float EarshotRadius = 7f * TileSize;
 
     /// <summary>Whether the game is paused (the Escape menu is up). Exposed for tests.</summary>
@@ -767,12 +776,24 @@ public partial class Arena3DScene : Node3D
         menu.AddChild(mainMenu);
 
         var exit = new Button { Name = "ExitGame", Text = "pause.exit" };
-        exit.Pressed += () => { _sfx.PlayUi(SfxKind.UiClick); GetTree().Quit(); };
+        exit.Pressed += () => { _sfx.PlayUi(SfxKind.UiClick); ExitGame(); };
         exit.MouseEntered += () => _sfx.PlayHover();
         menu.AddChild(exit);
 
         _pauseLayer.AddChild(menu);
         AddChild(_pauseLayer);
+    }
+
+    // "Exit" leaves the game. On desktop that quits the process; in the browser there is nothing to
+    // quit, so it navigates back to the Lundrea Arcade home page instead (the game is served at
+    // /tank/, so "/" is the arcade).
+    private void ExitGame()
+    {
+#if GODOT_WEB
+        JavaScriptBridge.Eval("window.top.location.href = '/';");
+#else
+        GetTree().Quit();
+#endif
     }
 
     private bool _labelsShown = true;
@@ -829,9 +850,22 @@ public partial class Arena3DScene : Node3D
             return; // the Escape menu or the victory screen is up — freeze the match
         }
 
-        _world.Step((float)delta);
-        _matchClock += (float)delta; // monotonic clock for the kill-streak window
-        _teleporter.Step((float)delta); // age pad cooldowns once per frame (tanks warp inside world.Step)
+        // Advance the simulation on a fixed timestep so combat collision never tunnels at low render
+        // FPS (see FixedSimStep). Run whole sub-steps for the time the frame accumulated, capped so a
+        // very slow frame sheds its backlog instead of spiralling into ever-longer catch-up.
+        _simAccumulator += (float)delta;
+        var steps = 0;
+        while (_simAccumulator >= FixedSimStep && steps < MaxSimStepsPerFrame)
+        {
+            _world.Step(FixedSimStep);
+            _teleporter.Step(FixedSimStep); // age pad cooldowns in lockstep (tanks warp inside world.Step)
+            _simAccumulator -= FixedSimStep;
+            steps++;
+        }
+        if (steps == MaxSimStepsPerFrame)
+        {
+            _simAccumulator = 0f; // fell behind this frame — drop the backlog rather than spiral
+        }
 
         var result = _matchTracker.Evaluate(_world.Entities);
         if (result.Decided)

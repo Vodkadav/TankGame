@@ -18,16 +18,43 @@
     <Compile Include="src/**/*.cs" />
   </ItemGroup>
 
-  <ItemGroup>
+  <ItemGroup Condition="'$(GodotTargetPlatform)' != 'web'">
     <PackageReference Include="Sentry" Version="6.5.0" />
   </ItemGroup>
 
   <!-- GoDotTest scene tests run inside the game assembly (GoDotTest reflects over
        the executing assembly), so they compile in for editor/debug builds and are
        excluded from ExportRelease. The runner entry is Bootstrap.cs (#if DEBUG). -->
-  <ItemGroup Condition="'$(Configuration)' != 'ExportRelease'">
+  <ItemGroup Condition="'$(Configuration)' != 'ExportRelease' And '$(GodotTargetPlatform)' != 'web'">
     <PackageReference Include="Chickensoft.GoDotTest" Version="2.0.34" />
     <Compile Include="tests/Presentation/**/*.cs" />
+  </ItemGroup>
+
+  <!-- Experimental .NET web (WASM) export only. Godot sets GodotTargetPlatform=web during a web
+       export, so these are scoped to it and leave Debug/test, Android and desktop builds completely
+       unchanged: the static-linked mono runtime needs an executable entry point (Program.cs +
+       OutputType Exe), and the trimmer must be told to keep the core runtime assemblies. -->
+  <PropertyGroup Condition="'$(GodotTargetPlatform)' == 'web'">
+    <OutputType>Exe</OutputType>
+    <!-- The ComplexRobot web template is built with threads; the managed publish must match it or
+         the .NET runtime fails to initialise (black canvas, engine quits right after GL init). -->
+    <WasmEnableThreads>true</WasmEnableThreads>
+    <!-- Lets code drop browser-incompatible bits (e.g. the Sentry .NET SDK) from the web build. -->
+    <DefineConstants>$(DefineConstants);GODOT_WEB</DefineConstants>
+  </PropertyGroup>
+
+  <ItemGroup Condition="'$(GodotTargetPlatform)' == 'web'">
+    <Compile Include="Program.cs" />
+    <!-- Sentry's .NET SDK relies on native/crypto APIs unavailable under WASM; excluded from web. -->
+    <Compile Remove="src/Infrastructure/SentryBootstrap.cs" />
+    <TrimmerRootAssembly Include="System.Private.CoreLib" />
+    <TrimmerRootAssembly Include="System.Runtime" />
+    <!-- The wasm publish trims to the Program.cs entry point. The engine's real managed entry,
+         GodotPlugins.Game.Main, is compiled into TankGame.dll and called only from native code
+         (godotsharp_game_main_init), so the trimmer can't see it and prunes the whole game. Root
+         the game assembly (and GodotSharp, which Godot reflects over) to keep them in the build. -->
+    <TrimmerRootAssembly Include="TankGame" />
+    <TrimmerRootAssembly Include="GodotSharp" />
   </ItemGroup>
 
 </Project>

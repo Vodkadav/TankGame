@@ -16,30 +16,23 @@ public enum StreakTier
     Multi,
 }
 
-/// <summary>Tracks one combatant's kill streak: consecutive kills landed within a sliding time
-/// window. A kill outside the window — or after <see cref="Reset"/> (e.g. the combatant's own
-/// death) — starts a fresh streak at one. Pure C# so it is unit-tested without Godot, like
+/// <summary>Tracks one combatant's kill streak: every kill landed since the combatant last died
+/// extends the streak, with no time limit between kills. Only <see cref="Reset"/> (the combatant's
+/// own death) ends it. Pure C# so it is unit-tested without Godot, like
 /// <see cref="BattleStats"/>.</summary>
 public sealed class KillStreakTracker
 {
-    private readonly float _windowSeconds;
     private int _count;
-    private float _lastKillTime;
-    private bool _hasKill;
 
-    public KillStreakTracker(float windowSeconds = 4f) => _windowSeconds = windowSeconds;
-
-    /// <summary>The current consecutive-kill count (0 before the first kill).</summary>
+    /// <summary>The current consecutive-kill count (0 before the first kill / after a reset).</summary>
     public int Count => _count;
 
-    /// <summary>Register a kill at <paramref name="now"/> (seconds, monotonic). A kill within the
-    /// window of the previous one extends the streak; otherwise it resets to a single. Returns the
-    /// tier reached.</summary>
-    public StreakTier RegisterKill(float now)
+    /// <summary>Register a kill: extends the streak by one and returns the tier reached. The streak
+    /// is bounded only by <see cref="Reset"/> — any kill while alive counts, however long since the
+    /// last one (owner ask: a streak is "kills without dying", not "kills in quick succession").</summary>
+    public StreakTier RegisterKill()
     {
-        _count = _hasKill && now - _lastKillTime <= _windowSeconds ? _count + 1 : 1;
-        _hasKill = true;
-        _lastKillTime = now;
+        _count++;
         return _count switch
         {
             1 => StreakTier.Single,
@@ -49,10 +42,6 @@ public sealed class KillStreakTracker
         };
     }
 
-    /// <summary>Drop the streak so the next kill starts fresh (e.g. the combatant died).</summary>
-    public void Reset()
-    {
-        _count = 0;
-        _hasKill = false;
-    }
+    /// <summary>Drop the streak so the next kill starts fresh (the combatant died).</summary>
+    public void Reset() => _count = 0;
 }
