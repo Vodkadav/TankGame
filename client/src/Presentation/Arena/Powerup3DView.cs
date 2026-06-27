@@ -3,27 +3,27 @@ using TankGame.Domain;
 
 namespace TankGame.Presentation;
 
-/// <summary>Renders an <see cref="IPowerup"/> as a real floating 3D emblem that shows what it is — a heart
-/// for repair, a shield, a rocket for the missile, a bomb for the airstrike, etc. (ADR-0017; the owner
-/// asked for emblems, not plain orbs). The emblem is a small Kenney CC0 model auto-fitted and spinning
-/// over a glowing disc tinted to the powerup's colour, so it reads as a pickup. Hidden while a respawning
-/// pickup is dormant; the scene frees it on despawn.</summary>
+/// <summary>Renders an <see cref="IPowerup"/> as a bold cartoon icon that bobs over a vivid glowing pad, so
+/// each pickup reads at a glance in the cartoon style the owner asked for (a white shield, golden bullets,
+/// green speed arrows, a bomb for the airstrike, …). The icon is a flat billboarded <see cref="Sprite3D"/>
+/// drawn from a true-alpha PNG (AI-generated — see <c>docs/credits/assets.md</c>); the pad underneath is
+/// tinted to the powerup's colour so the colour-coding survives. Hidden while a respawning pickup is
+/// dormant; the scene frees it on despawn.</summary>
 public partial class Powerup3DView : Node3D
 {
-    private const float HoverHeight = 34f;
-    private const float EmblemSpan = 30f;
-    private const float SpinSpeed = 1.6f;
-    private const float DiscRadius = 18f;
+    private const float HoverHeight = 26f;
+    private const float IconPixelSize = 0.046f; // ~icon source is 1024 px → roughly 45 world units across
+    private const float PadRadius = 18f;
+    private const float BobSpeed = 2.2f;
+    private const float BobHeight = 5f;
 
     private IPowerup? _powerup;
-    private Node3D _emblem = null!;
-    private bool _bob;     // text emblems bob instead of spinning
+    private Node3D _icon = null!;
     private float _bobTime;
 
     public void Bind(IPowerup powerup) => _powerup = powerup;
 
-    // Built in _Ready (not Bind), because ModelFit needs the model inside the tree to measure it, and the
-    // scene binds the view before adding it to the tree.
+    // Built in _Ready (not Bind), because the scene binds the view before adding it to the tree.
     public override void _Ready()
     {
         if (_powerup is null)
@@ -31,62 +31,23 @@ public partial class Powerup3DView : Node3D
             return;
         }
 
-        _emblem = new Node3D { Name = "Emblem", Position = new Vector3(0f, HoverHeight, 0f) };
-        AddChild(_emblem);
-        BuildEmblem(_powerup.Kind);
+        _icon = new Node3D { Name = "Icon", Position = new Vector3(0f, HoverHeight, 0f) };
+        AddChild(_icon);
+        _icon.AddChild(IconSprite(_powerup.Kind));
 
-        AddChild(GlowDisc(PowerupView.ColourFor(_powerup.Kind))); // coloured pad so it reads as a pickup
-        AddChild(DebugLabel.Make(_powerup.Kind.ToString(), HoverHeight + 26f));
+        AddChild(GlowPad(PowerupView.ColourFor(_powerup.Kind))); // coloured pad so it reads as a pickup
         UpdateFromModel();
-    }
-
-    private void BuildEmblem(PowerupKind kind)
-    {
-        switch (kind)
-        {
-            case PowerupKind.SpreadAmmo: // a bold "x3" tag that bobs to catch the eye, not a model
-                _bob = true;
-                _emblem.AddChild(new Label3D
-                {
-                    Text = "x3",
-                    Billboard = BaseMaterial3D.BillboardModeEnum.Enabled,
-                    NoDepthTest = true,
-                    FontSize = 130,
-                    PixelSize = 0.35f,
-                    OutlineSize = 48,
-                    OutlineModulate = Colors.Black,
-                    Modulate = new Color(1f, 0.85f, 0.3f),
-                });
-                return;
-            case PowerupKind.Missile: // a procedural rocket (no single-piece rocket asset exists)
-                _emblem.AddChild(Rocket.Build(new Color(0.9f, 0.35f, 0.2f), EmblemSpan));
-                return;
-            default:
-                var model = GD.Load<PackedScene>(EmblemPath(kind)).Instantiate<Node3D>();
-                _emblem.AddChild(model);
-                ModelFit.Apply(model, EmblemSpan, seatOnGround: false);
-                ModelFit.Tint(model, EmblemColour(kind)); // the bare kit .glb are untextured (white)
-                return;
-        }
     }
 
     public override void _Process(double delta)
     {
-        if (_emblem is null)
+        if (_icon is null)
         {
             return;
         }
 
-        if (_bob)
-        {
-            _bobTime += (float)delta;
-            _emblem.Position = new Vector3(0f, HoverHeight + (Mathf.Sin(_bobTime * 2.2f) * 6f), 0f);
-        }
-        else
-        {
-            _emblem.RotateY((float)delta * SpinSpeed);
-        }
-
+        _bobTime += (float)delta;
+        _icon.Position = new Vector3(0f, HoverHeight + (Mathf.Sin(_bobTime * BobSpeed) * BobHeight), 0f);
         UpdateFromModel();
     }
 
@@ -99,49 +60,47 @@ public partial class Powerup3DView : Node3D
         }
     }
 
-    private static MeshInstance3D GlowDisc(Color colour) => new()
+    // A flat cartoon icon that always faces the camera. Unshaded so the bold art keeps its own colours
+    // instead of being darkened by arena lighting; RenderPriority lifts it cleanly over the glowing pad.
+    private static Sprite3D IconSprite(PowerupKind kind) => new()
+    {
+        Name = "IconSprite",
+        Texture = GD.Load<Texture2D>("res://src/Presentation/Arena/icons/" + IconFile(kind)),
+        Billboard = BaseMaterial3D.BillboardModeEnum.Enabled,
+        Shaded = false,
+        PixelSize = IconPixelSize,
+        RenderPriority = 1,
+        TextureFilter = BaseMaterial3D.TextureFilterEnum.LinearWithMipmaps,
+    };
+
+    private static MeshInstance3D GlowPad(Color colour) => new()
     {
         Name = "Glow",
-        Mesh = new CylinderMesh { TopRadius = DiscRadius, BottomRadius = DiscRadius, Height = 1.5f },
+        Mesh = new CylinderMesh { TopRadius = PadRadius, BottomRadius = PadRadius, Height = 1.5f },
         Position = new Vector3(0f, 3f, 0f),
         MaterialOverride = new StandardMaterial3D
         {
-            AlbedoColor = new Color(colour.R, colour.G, colour.B, 0.55f),
+            AlbedoColor = new Color(colour.R, colour.G, colour.B, 0.7f),
             EmissionEnabled = true,
             Emission = colour,
-            EmissionEnergyMultiplier = 0.8f,
+            EmissionEnergyMultiplier = 2.0f,
             Transparency = BaseMaterial3D.TransparencyEnum.Alpha,
             ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded,
         },
     };
 
-    // A natural colour per emblem so the bare (untextured) kit models read clearly rather than white.
-    private static Color EmblemColour(PowerupKind kind) => kind switch
+    // The cartoon sprite that depicts each powerup (its shape + colour read the meaning).
+    private static string IconFile(PowerupKind kind) => kind switch
     {
-        PowerupKind.SpeedBoost => new Color(0.30f, 0.80f, 0.95f),   // cyan
-        PowerupKind.RapidFire => new Color(1.00f, 0.60f, 0.15f),    // orange
-        PowerupKind.BouncingAmmo => new Color(0.70f, 0.35f, 0.95f), // purple
-        PowerupKind.SpreadAmmo => new Color(0.35f, 0.72f, 0.32f),   // green
-        PowerupKind.PiercingAmmo => new Color(1.00f, 0.85f, 0.20f), // yellow
-        PowerupKind.Repair => new Color(0.95f, 0.25f, 0.25f),       // red heart
-        PowerupKind.Shield => new Color(0.50f, 0.66f, 0.88f),       // steel blue
-        PowerupKind.Missile => new Color(1.00f, 0.40f, 0.20f),      // red-orange
-        PowerupKind.Telephone => new Color(0.28f, 0.28f, 0.32f),    // dark bomb
-        _ => Colors.White,
-    };
-
-    // The Kenney CC0 model that depicts each powerup (its shape reads the meaning).
-    private static string EmblemPath(PowerupKind kind) => "res://src/Presentation/Arena/emblems/" + kind switch
-    {
-        PowerupKind.SpeedBoost => "EmblemSpeed.glb",     // double chevrons
-        PowerupKind.RapidFire => "EmblemRapid.glb",      // blaster
-        PowerupKind.BouncingAmmo => "EmblemBounce.glb",  // spring
-        PowerupKind.SpreadAmmo => "EmblemSpread.glb",    // grenade (scatter)
-        PowerupKind.PiercingAmmo => "EmblemPierce.glb",  // arrow
-        PowerupKind.Repair => "EmblemRepair.glb",        // heart
-        PowerupKind.Shield => "EmblemShield.glb",        // shield
-        PowerupKind.Missile => "EmblemMissile.glb",      // rocket
-        PowerupKind.Telephone => "EmblemPhone.glb",      // bomb (airstrike)
-        _ => "EmblemRepair.glb",
+        PowerupKind.SpeedBoost => "speed.png",       // green speed arrows
+        PowerupKind.RapidFire => "rapidfire.png",    // muzzle-flash burst
+        PowerupKind.BouncingAmmo => "bounce.png",    // ricochet round
+        PowerupKind.SpreadAmmo => "spread.png",      // fan of golden bullets
+        PowerupKind.PiercingAmmo => "pierce.png",    // armour-piercing round
+        PowerupKind.Repair => "repair.png",          // wrench
+        PowerupKind.Shield => "shield.png",          // shield
+        PowerupKind.Missile => "missile.png",        // rocket
+        PowerupKind.Telephone => "telephone.png",    // bomb (airstrike)
+        _ => "repair.png",
     };
 }

@@ -227,16 +227,13 @@ public partial class Terrain3DView : Node3D
         }
     }
 
-    // The slow-going patches render as a dark oil spill: two merged flat discs (a filled figure-8), the
-    // larger overlapping a smaller one. Oily sheen (low roughness, a little metallic).
+    // The slow-going patches render as a glossy black oil puddle with an iridescent purple/blue sheen — a
+    // flat decal (a textured quad lying on the floor) rotated per cell so repeats don't visibly tile. The
+    // art (true-alpha PNG, AI-generated — see docs/credits/assets.md) carries the puddle shape and sheen,
+    // so the mesh is just a square the texture sits on; unshaded keeps the baked sheen vivid.
     private void BuildOilPuddles(bool[,] oil)
     {
-        var slick = new StandardMaterial3D
-        {
-            AlbedoColor = new Color(0.05f, 0.05f, 0.07f),
-            Metallic = 0.4f,
-            Roughness = 0.2f,
-        };
+        var tex = GD.Load<Texture2D>("res://src/Presentation/Arena/icons/oil_spill.png");
         for (var x = 0; x < oil.GetLength(0); x++)
         {
             for (var y = 0; y < oil.GetLength(1); y++)
@@ -247,20 +244,24 @@ public partial class Terrain3DView : Node3D
                 }
 
                 var centre = CellCentre(x, y);
-                var holder = new Node3D { Name = $"Oil_{x}_{y}", Position = new Vector3(centre.X, 0.6f, centre.Y) };
-                AddChild(holder);
-                holder.AddChild(Blob(slick, 22f, new Vector3(-7f, 0f, -4f)));  // larger lobe
-                holder.AddChild(Blob(slick, 15f, new Vector3(13f, 0f, 7f)));   // smaller lobe → a filled "8"
+                var puddle = new MeshInstance3D
+                {
+                    Name = $"Oil_{x}_{y}",
+                    Mesh = new PlaneMesh { Size = new Vector2(_tileSize * 1.1f, _tileSize * 1.1f) },
+                    Position = new Vector3(centre.X, 0.6f, centre.Y),
+                    MaterialOverride = new StandardMaterial3D
+                    {
+                        AlbedoTexture = tex,
+                        Transparency = BaseMaterial3D.TransparencyEnum.Alpha,
+                        ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded,
+                        TextureFilter = BaseMaterial3D.TextureFilterEnum.LinearWithMipmaps,
+                    },
+                };
+                puddle.RotateY(Mathf.DegToRad(((x * 53) + (y * 97)) % 360)); // vary orientation between cells
+                AddChild(puddle);
             }
         }
     }
-
-    private static MeshInstance3D Blob(Material material, float radius, Vector3 offset) => new()
-    {
-        Mesh = new CylinderMesh { TopRadius = radius, BottomRadius = radius, Height = 0.8f },
-        Position = offset,
-        MaterialOverride = material,
-    };
 
     // Each connected block of building cells (the generator lays them as small rectangles) is one
     // building model stretched over the whole block, instead of a separate building per cell.
