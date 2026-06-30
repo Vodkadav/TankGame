@@ -120,6 +120,43 @@ public class WebSocketTransportTests
     }
 
     [Fact]
+    public void SendLobby_PutsTheTaggedCommandOnTheSocket()
+    {
+        var socket = new FakeSocket();
+        var transport = new WebSocketTransport(socket);
+        var command = LobbyProtocol.EncodeSetReady(true);
+
+        transport.SendLobby(command);
+
+        Assert.Single(socket.Sent);
+        Assert.Equal(command, socket.Sent[0]);
+    }
+
+    [Fact]
+    public void Poll_DispatchesALobbyStatePush_ToLobbyStateReceived()
+    {
+        var socket = new FakeSocket();
+        var transport = new WebSocketTransport(socket);
+        LobbyView? received = null;
+        transport.LobbyStateReceived += v => received = v;
+
+        var json = "{\"mode\":\"team\",\"phase\":\"waiting\",\"hostSlot\":0,\"countdown\":0," +
+            "\"players\":[{\"slot\":0,\"name\":\"Ada\",\"team\":0,\"ready\":true}]}";
+        var payload = System.Text.Encoding.UTF8.GetBytes(json);
+        var message = new byte[payload.Length + 1];
+        message[0] = LobbyProtocol.MsgLobbyState;
+        Array.Copy(payload, 0, message, 1, payload.Length);
+        socket.Inbound.Enqueue(message);
+
+        transport.Poll();
+
+        Assert.NotNull(received);
+        Assert.Equal(GameMode.Team, received!.Mode);
+        Assert.Single(received.Players);
+        Assert.True(received.Players[0].Ready);
+    }
+
+    [Fact]
     public void Poll_WithNoInboundMessages_RaisesNothing()
     {
         var socket = new FakeSocket();
