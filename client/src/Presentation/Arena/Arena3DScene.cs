@@ -555,6 +555,23 @@ public partial class Arena3DScene : Node3D
     private WorldEnvironment _worldEnv = null!;
     private DirectionalLight3D _sun = null!;
     private SettingsOverlay _settingsOverlay = null!;
+    private TouchControls? _touch;
+
+    // On a touch device (the shipped Android APK) drive with the on-screen twin sticks; otherwise the
+    // desktop keyboard/mouse. Headless tests report no touchscreen, so they keep the keyboard path.
+    private IInputSource BuildPlayerInput()
+    {
+        if (!DisplayServer.IsTouchscreenAvailable())
+        {
+            return new KeyboardMouse3DInputSource(_camera, fireOnClick: true);
+        }
+
+        _touch = new TouchControls { Name = "TouchControls" };
+        var layer = new CanvasLayer { Name = "TouchControlsLayer" };
+        layer.AddChild(_touch);
+        AddChild(layer);
+        return new TouchInput3DSource(_camera, () => _touch.MoveOutput, () => _touch.AimOutput);
+    }
 
     public override void _Ready()
     {
@@ -1057,7 +1074,7 @@ public partial class Arena3DScene : Node3D
             };
         }
 
-        var p1Input = new KeyboardMouse3DInputSource(_camera, fireOnClick: true);
+        var p1Input = BuildPlayerInput();
         var playerName = GameSetup.PlayerName.Length > 0 ? GameSetup.PlayerName : "Player";
         var player = new Tank(p1Input, _world, _arena, CellCentre(playerCell.X, playerCell.Y),
             TankSpeed, FireInterval, ProjectileSpeed, maxHp: TankMaxHp, team: PlayerTeam, lives: StartingLives,
