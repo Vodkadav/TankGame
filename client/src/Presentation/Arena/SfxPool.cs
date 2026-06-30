@@ -18,6 +18,10 @@ public partial class SfxPool : Node
     // louder but still subdued.
     private const float HoverOffsetDb = -16f;
     private const float UiClickOffsetDb = -6f;
+    // Cannon shots fire constantly during a fight; at full volume they drown everything else out
+    // (owner feedback 2026-06-30: too loud). −20 dB ≈ 10% of the previous amplitude, the level asked
+    // for. Applied per-shot to the Fire kind only, so explosions/pickups/voice keep their volume.
+    private const float FireOffsetDb = -20f;
 
     private static readonly Dictionary<SfxKind, string> SfxFiles = new()
     {
@@ -116,6 +120,7 @@ public partial class SfxPool : Node
         if (!_streams.TryGetValue(kind, out var stream) || stream is null) return;
         var player = _pool3D[_next3D % Pool3DSize];
         _next3D++;
+        player.VolumeDb = _sfxVolumeDb + (kind == SfxKind.Fire ? FireOffsetDb : 0f);
         player.Stream = stream;
         player.Position = worldPosition;
         player.Play();

@@ -62,6 +62,24 @@ public partial class NetArena3DScene : Node3D
     private IInputSource? _guestLocalInput;
     private uint _inputSeq;
 
+    // The local player's input — twin-stick touch on a phone (the shipped APK), keyboard/mouse on
+    // desktop. One overlay serves whichever role this client took; tests report no touchscreen.
+    private TouchControls? _touch;
+
+    private IInputSource BuildLocalInput()
+    {
+        if (!DisplayServer.IsTouchscreenAvailable())
+        {
+            return new KeyboardMouse3DInputSource(_camera);
+        }
+
+        _touch = new TouchControls { Name = "TouchControls" };
+        var layer = new CanvasLayer { Name = "TouchControlsLayer" };
+        layer.AddChild(_touch);
+        AddChild(layer);
+        return new TouchInput3DSource(_camera, () => _touch.MoveOutput, () => _touch.AimOutput);
+    }
+
     // Guest role: the shots mirrored from the latest snapshot (ADR-0019 step 4) — the guest has no
     // world, so each snapshot rebuilds this set of throwaway projectile views.
     private readonly List<Projectile3DView> _snapshotProjectiles = new();
@@ -168,7 +186,7 @@ public partial class NetArena3DScene : Node3D
         _world.EntitySpawned += OnEntitySpawned;
         _world.EntityDespawned += OnEntityDespawned;
 
-        _hostInput = new KeyboardMouse3DInputSource(_camera);
+        _hostInput = BuildLocalInput();
         var hostTank = new Tank(_hostInput, _world, _arena, CellCentre(_level.SpawnX, _level.SpawnY),
             TankSpeed, FireInterval, ProjectileSpeed, maxHp: TankMaxHp, team: 0);
         var guestInput = new RelayedInputSource();
@@ -186,7 +204,7 @@ public partial class NetArena3DScene : Node3D
 
     private void BecomeGuest(byte slot)
     {
-        _guestLocalInput = new KeyboardMouse3DInputSource(_camera);
+        _guestLocalInput = BuildLocalInput();
         _predicted = new PredictedTank(slot, _arena, CellCentre(GuestSpawn.X, GuestSpawn.Y));
         EnsureMirroredTank(slot);
         SyncLocalFromPrediction();
