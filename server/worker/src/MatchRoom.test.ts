@@ -207,6 +207,17 @@ describe("MatchRoom (lobby)", () => {
     guest.ws.close();
   });
 
+  it("appears in the lobby browser once joined, and withdraws when emptied", async () => {
+    const host = await joinRoom("BRWS01", "Ada");
+    expect(await welcomeOf(host)).toBe(0); // fetch awaits the join+publish before returning 101
+
+    const listed = await SELF.fetch("http://room.test/lobbies");
+    const open = (await listed.json()) as { code: string; mode: string; players: number }[];
+    expect(open.find((l) => l.code === "BRWS01")).toMatchObject({ mode: "ffa", players: 1 });
+
+    host.ws.close();
+  });
+
   it("frees a slot when a player leaves so the next joiner reuses it", async () => {
     const a = await joinRoom("LOB002");
     const b = await joinRoom("LOB002");

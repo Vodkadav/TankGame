@@ -22,23 +22,33 @@ import {
   type LobbyState,
   type LobbyCommand,
 } from "./lobbyState";
+import { publishLobby, type LobbyMetaStore } from "./lobbyDirectory";
 
 const LOBBY_KEY = "lobby";
+const CODE_KEY = "code";
 const TICK_MS = 1000;
 
 interface Attachment {
   slot: number;
 }
 
+interface RoomEnv {
+  LOBBY_KV: KVNamespace;
+}
+
 export class MatchRoom implements DurableObject {
   private readonly state: DurableObjectState;
+  private readonly env: RoomEnv;
   private lobby: LobbyState = emptyLobby();
+  private code = ""; // this room's lobby code, learned from the first /room/:code request
 
-  constructor(state: DurableObjectState, _env: unknown) {
+  constructor(state: DurableObjectState, env: RoomEnv) {
     this.state = state;
-    // Restore the lobby before any request/alarm runs (storage survives hibernation/eviction).
+    this.env = env;
+    // Restore the lobby + code before any request/alarm runs (storage survives hibernation/eviction).
     this.state.blockConcurrencyWhile(async () => {
       this.lobby = (await this.state.storage.get<LobbyState>(LOBBY_KEY)) ?? emptyLobby();
+      this.code = (await this.state.storage.get<string>(CODE_KEY)) ?? "";
     });
   }
 
@@ -53,8 +63,14 @@ export class MatchRoom implements DurableObject {
       return new Response("room full", { status: 503 });
     }
 
+    const url = new URL(request.url);
+    if (this.code === "") {
+      this.code = url.pathname.slice("/room/".length); // learn our code from the first request
+      await this.state.storage.put(CODE_KEY, this.code);
+    }
+
     const slot = this.assignSlot();
-    const name = new URL(request.url).searchParams.get("name") ?? "Player";
+    const name = url.searchParams.get("name") ?? "Player";
 
     const pair = new WebSocketPair();
     const [client, server] = [pair[0], pair[1]];
@@ -111,6 +127,11 @@ export class MatchRoom implements DurableObject {
     this.lobby = reduce(this.lobby, command);
     await this.state.storage.put(LOBBY_KEY, this.lobby);
     this.broadcast();
+
+    // Keep this room's entry in the lobby browser in step with its joinability.
+    if (this.code !== "") {
+      await publishLobby(this.env.LOBBY_KV as unknown as LobbyMetaStore, this.lobby, this.code);
+    }
 
     if (this.lobby.phase === "countdown") {
       await this.state.storage.setAlarm(Date.now() + TICK_MS);

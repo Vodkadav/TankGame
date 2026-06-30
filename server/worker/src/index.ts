@@ -2,6 +2,7 @@ import * as Sentry from "@sentry/cloudflare";
 import { withSentry } from "@sentry/cloudflare";
 import { MatchRoom } from "./MatchRoom";
 import { createLobby, joinLobby } from "./lobby";
+import { listOpenLobbies, type LobbyMetaStore } from "./lobbyDirectory";
 import {
   checkRequestBudget,
   cloudflareAnalytics,
@@ -38,6 +39,12 @@ const handler: ExportedHandler<Env> = {
     if (request.method === "POST" && url.pathname === "/lobby") {
       const lobby = await createLobby(env.LOBBY_KV, env.MATCH_ROOM);
       return Response.json(lobby, { status: 201 });
+    }
+
+    // Lobby browser (multiplayer milestone): every currently-joinable lobby, for the in-client list.
+    if (request.method === "GET" && url.pathname === "/lobbies") {
+      const open = await listOpenLobbies(env.LOBBY_KV as unknown as LobbyMetaStore);
+      return Response.json(open);
     }
     const joinMatch = JOIN_ROUTE.exec(url.pathname);
     if (request.method === "POST" && joinMatch) {
