@@ -44,9 +44,10 @@ public class PredictedTankTests
 
     private static InputFrame Move(uint seq, float x, float y) => new(seq, x, y, 0f, 0);
 
-    private static SnapshotFrame SnapshotWith(uint ackSeq, byte slot, float x, float y, int hp = 3, int team = 1)
+    private static SnapshotFrame SnapshotWith(
+        uint ackSeq, byte slot, float x, float y, int hp = 3, int team = 1, int shield = 0, int layer = 0)
         => new(1, ackSeq,
-            new[] { new TankState(slot, x, y, 0f, 0f, (byte)hp, (byte)team) },
+            new[] { new TankState(slot, x, y, 0f, 0f, (byte)hp, (byte)team, (byte)shield, (byte)layer) },
             new List<WallDelta>());
 
     [Fact]
@@ -93,6 +94,32 @@ public class PredictedTankTests
         Assert.Equal(50f, tank.Position.Y, precision: 3);
         Assert.Equal(2, tank.Hp);
         Assert.Equal(1, tank.Team);
+    }
+
+    [Fact]
+    public void Reconcile_TracksShieldAndLayer_FromAuthority()
+    {
+        // The guest's own tank must predict its over-shield and elevation from authority, not just
+        // its transform (ADR-0019 step 4) — otherwise it renders unshielded/grounded until a re-hit.
+        var tank = new PredictedTank(1, new OpenArena(), Vector2.Zero);
+
+        tank.Reconcile(SnapshotWith(ackSeq: 0, slot: 1, x: 100f, y: 50f, shield: 5, layer: 2));
+
+        Assert.Equal(5, tank.Shield);
+        Assert.Equal(2, tank.Layer);
+    }
+
+    [Fact]
+    public void Reconcile_IgnoresSnapshotsWithoutThisSlot_LeavesShieldAndLayer()
+    {
+        var tank = new PredictedTank(1, new OpenArena(), Vector2.Zero);
+        tank.Reconcile(SnapshotWith(ackSeq: 0, slot: 1, x: 0f, y: 0f, shield: 4, layer: 3));
+
+        // A later snapshot only carries slot 0 — this tank's shield/elevation stand.
+        tank.Reconcile(SnapshotWith(ackSeq: 0, slot: 0, x: 999f, y: 999f, shield: 0, layer: 0));
+
+        Assert.Equal(4, tank.Shield);
+        Assert.Equal(3, tank.Layer);
     }
 
     [Fact]
