@@ -22,6 +22,10 @@ public interface ITank : IEntity, IDamageable
     /// The view renders it above the health bar.</summary>
     int Shield { get; }
 
+    /// <summary>Lives left including the current one (respawns remaining = this minus one). Default 1 =
+    /// a tank with no respawns; the HUD reads it to show how many revives the player has left.</summary>
+    int LivesRemaining => 1;
+
     /// <summary>The name shown above the tank in battle — the player's chosen name, or an AI's
     /// generated one. Blank (the default) means no name tag.</summary>
     string DisplayName => "";
