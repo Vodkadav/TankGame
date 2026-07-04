@@ -58,15 +58,15 @@ public sealed class AmmoPickup : IPickupEffect
     public void ApplyTo(Tank tank, IWorld world) => tank.LoadAmmo(_modifier);
 }
 
-/// <summary>A telephone: on pickup it calls in a carpet-bombing <see cref="Airstrike"/> that covers a
-/// connected swathe of the field (about <see cref="CoverFraction"/> of it) — a run of blast zones that
-/// light up one after another and then detonate in the same order. The swathe grows out from the
-/// collector's nearest foe (or the field centre), so it sweeps toward the action. Spawns the strike into
-/// the world the pickup hands it.</summary>
+/// <summary>A telephone: on pickup it calls in a carpet-bombing <see cref="Airstrike"/> that drops a small,
+/// randomized organic blob of blast zones (about <see cref="TargetCells"/> of them) — a clump that lights up
+/// one zone after another and then detonates in the same order. The blob grows outward from the collector's
+/// nearest foe (or the field centre) in random directions, so it lands as a different shape each call.
+/// Spawns the strike into the world the pickup hands it.</summary>
 public sealed class AirstrikePickup : IPickupEffect
 {
-    /// <summary>Fraction of the field the carpet bomb blankets.</summary>
-    public const float CoverFraction = 0.55f;
+    /// <summary>Roughly how many blast cells the strike drops (jittered a little per call for variety).</summary>
+    public const int TargetCells = 30;
 
     private readonly Vector2 _min;
     private readonly Vector2 _max;
@@ -93,7 +93,10 @@ public sealed class AirstrikePickup : IPickupEffect
 
     public void ApplyTo(Tank tank, IWorld world)
     {
-        var zones = BuildSwathe(NearestFoe(tank, world)?.Position ?? Centre());
+        // A fresh, time-seeded rng each call so every strike is a different blob. NOT Guid.NewGuid(): on the
+        // web/WASM runtime that returns a constant, which would make every strike land identically.
+        var rng = new System.Random();
+        var zones = BuildSwathe(NearestFoe(tank, world)?.Position ?? Centre(), rng);
         if (zones.Count > 0)
         {
             world.Spawn(new Airstrike(world, zones, tank.Team, _zoneRadius, _armWindow, _delay, _damage));
@@ -102,35 +105,25 @@ public sealed class AirstrikePickup : IPickupEffect
 
     private Vector2 Centre() => (_min + _max) * 0.5f;
 
-    // Grow a connected blob of zones (a grid spaced by the zone radius) out from the cell nearest the
-    // start point, in breadth-first order, until it blankets CoverFraction of the field. The BFS order is
-    // the order the zones light up and then detonate, so the carpet sweeps outward.
-    private List<Vector2> BuildSwathe(Vector2 start)
+    // Grow a small randomized blob of zones (a grid spaced by the zone radius) out from the cell nearest the
+    // start point, in Eden-growth order, until it holds about TargetCells cells. The growth order is the
+    // order the zones light up and then detonate, so the strike still sweeps outward from the seed.
+    private List<Vector2> BuildSwathe(Vector2 start, System.Random rng)
     {
         var spacing = _zoneRadius;
         var cols = System.Math.Max(1, (int)((_max.X - _min.X) / spacing));
         var rows = System.Math.Max(1, (int)((_max.Y - _min.Y) / spacing));
-        var target = System.Math.Max(1, (int)(CoverFraction * cols * rows));
 
         var sx = System.Math.Clamp((int)((start.X - _min.X) / spacing), 0, cols - 1);
         var sy = System.Math.Clamp((int)((start.Y - _min.Y) / spacing), 0, rows - 1);
 
-        var visited = new HashSet<(int, int)>();
-        var order = new List<Vector2>();
-        var queue = new Queue<(int X, int Y)>();
-        queue.Enqueue((sx, sy));
-        visited.Add((sx, sy));
-        while (queue.Count > 0 && order.Count < target)
+        var target = TargetCells + rng.Next(-2, 3); // ~30 (28–32): a slightly different size each call
+        var cells = AirstrikeSpread.Grow(sx, sy, cols, rows, target, rng);
+
+        var order = new List<Vector2>(cells.Count);
+        foreach (var (cx, cy) in cells)
         {
-            var (cx, cy) = queue.Dequeue();
             order.Add(new Vector2(_min.X + ((cx + 0.5f) * spacing), _min.Y + ((cy + 0.5f) * spacing)));
-            foreach (var (nx, ny) in new[] { (cx, cy - 1), (cx + 1, cy), (cx, cy + 1), (cx - 1, cy) })
-            {
-                if (nx >= 0 && ny >= 0 && nx < cols && ny < rows && visited.Add((nx, ny)))
-                {
-                    queue.Enqueue((nx, ny));
-                }
-            }
         }
 
         return order;

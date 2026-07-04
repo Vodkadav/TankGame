@@ -107,7 +107,7 @@ public class AirstrikeTests
     }
 
     [Fact]
-    public void Telephone_CarpetBombsAConnectedSwatheOfTheField()
+    public void Telephone_DropsASmallRandomizedBlob_NotTheWholeField()
     {
         var world = new World();
         var caller = TankAt(world, Vector2.Zero, team: 1);
@@ -120,6 +120,8 @@ public class AirstrikeTests
             .ApplyTo(caller, world);
 
         var strike = Assert.Single(world.Entities.OfType<Airstrike>());
-        Assert.True(strike.Zones.Count > 5, $"the carpet bomb should cover many zones; was {strike.Zones.Count}");
+        // A ~30-cell blob, jittered a little — well short of the old ~55%-of-field carpet (an 8x8 grid is
+        // 64 cells, so ~30 is under half).
+        Assert.InRange(strike.Zones.Count, 25, 35);
     }
 }
