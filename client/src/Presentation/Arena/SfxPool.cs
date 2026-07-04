@@ -51,7 +51,15 @@ public partial class SfxPool : Node
     {
         for (var i = 0; i < Pool3DSize; i++)
         {
-            var p = new AudioStreamPlayer3D { Name = $"Sfx3D_{i}" };
+            // Disable distance attenuation: the arena listener is the top-down camera ~2500 units
+            // from the action, so default inverse-distance falloff drops every positional SFX to
+            // roughly −48 dB (silent). Stereo panning by direction is preserved. The ~7-cell
+            // earshot gate still decides which sounds play; this just keeps them audible.
+            var p = new AudioStreamPlayer3D
+            {
+                Name = $"Sfx3D_{i}",
+                AttenuationModel = AudioStreamPlayer3D.AttenuationModelEnum.Disabled,
+            };
             AddChild(p);
             _pool3D[i] = p;
         }
