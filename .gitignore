@@ -1,7 +1,11 @@
-# Godot
+# Godot — commit .uid (script) and .import (resource) files so UIDs stay stable across
+# machines/checkouts (Godot reuses them instead of minting new ones, which avoids scene-
+# reference drift). Only the reimport cache, mono glue, compiled translations, and export
+# output are ignored — all regenerated from source on import/build.
 .godot/
-*.import
 mono/
+*.translation
+/build/
 # Gradle custom-build template — installed fresh per-build (CI: --install-android-build-template)
 client/android/
 
@@ -26,8 +30,10 @@ dist/
 # Sentry CLI
 .sentryclirc
 
-# Orchestration plans (ephemeral — never committed)
+# Claude Code local/session dirs (ephemeral, per-machine — never committed)
 .claude/plans/
+.claude/worktrees/
+.claude/settings.local.json
 
 # Art working area + extracted source asset packs (only processed outputs are committed)
 art-wip/
