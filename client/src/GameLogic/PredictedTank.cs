@@ -57,6 +57,12 @@ public sealed class PredictedTank
     /// <summary>Authoritative team from the last reconciled snapshot.</summary>
     public int Team { get; private set; }
 
+    /// <summary>Authoritative over-shield points from the last reconciled snapshot (ADR-0019 step 4).</summary>
+    public int Shield { get; private set; }
+
+    /// <summary>Authoritative elevation layer from the last reconciled snapshot (ADR-0018).</summary>
+    public int Layer { get; private set; }
+
     /// <summary>Inputs sent to the server but not yet acknowledged by a snapshot — the ones replayed
     /// on top of each authoritative correction.</summary>
     public int PendingInputCount => _pending.Count;
@@ -69,8 +75,8 @@ public sealed class PredictedTank
         ApplyMovement(input);
     }
 
-    /// <summary>Reconciles against an authoritative snapshot: snap this slot's transform and health
-    /// to the server, drop every input the server has acknowledged, and replay the rest so the
+    /// <summary>Reconciles against an authoritative snapshot: snap this slot's transform, health,
+    /// shield and elevation to the server, drop every input the server has acknowledged, and replay the rest so the
     /// predicted position stays ahead of the acknowledged truth. A snapshot that does not carry this
     /// slot is ignored (nothing authoritative to correct against).</summary>
     public void Reconcile(SnapshotFrame snapshot)
@@ -85,6 +91,8 @@ public sealed class PredictedTank
         TurretRotation = authoritative.TurretRotation;
         Hp = authoritative.Hp;
         Team = authoritative.Team;
+        Shield = authoritative.Shield;
+        Layer = authoritative.Layer;
 
         _pending.RemoveAll(frame => frame.Seq <= snapshot.AckSeq);
         foreach (var frame in _pending)
