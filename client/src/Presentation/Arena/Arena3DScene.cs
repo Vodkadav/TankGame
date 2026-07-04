@@ -507,7 +507,7 @@ public partial class Arena3DScene : Node3D
         bar.AddChild(menu);
 
         var exit = StyledButton("ExitGame", "pause.exit", viewport);
-        exit.Pressed += () => { _sfx.PlayUi(SfxKind.UiClick); GetTree().Quit(); };
+        exit.Pressed += () => { _sfx.PlayUi(SfxKind.UiClick); PlatformExit.Run(GetTree()); };
         exit.MouseEntered += () => _sfx.PlayHover();
         bar.AddChild(exit);
         return bar;
@@ -555,6 +555,23 @@ public partial class Arena3DScene : Node3D
     private WorldEnvironment _worldEnv = null!;
     private DirectionalLight3D _sun = null!;
     private SettingsOverlay _settingsOverlay = null!;
+    private TouchControls? _touch;
+
+    // On a touch device (the shipped Android APK) drive with the on-screen twin sticks; otherwise the
+    // desktop keyboard/mouse. Headless tests report no touchscreen, so they keep the keyboard path.
+    private IInputSource BuildPlayerInput()
+    {
+        if (!DisplayServer.IsTouchscreenAvailable())
+        {
+            return new KeyboardMouse3DInputSource(_camera, fireOnClick: true);
+        }
+
+        _touch = new TouchControls { Name = "TouchControls" };
+        var layer = new CanvasLayer { Name = "TouchControlsLayer" };
+        layer.AddChild(_touch);
+        AddChild(layer);
+        return new TouchInput3DSource(_camera, () => _touch.MoveOutput, () => _touch.AimOutput);
+    }
 
     public override void _Ready()
     {
@@ -636,6 +653,7 @@ public partial class Arena3DScene : Node3D
         SpawnTanks();
         BuildPreviewHud();
         BuildPauseMenu();
+        BuildTouchPauseButton();
 
         // SFX pool — must come after _grid and _world are assigned (we subscribe to their events).
         _sfx = new SfxPool { Name = "SfxPool" };
@@ -767,12 +785,33 @@ public partial class Arena3DScene : Node3D
         menu.AddChild(mainMenu);
 
         var exit = new Button { Name = "ExitGame", Text = "pause.exit" };
-        exit.Pressed += () => { _sfx.PlayUi(SfxKind.UiClick); GetTree().Quit(); };
+        exit.Pressed += () => { _sfx.PlayUi(SfxKind.UiClick); PlatformExit.Run(GetTree()); };
         exit.MouseEntered += () => _sfx.PlayHover();
         menu.AddChild(exit);
 
         _pauseLayer.AddChild(menu);
         AddChild(_pauseLayer);
+    }
+
+    // Escape opens the pause menu on desktop, but a phone has no Escape — without an on-screen button a
+    // touch player can never pause, and so can never reach Settings, Main Menu, or Exit mid-match (owner
+    // ask 2026-07-04). A corner button (touch devices only) opens the same menu. A high layer keeps it
+    // above the twin-stick overlay; the Button consumes its own taps, so tapping it doesn't also aim.
+    private void BuildTouchPauseButton()
+    {
+        if (!DisplayServer.IsTouchscreenAvailable())
+        {
+            return;
+        }
+
+        var layer = new CanvasLayer { Name = "TouchPauseLayer", Layer = 3 };
+        var pause = new Button { Name = "TouchPause", Text = "pause.open" };
+        pause.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.TopRight);
+        pause.Position += new Vector2(-16f, 16f);
+        pause.CustomMinimumSize = new Vector2(112f, 64f); // a comfortable thumb target
+        pause.Pressed += () => { _sfx.PlayUi(SfxKind.UiClick); if (!_paused) TogglePause(); };
+        layer.AddChild(pause);
+        AddChild(layer);
     }
 
     private bool _labelsShown = true;
@@ -1057,7 +1096,7 @@ public partial class Arena3DScene : Node3D
             };
         }
 
-        var p1Input = new KeyboardMouse3DInputSource(_camera, fireOnClick: true);
+        var p1Input = BuildPlayerInput();
         var playerName = GameSetup.PlayerName.Length > 0 ? GameSetup.PlayerName : "Player";
         var player = new Tank(p1Input, _world, _arena, CellCentre(playerCell.X, playerCell.Y),
             TankSpeed, FireInterval, ProjectileSpeed, maxHp: TankMaxHp, team: PlayerTeam, lives: StartingLives,

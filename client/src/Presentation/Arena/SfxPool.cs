@@ -18,25 +18,21 @@ public partial class SfxPool : Node
     // louder but still subdued.
     private const float HoverOffsetDb = -16f;
     private const float UiClickOffsetDb = -6f;
+    // Cannon shots fire constantly during a fight; at full volume they drown everything else out
+    // (owner feedback 2026-06-30: too loud). −20 dB ≈ 10% of the previous amplitude, the level asked
+    // for. Applied per-shot to the Fire kind only, so explosions/pickups/voice keep their volume.
+    private const float FireOffsetDb = -20f;
 
     private static readonly Dictionary<SfxKind, string> SfxFiles = new()
     {
         [SfxKind.Fire]      = "fire.ogg",
-        [SfxKind.Explosion] = "explosion.ogg",
         [SfxKind.WallBreak] = "wall_break.ogg",
-        [SfxKind.Pickup]    = "pickup.ogg",
         [SfxKind.Victory]   = "victory.ogg",
         [SfxKind.UiClick]   = "ui_click.ogg",
         [SfxKind.UiHover]   = "ui_hover.ogg",
-        [SfxKind.PowerupSpeed]     = "powerup_speed.ogg",
-        [SfxKind.PowerupRapidFire] = "powerup_rapid.ogg",
-        [SfxKind.PowerupBouncing]  = "powerup_bounce.ogg",
-        [SfxKind.PowerupSpread]    = "powerup_spread.ogg",
-        [SfxKind.PowerupPiercing]  = "powerup_pierce.ogg",
-        [SfxKind.PowerupRepair]    = "powerup_repair.ogg",
-        [SfxKind.PowerupShield]    = "powerup_shield.ogg",
-        [SfxKind.PowerupMissile]   = "powerup_missile.ogg",
-        [SfxKind.PowerupAirstrike] = "powerup_airstrike.ogg",
+        // Tank-death (Explosion) and powerup-pickup (Pickup + every PowerupX) are intentionally
+        // silent placeholders: no entry here means the play methods no-op. Restore these mappings
+        // once the owner supplies the real audio assets.
         [SfxKind.KillEnemy]        = "kill_enemy.ogg",
         [SfxKind.StreakDouble]     = "streak_double.ogg",
         [SfxKind.StreakTriple]     = "streak_triple.ogg",
@@ -110,6 +106,7 @@ public partial class SfxPool : Node
         if (!_streams.TryGetValue(kind, out var stream) || stream is null) return;
         var player = _pool3D[_next3D % Pool3DSize];
         _next3D++;
+        player.VolumeDb = _sfxVolumeDb + (kind == SfxKind.Fire ? FireOffsetDb : 0f);
         player.Stream = stream;
         player.Position = worldPosition;
         player.Play();
