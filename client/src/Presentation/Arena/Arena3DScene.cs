@@ -27,7 +27,7 @@ public partial class Arena3DScene : Node3D
     private const int PlayerTeam = 0;
     private const int EnemyTeam = 1;
     private const int EnemyCount = 3;
-    private const int StartingLives = 3;
+    private const int StartingLives = 6; // 1 current life + 5 respawns (owner ask); HUD shows respawns left
     private const int TankMaxHp = 8; // beefier tanks so fights last longer (below 40% HP a tank limps + smokes)
 
     // Fog of war (the 3D port of the iso fog): the player sees only a lit circle around their tank. An
@@ -544,6 +544,7 @@ public partial class Arena3DScene : Node3D
     private IReadOnlyList<(int X, int Y)> _enemySpawns = Array.Empty<(int, int)>();
     private Camera3D _camera = null!;
     private ITank _player = null!;
+    private RespawnHud _respawnHud = null!;
 
     // The fog spotlight rides the player and lights roughly a vision-radius circle on the ground; the
     // viewers are the tanks whose sight reveals the field (just the player today; co-op allies would join
@@ -887,6 +888,7 @@ public partial class Arena3DScene : Node3D
         PositionFogLight();   // the lit circle rides the player (goes dark while the player is down)
         UpdateConcealment();  // hide enemies outside the player's vision; darken the player in cover
         UpdatePadViews();     // pulse ready pads, dim ones on cooldown
+        _respawnHud.Show(_player.LivesRemaining - 1); // dim a tank icon as each respawn is spent
     }
 
     private static Vector3 CameraOffset()
@@ -1104,6 +1106,10 @@ public partial class Arena3DScene : Node3D
         _player = player;
         _viewers.Add(player); // the player's sight reveals the field; co-op allies would join this list
         SpawnTank(player);
+
+        _respawnHud = new RespawnHud { Name = "RespawnHud" };
+        AddChild(_respawnHud);
+        _respawnHud.Show(player.LivesRemaining - 1); // respawns in hand (one life is the tank fighting now)
 
         // Seeded by the arena so a best-of-N series keeps its cast of derpy adversaries.
         var names = new TankNameGenerator(GameSetup.ArenaSeed);

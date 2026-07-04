@@ -149,6 +149,11 @@ public sealed class Tank : ITank
     // it is a tangible, fightable tank right now).
     public bool IsAlive => Hp > 0 || _livesRemaining > 0;
 
+    /// <summary>Lives left including the current one — starts at the constructor's <c>lives</c> and drops
+    /// by one on each death. The HUD reads this to show respawns remaining (<c>LivesRemaining - 1</c>: the
+    /// future revives, since one life is the tank fighting now).</summary>
+    public int LivesRemaining => _livesRemaining;
+
     /// <summary>Raised with the hit points actually restored by a heal (never the over-heal excess)
     /// — <see cref="BattleStats"/> tallies it for the victory screen.</summary>
     public event Action<int>? Healed;

@@ -361,6 +361,19 @@ public class TankTests
     }
 
     [Fact]
+    public void LivesRemaining_StartsAtTotalLives_AndDropsOneEachDeath_SoTheHudCanShowRespawnsLeft()
+    {
+        var tank = new Tank(new ScriptedInput(new TankInput(Vector2.Zero, Aim: 0f, Fire: false)),
+            new World(), new OpenArena(), Vector2.Zero, Speed, FireInterval, ProjectileSpeed, maxHp: 1, lives: 6);
+
+        Assert.Equal(6, tank.LivesRemaining); // 6 lives = 5 respawns
+
+        tank.TakeDamage(1); // first death spends a life
+        Assert.Equal(5, tank.LivesRemaining);
+        Assert.True(tank.IsAlive); // still has lives, so it will respawn
+    }
+
+    [Fact]
     public void TakeDamage_ReducesHp_AndKillsTheTankAtZero()
     {
         var tank = NewTank(new ScriptedInput(new TankInput(Vector2.Zero, Aim: 0f, Fire: false)));
