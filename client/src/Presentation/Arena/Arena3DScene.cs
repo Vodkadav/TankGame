@@ -507,7 +507,7 @@ public partial class Arena3DScene : Node3D
         bar.AddChild(menu);
 
         var exit = StyledButton("ExitGame", "pause.exit", viewport);
-        exit.Pressed += () => { _sfx.PlayUi(SfxKind.UiClick); GetTree().Quit(); };
+        exit.Pressed += () => { _sfx.PlayUi(SfxKind.UiClick); PlatformExit.Run(GetTree()); };
         exit.MouseEntered += () => _sfx.PlayHover();
         bar.AddChild(exit);
         return bar;
@@ -653,6 +653,7 @@ public partial class Arena3DScene : Node3D
         SpawnTanks();
         BuildPreviewHud();
         BuildPauseMenu();
+        BuildTouchPauseButton();
 
         // SFX pool — must come after _grid and _world are assigned (we subscribe to their events).
         _sfx = new SfxPool { Name = "SfxPool" };
@@ -784,12 +785,33 @@ public partial class Arena3DScene : Node3D
         menu.AddChild(mainMenu);
 
         var exit = new Button { Name = "ExitGame", Text = "pause.exit" };
-        exit.Pressed += () => { _sfx.PlayUi(SfxKind.UiClick); GetTree().Quit(); };
+        exit.Pressed += () => { _sfx.PlayUi(SfxKind.UiClick); PlatformExit.Run(GetTree()); };
         exit.MouseEntered += () => _sfx.PlayHover();
         menu.AddChild(exit);
 
         _pauseLayer.AddChild(menu);
         AddChild(_pauseLayer);
+    }
+
+    // Escape opens the pause menu on desktop, but a phone has no Escape — without an on-screen button a
+    // touch player can never pause, and so can never reach Settings, Main Menu, or Exit mid-match (owner
+    // ask 2026-07-04). A corner button (touch devices only) opens the same menu. A high layer keeps it
+    // above the twin-stick overlay; the Button consumes its own taps, so tapping it doesn't also aim.
+    private void BuildTouchPauseButton()
+    {
+        if (!DisplayServer.IsTouchscreenAvailable())
+        {
+            return;
+        }
+
+        var layer = new CanvasLayer { Name = "TouchPauseLayer", Layer = 3 };
+        var pause = new Button { Name = "TouchPause", Text = "pause.open" };
+        pause.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.TopRight);
+        pause.Position += new Vector2(-16f, 16f);
+        pause.CustomMinimumSize = new Vector2(112f, 64f); // a comfortable thumb target
+        pause.Pressed += () => { _sfx.PlayUi(SfxKind.UiClick); if (!_paused) TogglePause(); };
+        layer.AddChild(pause);
+        AddChild(layer);
     }
 
     private bool _labelsShown = true;

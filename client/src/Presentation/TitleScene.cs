@@ -1,4 +1,5 @@
 using Godot;
+using TankGame.Infrastructure;
 
 namespace TankGame.Presentation;
 
@@ -73,7 +74,7 @@ public partial class TitleScene : Control
         menu.AddChild(settings);
 
         var exit = Button("Exit", "title.exit");
-        exit.Pressed += () => { _sfx.PlayUi(SfxKind.UiClick); GetTree().Quit(); };
+        exit.Pressed += () => { _sfx.PlayUi(SfxKind.UiClick); PlatformExit.Run(GetTree()); };
         exit.MouseEntered += () => _sfx.PlayHover();
         menu.AddChild(exit);
 

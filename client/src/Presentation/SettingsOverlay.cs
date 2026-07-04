@@ -111,13 +111,13 @@ public partial class SettingsOverlay : Node
         vbox.AddChild(RowLabel("settings.brightness"));
         var brightRow = new HBoxContainer();
         var brightLabel = new Label { CustomMinimumSize = new Vector2(52f, 0f), HorizontalAlignment = HorizontalAlignment.Right };
-        brightLabel.Text = $"{GameSetup.BrightnessMultiplier:F2}×";
+        brightLabel.Text = SettingsFormat.Brightness(GameSetup.BrightnessMultiplier);
         var brightSlider = Slider(0.5f, 2.0f, 0.05f, GameSetup.BrightnessMultiplier);
         brightSlider.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
         brightSlider.ValueChanged += v =>
         {
             GameSetup.BrightnessMultiplier = (float)v;
-            brightLabel.Text = $"{v:F2}×";
+            brightLabel.Text = SettingsFormat.Brightness((float)v);
             GameSetup.ApplySettings(); // live brightness update via SettingsChanged event
         };
         brightRow.AddChild(brightSlider);
@@ -157,7 +157,7 @@ public partial class SettingsOverlay : Node
     }
 
     private static void UpdateDbLabel(Label label, float db) =>
-        label.Text = db <= -29f ? TranslationServer.Translate("settings.mute") : $"{(int)db} dB";
+        label.Text = db <= -29f ? TranslationServer.Translate("settings.mute") : SettingsFormat.Db((int)db);
 
     private static HSlider Slider(float min, float max, float step, float value)
     {
