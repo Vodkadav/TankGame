@@ -108,14 +108,16 @@ public partial class Arena3DScene : Node3D
 
     // The ranking views, switched with the nav arrows (owner ask 2026-06-11/14): each is a full
     // ranking of every tank by one metric.
-    private static readonly (string TitleKey, Func<BattleStats.TankTally, int> Value)[] LeaderboardViews =
+    // LowerIsBetter flips the ranking: deaths and damage taken rank ascending (fewer/less is better),
+    // so the tank that died least or took the least damage sits at the top.
+    private static readonly (string TitleKey, Func<BattleStats.TankTally, int> Value, bool LowerIsBetter)[] LeaderboardViews =
     {
-        ("stats.kills", t => t.Kills),
-        ("stats.deaths", t => t.Deaths),
-        ("stats.dealt", t => t.DamageDealt),
-        ("stats.taken", t => t.DamageTaken),
-        ("stats.healing", t => t.HealingTaken),
-        ("stats.assists", t => t.Assists),
+        ("stats.kills", t => t.Kills, false),
+        ("stats.deaths", t => t.Deaths, true),
+        ("stats.dealt", t => t.DamageDealt, false),
+        ("stats.taken", t => t.DamageTaken, true),
+        ("stats.repairs", t => t.HealingTaken, false),
+        ("stats.assists", t => t.Assists, false),
     };
 
     // The victory screen is composed from real UI controls over a generated celebration backdrop
@@ -391,8 +393,9 @@ public partial class Arena3DScene : Node3D
     // and the metric value — all real controls in an HBox, so names and numbers never clip.
     private void RebuildLeaderboard(Vector2 viewport)
     {
-        _viewTitle.Text = LeaderboardViews[_viewIndex].TitleKey;
-        var value = LeaderboardViews[_viewIndex].Value;
+        var view = LeaderboardViews[_viewIndex];
+        _viewTitle.Text = view.TitleKey;
+        var value = view.Value;
 
         foreach (var child in _leaderboardRows.GetChildren())
         {
@@ -401,7 +404,7 @@ public partial class Arena3DScene : Node3D
 
         var awards = BattleAwards.Compute(Stats.Tallies);
         var rank = 0;
-        foreach (var tally in Stats.Tallies.OrderByDescending(value))
+        foreach (var tally in LeaderboardOrder.Rank(Stats.Tallies, value, view.LowerIsBetter))
         {
             if (rank >= MaxRows)
             {
