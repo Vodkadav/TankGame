@@ -20,6 +20,7 @@ title.two_player_versus,"2 Players — Versus","2 jugadores — Versus","2 spill
 net.connecting,"Connecting…","Conectando…","Forbinder…"
 net.connected,"Connected","Conectado","Forbundet"
 net.player2_joined,"Player 2 joined","Jugador 2 se unió","Spiller 2 deltog"
+net.leave,"Leave","Salir","Forlad"
 pickup.speed_boost,"Speed Boost!","¡Velocidad!","Fart!"
 pickup.rapid_fire,"Rapid Fire!","¡Fuego rápido!","Hurtig ild!"
 pickup.bouncing_ammo,"Bouncing Ammo!","¡Munición rebote!","Hoppende ammo!"

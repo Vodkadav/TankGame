@@ -117,8 +117,50 @@ public partial class NetArena3DScene : Node3D
         _status = new NetStatusOverlay { Name = "NetStatusOverlay" };
         AddChild(_status); // shows "Connecting…" until the welcome arrives
 
+        BuildLeaveButton();
+
         _transport.WelcomeReceived += OnWelcome;
         _transport.SnapshotReceived += OnSnapshot;
+    }
+
+    // A versus match has no pause (you can't freeze the other player), so the pause-menu route to an
+    // exit that the solo arena offers doesn't apply here — yet a touch player still needs a way out,
+    // and on a phone there is no Escape key (owner ask 2026-07-04). A always-visible corner button
+    // leaves the match back to the main menu; Escape does the same on desktop. Present from _Ready so
+    // a player can bail even while the connection is still "Connecting…".
+    private void BuildLeaveButton()
+    {
+        var layer = new CanvasLayer { Name = "LeaveLayer", Layer = 3 };
+        var leave = new Button { Name = "LeaveButton", Text = "net.leave" };
+        leave.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.TopRight);
+        leave.Position += new Vector2(-16f, 16f);
+        leave.CustomMinimumSize = new Vector2(112f, 64f); // a comfortable thumb target
+        leave.Pressed += LeaveMatch;
+        layer.AddChild(leave);
+        AddChild(layer);
+    }
+
+    // Escape leaves the match on desktop — the same exit the corner Leave button gives touch players.
+    public override void _UnhandledInput(InputEvent @event)
+    {
+        if (@event.IsActionPressed("ui_cancel"))
+        {
+            LeaveMatch();
+            GetViewport().SetInputAsHandled();
+        }
+    }
+
+    /// <summary>Leave the match: drop the shared transport (so it is not reused) and return to the
+    /// main menu. Public so a test can drive it; the scene change is guarded like the title screen's
+    /// so the test harness — which parents this scene rather than making it current — isn't swapped
+    /// out from under itself.</summary>
+    public void LeaveMatch()
+    {
+        NetworkSession.Reset();
+        if (GetTree().CurrentScene == this)
+        {
+            GetTree().ChangeSceneToFile("res://src/Presentation/Title.tscn");
+        }
     }
 
     public override void _Process(double delta) => Tick((float)delta);

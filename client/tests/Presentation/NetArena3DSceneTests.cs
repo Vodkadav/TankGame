@@ -174,6 +174,30 @@ public class NetArena3DSceneTests : TestClass
     }
 
     [Test]
+    public void Ready_ShowsALeaveButton_SoATouchPlayerCanExitTheMatch()
+    {
+        // The button exists from _Ready — before any welcome — so a player can bail out even while
+        // the connection is still "Connecting…" (there is no pause menu in a versus match).
+        if (_scene.FindChild("LeaveButton", recursive: true, owned: false) is not Button)
+        {
+            throw new Exception("The networked match must show a Leave button so a touch player can exit.");
+        }
+    }
+
+    [Test]
+    public void LeaveMatch_DropsTheActiveSession()
+    {
+        _transport.DeliverWelcome(1);
+
+        _scene.LeaveMatch();
+
+        if (NetworkSession.Active is not null)
+        {
+            throw new Exception("Leaving the match must drop the active transport so it is not reused.");
+        }
+    }
+
+    [Test]
     public void HostWelcome_BuildsTheAuthoritativeMatch_AndBroadcastsSnapshots()
     {
         _transport.DeliverWelcome(0);
