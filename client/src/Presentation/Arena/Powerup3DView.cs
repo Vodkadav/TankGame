@@ -7,8 +7,10 @@ namespace TankGame.Presentation;
 /// each pickup reads at a glance in the cartoon style the owner asked for (a white shield, golden bullets,
 /// green speed arrows, a bomb for the airstrike, …). The icon is a flat billboarded <see cref="Sprite3D"/>
 /// drawn from a true-alpha PNG (AI-generated — see <c>docs/credits/assets.md</c>); the pad underneath is
-/// tinted to the powerup's colour so the colour-coding survives. Hidden while a respawning pickup is
-/// dormant; the scene frees it on despawn.</summary>
+/// tinted to the powerup's colour so the colour-coding survives. A billboarded name label floats above the
+/// icon (owner ask) so each powerup is identifiable by name, not just its picture — the localized name from
+/// <see cref="PickupFloater.LabelKeyFor"/> (EN/ES/DK). Hidden while a respawning pickup is dormant; the scene
+/// frees it on despawn.</summary>
 public partial class Powerup3DView : Node3D
 {
     private const float HoverHeight = 26f;
@@ -16,6 +18,7 @@ public partial class Powerup3DView : Node3D
     private const float PadRadius = 18f;
     private const float BobSpeed = 2.2f;
     private const float BobHeight = 5f;
+    private const float NameLabelHeight = 66f; // clears the top of the (~47u tall) bobbing icon
 
     private IPowerup? _powerup;
     private Node3D _icon = null!;
@@ -36,6 +39,7 @@ public partial class Powerup3DView : Node3D
         _icon.AddChild(IconSprite(_powerup.Kind));
 
         AddChild(GlowPad(PowerupView.ColourFor(_powerup.Kind))); // coloured pad so it reads as a pickup
+        AddChild(NameLabel(_powerup.Kind)); // floating name so the powerup is identifiable, not just its icon
         UpdateFromModel();
     }
 
@@ -71,6 +75,22 @@ public partial class Powerup3DView : Node3D
         PixelSize = IconPixelSize,
         RenderPriority = 1,
         TextureFilter = BaseMaterial3D.TextureFilterEnum.LinearWithMipmaps,
+    };
+
+    // The powerup's localized name, billboarded above the icon so it always faces the camera and reads
+    // at a glance. Reuses the pickup floater's key map (EN/ES/DK) so there's one source of powerup names.
+    private static Label3D NameLabel(PowerupKind kind) => new()
+    {
+        Name = "NameLabel",
+        Text = TranslationServer.Translate(PickupFloater.LabelKeyFor(kind)),
+        Position = new Vector3(0f, NameLabelHeight, 0f),
+        Billboard = BaseMaterial3D.BillboardModeEnum.Enabled,
+        FontSize = 64,
+        PixelSize = 0.42f, // ~27 world units tall — legible at the ~2500u battle-camera distance
+        Modulate = Colors.White,
+        OutlineSize = 22,
+        OutlineModulate = Colors.Black,
+        RenderPriority = 2, // above the icon and pad
     };
 
     private static MeshInstance3D GlowPad(Color colour) => new()
