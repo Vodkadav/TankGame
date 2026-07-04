@@ -1,4 +1,6 @@
+using System;
 using Godot;
+using TankGame.GameLogic;
 using TankGame.Infrastructure;
 
 namespace TankGame.Presentation;
@@ -187,10 +189,40 @@ public partial class TitleScene : Control
         config.Save(SettingsPath);
     }
 
+    private const string MapsDir = "user://maps";
+    private static readonly ArenaId[] BuiltInArenas = { ArenaId.DesertWar, ArenaId.CliffsAndValleys };
+    private static readonly Random SoloMapRng = new();
+
     private void StartSolo()
     {
         GameSetup.StartNewMatch(GameMode.OnePlayer); // fresh series at 0 - 0
+        ChooseRandomMap(); // no specific map chosen → drop into a random one of all available maps (owner ask)
         Go(ArenaScenePath);
+    }
+
+    // The player reached Solo without picking a map. Play a random one of ALL available maps — the
+    // built-in arenas plus any created maps — instead of always the built-in Desert War. A created map
+    // that turns out to be corrupt falls back to the built-in arena, so one bad file never blocks a game.
+    private static void ChooseRandomMap()
+    {
+        var repo = new MapRepository(ProjectSettings.GlobalizePath(MapsDir));
+        switch (SoloMapSelection.Pick(BuiltInArenas, repo.List(), SoloMapRng))
+        {
+            case SoloMapSelection.BuiltIn builtIn:
+                GameSetup.Arena = builtIn.Arena; // CustomMap already cleared by StartNewMatch
+                break;
+            case SoloMapSelection.Created created:
+                try
+                {
+                    GameSetup.CustomMap = repo.Load(created.MapId);
+                }
+                catch (MapFormatException)
+                {
+                    // corrupt map file → leave CustomMap null and fall back to the built-in arena
+                }
+
+                break;
+        }
     }
 
     // Guarded so the GoDotTest click-path (which adds the title as a child, not the active scene) can
