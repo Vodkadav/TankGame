@@ -31,12 +31,15 @@ public sealed class World : IWorld
 
     public void Step(float deltaSeconds)
     {
-        // Snapshot the live set so an entity that spawns a child mid-step (the
-        // future-spawner seam) does not mutate the collection we are iterating;
-        // the child joins the world now but is not stepped until the next tick.
-        foreach (var entity in _entities.ToArray())
+        // Only entities alive at the start of the step are advanced, so a child spawned
+        // mid-step (the future-spawner seam) joins the world now but is not stepped until the
+        // next tick. Entities are only ever appended during a step (reaping happens below),
+        // so an index bound gives the same snapshot the old per-frame ToArray copy did —
+        // without allocating on every frame of the WASM build.
+        var liveAtStepStart = _entities.Count;
+        for (var i = 0; i < liveAtStepStart; i++)
         {
-            entity.Step(deltaSeconds);
+            _entities[i].Step(deltaSeconds);
         }
 
         // Resolve combat after everyone has moved, before reaping — so a tank killed by a

@@ -10,6 +10,7 @@ namespace TankGame.Domain;
 public interface ICombatResolver
 {
     /// <summary>Resolves combat among <paramref name="entities"/>. May mutate entities
-    /// (damage, expiry) but must not add or remove them — the world owns the collection.</summary>
-    void Resolve(IReadOnlyCollection<IEntity> entities);
+    /// (damage, expiry) but must not add or remove them — the world owns the collection.
+    /// Indexed access (not an enumerable) so the per-step pass allocates nothing.</summary>
+    void Resolve(IReadOnlyList<IEntity> entities);
 }

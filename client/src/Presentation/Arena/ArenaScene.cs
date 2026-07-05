@@ -104,6 +104,10 @@ public partial class ArenaScene : Node2D
     private readonly ScoreBoard _scoreBoard = new();
     private readonly MeterBoard _meterBoard = new();
     private World _world = null!;
+
+    // Fixed 1/60 s sim steps drained from frame time, so a laggy frame cannot become one huge
+    // delta in which shots tunnel past tanks (see Arena3DScene._timestep).
+    private readonly FixedTimestep _timestep = new();
     private GridArena _arena = null!;
     private IWallGrid _grid = null!;
     private BushField _bushes = null!;
@@ -335,7 +339,11 @@ public partial class ArenaScene : Node2D
             return;
         }
 
-        _world.Step((float)delta);
+        var steps = _timestep.Advance((float)delta);
+        for (var i = 0; i < steps; i++)
+        {
+            _world.Step(_timestep.StepSeconds);
+        }
 
         // One-player keeps the camera on the player; two-player uses a fixed field-framing camera.
         // While the player is down (awaiting respawn) the camera holds its last position.

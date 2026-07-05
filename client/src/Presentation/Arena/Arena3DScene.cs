@@ -88,6 +88,11 @@ public partial class Arena3DScene : Node3D
 
     private readonly Dictionary<Guid, Node3D> _views = new();
     private World _world = null!;
+
+    // The sim advances in fixed 1/60 s steps drained from real frame time — a laggy frame (WASM GC
+    // hitch, iPad frame drop) becomes several exact catch-up steps instead of one huge delta in
+    // which shots tunnel through tanks (the flaky-damage bug). Visual work below stays per-frame.
+    private readonly FixedTimestep _timestep = new();
     private GridArena _arena = null!;
     private IWallGrid _grid = null!;
     private BushField _bushes = null!;
@@ -872,9 +877,14 @@ public partial class Arena3DScene : Node3D
             return; // the Escape menu or the victory screen is up — freeze the match
         }
 
-        _world.Step((float)delta);
-        _matchClock += (float)delta; // monotonic clock for the kill-streak window
-        _teleporter.Step((float)delta); // age pad cooldowns once per frame (tanks warp inside world.Step)
+        var steps = _timestep.Advance((float)delta);
+        for (var i = 0; i < steps; i++)
+        {
+            _world.Step(_timestep.StepSeconds);
+            _teleporter.Step(_timestep.StepSeconds); // pad cooldowns age in sim time (tanks warp inside world.Step)
+        }
+
+        _matchClock += steps * _timestep.StepSeconds; // monotonic sim clock for the kill-streak window
 
         var result = _matchTracker.Evaluate(_world.Entities);
         if (result.Decided)

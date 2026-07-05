@@ -48,6 +48,7 @@ public sealed class Projectile : IProjectile
             Layer = layer,
         };
         _behaviour = behaviour ?? StraightBehaviour.Instance;
+        PreviousPosition = spawn;
     }
 
     public int Team => _state.Team;
@@ -61,6 +62,12 @@ public sealed class Projectile : IProjectile
     public int Layer { get; }
 
     public Vector2 Position => _state.Position;
+
+    /// <summary>Where the shot was before its most recent step — the other end of the segment it
+    /// travelled this tick. Combat sweeps that segment against tanks so a large laggy step cannot
+    /// jump clean over one. Equals <see cref="Position"/> until the first step.</summary>
+    public Vector2 PreviousPosition { get; private set; }
+
     public Vector2 Direction => _state.Direction;
     public ProjectileStyle Style => _state.Style;
     public bool IsAlive => _state.IsAlive;
@@ -103,6 +110,7 @@ public sealed class Projectile : IProjectile
             return;
         }
 
+        PreviousPosition = _state.Position;
         _behaviour.Step(_state, _arena, deltaSeconds);
     }
 }
