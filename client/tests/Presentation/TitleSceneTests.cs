@@ -31,7 +31,7 @@ public class TitleSceneTests : TestClass
     [Test]
     public void Title_OffersTheSlimmedMenu()
     {
-        foreach (var name in new[] { "Solo", "TeamVsTeam", "SelectMap", "Editor", "Exit" })
+        foreach (var name in new[] { "Solo", "Multiplayer", "SelectMap", "Editor", "Exit" })
         {
             if (_title.FindChild(name, recursive: true, owned: false) is not Button)
             {
@@ -43,7 +43,7 @@ public class TitleSceneTests : TestClass
     [Test]
     public void Title_DropsTheOldModeAndNetButtons()
     {
-        foreach (var name in new[] { "Coop", "Versus", "JoinTest", "ThreeD", "OnePlayer" })
+        foreach (var name in new[] { "Coop", "Versus", "JoinTest", "ThreeD", "OnePlayer", "TeamVsTeam" })
         {
             if (_title.FindChild(name, recursive: true, owned: false) is Button)
             {
@@ -53,13 +53,13 @@ public class TitleSceneTests : TestClass
     }
 
     [Test]
-    public void Title_EnablesTeamVsTeam_LeadingToTheLobby()
+    public void Title_EnablesMultiplayer_LeadingToTheLobbyBrowser()
     {
-        var team = _title.FindChild("TeamVsTeam", recursive: true, owned: false) as Button
-            ?? throw new System.Exception("Missing 'TeamVsTeam' button.");
-        if (team.Disabled)
+        var multiplayer = _title.FindChild("Multiplayer", recursive: true, owned: false) as Button
+            ?? throw new System.Exception("Missing 'Multiplayer' button.");
+        if (multiplayer.Disabled)
         {
-            throw new System.Exception("Team vs Team should be enabled now that the lobby flow exists (ADR-0019 step 2).");
+            throw new System.Exception("Multiplayer should be enabled — it opens the lobby browser (plan Phase 2).");
         }
     }
 

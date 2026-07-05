@@ -54,4 +54,34 @@ public sealed class HttpLobbyClient : ILobbyClient
             return false;
         }
     }
+
+    public async Task<System.Collections.Generic.IReadOnlyList<OpenLobbyInfo>?> ListOpenLobbiesAsync()
+    {
+        try
+        {
+            var response = await _http.GetAsync("/lobbies");
+            if (!response.IsSuccessStatusCode)
+            {
+                return null;
+            }
+
+            using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+            var open = new System.Collections.Generic.List<OpenLobbyInfo>();
+            foreach (var lobby in body.RootElement.EnumerateArray())
+            {
+                open.Add(new OpenLobbyInfo(
+                    lobby.GetProperty("code").GetString() ?? "",
+                    lobby.GetProperty("mode").GetString() == "team" ? GameMode.Team : GameMode.Ffa,
+                    lobby.GetProperty("players").GetInt32(),
+                    lobby.TryGetProperty("map", out var map) ? map.GetString() ?? "" : ""));
+            }
+
+            return open;
+        }
+        catch (Exception e) when (e is HttpRequestException or TaskCanceledException or JsonException
+            or System.Collections.Generic.KeyNotFoundException or InvalidOperationException)
+        {
+            return null;
+        }
+    }
 }

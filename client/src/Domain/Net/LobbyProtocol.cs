@@ -45,6 +45,10 @@ public sealed record LobbyView(
 /// Pure — no Godot — so the parse/encode round-trips are unit-tested without a runtime.</summary>
 public static class LobbyProtocol
 {
+    /// <summary>Seats per room — mirrors the worker's <c>MAX_PLAYERS</c> (owner ask: 4, extendable
+    /// later). The room UI, placeholder cast, and spawn table all size off this.</summary>
+    public const int MaxPlayers = 4;
+
     /// <summary>Leading kind byte of a server→client lobby-state push.</summary>
     public const byte MsgLobbyState = 0x10;
 

@@ -5,14 +5,14 @@ using TankGame.Infrastructure;
 
 namespace TankGame.Presentation;
 
-/// <summary>The start screen. Offers the two play modes (Solo, and Team vs Team via the networked
-/// lobby — ADR-0019 step 2), a Select Map browser, and Exit. Solo launches the 3D arena — the game's
-/// main presentation (ADR-0017). Button labels are translation keys (Godot auto-translates).</summary>
+/// <summary>The start screen. Offers the two play modes (Solo, and Multiplayer via the lobby
+/// browser — multiplayer plan Phase 2), a Select Map browser, and Exit. Solo launches the 3D arena —
+/// the game's main presentation (ADR-0017). Button labels are translation keys (Godot auto-translates).</summary>
 public partial class TitleScene : Control
 {
     public const string ArenaScenePath = "res://src/Presentation/Arena/Arena3D.tscn";
     public const string MapSelectScenePath = "res://src/Presentation/MapSelect.tscn";
-    public const string LobbyScenePath = "res://src/Presentation/Lobby.tscn";
+    public const string LobbyBrowserScenePath = "res://src/Presentation/LobbyBrowser.tscn";
 
     private const string SettingsPath = "user://settings.cfg";
 
@@ -53,10 +53,10 @@ public partial class TitleScene : Control
         solo.MouseEntered += () => _sfx.PlayHover();
         menu.AddChild(solo);
 
-        var team = Button("TeamVsTeam", "title.team_vs_team");
-        team.Pressed += () => { _sfx.PlayUi(SfxKind.UiClick); PromptForName(() => Go(LobbyScenePath)); };
-        team.MouseEntered += () => _sfx.PlayHover();
-        menu.AddChild(team);
+        var multiplayer = Button("Multiplayer", "title.multiplayer");
+        multiplayer.Pressed += () => { _sfx.PlayUi(SfxKind.UiClick); PromptForName(() => Go(LobbyBrowserScenePath)); };
+        multiplayer.MouseEntered += () => _sfx.PlayHover();
+        menu.AddChild(multiplayer);
 
         var selectMap = Button("SelectMap", "title.select_map");
         selectMap.Pressed += () => { _sfx.PlayUi(SfxKind.UiClick); Go(MapSelectScenePath); };
