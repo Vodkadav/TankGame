@@ -109,8 +109,8 @@ describe("lobby state reducer", () => {
     expect(state.countdown).toBe(COUNTDOWN_SECONDS);
   });
 
-  it("refuses to start with fewer than two players", () => {
-    const state = reduce(joinN(1), { type: "start", slot: 0 });
+  it("refuses a start from someone not seated in the lobby", () => {
+    const state = reduce(joinN(1), { type: "start", slot: 3 });
     expect(state.phase).toBe("waiting");
   });
 
@@ -139,10 +139,21 @@ describe("lobby state reducer", () => {
     expect(state).toEqual(emptyLobby());
   });
 
-  it("aborts the countdown if a leave drops below the start threshold", () => {
+  it("a single player can start — AI tanks fill the empty seats (owner ask)", () => {
+    const state = reduce(joinN(1), { type: "start", slot: 0 });
+    expect(state.phase).toBe("countdown");
+  });
+
+  it("keeps counting down when a leave still leaves someone seated", () => {
     let state = reduce(joinN(2), { type: "start", slot: 0 });
     expect(state.phase).toBe("countdown");
     state = reduce(state, { type: "leave", slot: 1 });
+    expect(state.phase).toBe("countdown"); // the remaining player still gets their match (AI fill)
+  });
+
+  it("resets to a fresh waiting lobby when the countdown loses its last player", () => {
+    let state = reduce(joinN(1), { type: "start", slot: 0 });
+    state = reduce(state, { type: "leave", slot: 0 });
     expect(state.phase).toBe("waiting");
     expect(state.countdown).toBe(0);
   });

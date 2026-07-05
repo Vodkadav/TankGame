@@ -8,7 +8,10 @@
 // and the relay cap all size themselves off this one constant.
 export const MAX_PLAYERS = 4;
 export const COUNTDOWN_SECONDS = 3;
-export const MIN_PLAYERS_TO_START = 2;
+
+// 1, not 2: pressing Start fills every empty seat with an AI tank (owner ask), so a lone player
+// starting a room is a real match, not a stall.
+export const MIN_PLAYERS_TO_START = 1;
 
 export type GameMode = "ffa" | "team";
 export type LobbyPhase = "waiting" | "countdown" | "started";

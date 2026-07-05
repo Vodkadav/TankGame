@@ -52,6 +52,19 @@ public partial class NetArena3DScene : Node3D
     private float _accumulator;
     private byte? _localSlot;
 
+    // The seating plan from the lobby's final roster (placeholder-named AI on empty seats), the
+    // shared four-cell spawn table both roles derive identically, and the host's authoritative
+    // round state.
+    private IReadOnlyList<NetRoster.Seat> _roster = System.Array.Empty<NetRoster.Seat>();
+    private IReadOnlyList<(int X, int Y)> _spawns = System.Array.Empty<(int, int)>();
+    private readonly List<(byte Slot, ITank Tank)> _rosterTanks = new();
+    private readonly List<(int Team, bool Alive)> _roundStatus = new();
+
+    /// <summary>The decided round (FFA: last tank standing; Team: last team standing), evaluated
+    /// by the host each tick. Null while the round is still being fought — and always null on a
+    /// guest, which learns the outcome from the frozen snapshots for now.</summary>
+    public (bool Decided, int WinningTeam)? RoundResult { get; private set; }
+
     // Host role: the authoritative world and its session.
     private World? _world;
     private HostSession? _session;
@@ -190,8 +203,14 @@ public partial class NetArena3DScene : Node3D
     {
         if (_session is not null)
         {
-            // Host: the world reads every input source (keyboard + relayed) and the session broadcasts.
+            if (RoundResult is not null)
+            {
+                return; // decided — the world freezes; guests see the match hold still
+            }
+
+            // Host: the world reads every input source (keyboard + relayed + AI) and the session broadcasts.
             _session.Step(TickSeconds);
+            EvaluateRound();
             return;
         }
 
@@ -206,10 +225,17 @@ public partial class NetArena3DScene : Node3D
         }
     }
 
-    // The relay welcomed us: slot 0 becomes the authority, anyone else a predicting guest.
+    // The relay welcomed us: slot 0 becomes the authority, anyone else a predicting guest. Both
+    // roles derive the same roster (from the lobby's snapshotted final state) and the same spawn
+    // table, so host truth and guest prediction agree from the first tick.
     private void OnWelcome(byte slot)
     {
         _localSlot = slot;
+        _roster = NetRoster.Build(
+            NetworkSession.StartedLobby, slot, NetworkSession.ActiveCode, LobbyProtocol.MaxPlayers);
+        _spawns = SpawnTable.For(_level.Width, _level.Height,
+            (_level.SpawnX, _level.SpawnY), GuestSpawn,
+            (x, y) => _arena.IsBlocked(CellCentre(x, y)));
         if (slot == HostSlot)
         {
             BecomeHost();
@@ -229,25 +255,39 @@ public partial class NetArena3DScene : Node3D
         _world.EntityDespawned += OnEntityDespawned;
 
         _hostInput = BuildLocalInput();
-        var hostTank = new Tank(_hostInput, _world, _arena, CellCentre(_level.SpawnX, _level.SpawnY),
-            TankSpeed, FireInterval, ProjectileSpeed, maxHp: TankMaxHp, team: 0);
-        var guestInput = new RelayedInputSource();
-        var guestTank = new Tank(guestInput, _world, _arena, CellCentre(GuestSpawn.X, GuestSpawn.Y),
-            TankSpeed, FireInterval, ProjectileSpeed, maxHp: TankMaxHp, team: 1);
+        var guestInputs = new Dictionary<byte, RelayedInputSource>();
 
-        _tanks[0] = hostTank;
-        _tanks[1] = guestTank;
-        _world.Spawn(hostTank);
-        _world.Spawn(guestTank);
+        // One tank per roster seat: the host on local input, each remote human on a relayed input
+        // keyed by its slot, and every un-joined seat an AI tank carrying the placeholder name the
+        // room showed in gray (owner ask).
+        foreach (var seat in _roster)
+        {
+            AiInputSource? ai = null;
+            IInputSource input = seat.Kind switch
+            {
+                NetRoster.SeatKind.LocalHuman => _hostInput,
+                NetRoster.SeatKind.RemoteHuman => guestInputs[seat.Slot] = new RelayedInputSource(),
+                _ => ai = new AiInputSource(_world, _arena, grid: _grid, tileSize: TileSize, origin: GridOrigin),
+            };
 
-        _session = new HostSession(_transport, _world, _grid,
-            new (byte Slot, ITank Tank)[] { (0, hostTank), (1, guestTank) }, guestInput);
+            var spawn = _spawns[seat.Slot % _spawns.Count];
+            var tank = new Tank(input, _world, _arena, CellCentre(spawn.X, spawn.Y),
+                TankSpeed, FireInterval, ProjectileSpeed, maxHp: TankMaxHp, team: seat.Team,
+                displayName: seat.Name);
+            ai?.Bind(tank);
+            _tanks[seat.Slot] = tank;
+            _rosterTanks.Add((seat.Slot, tank));
+            _world.Spawn(tank);
+        }
+
+        _session = new HostSession(_transport, _world, _grid, _rosterTanks, guestInputs);
     }
 
     private void BecomeGuest(byte slot)
     {
         _guestLocalInput = BuildLocalInput();
-        _predicted = new PredictedTank(slot, _arena, CellCentre(GuestSpawn.X, GuestSpawn.Y));
+        var spawn = _spawns[slot % _spawns.Count];
+        _predicted = new PredictedTank(slot, _arena, CellCentre(spawn.X, spawn.Y));
         EnsureMirroredTank(slot);
         SyncLocalFromPrediction();
     }
@@ -375,6 +415,24 @@ public partial class NetArena3DScene : Node3D
         _tankViews[slot].ApplyTeamTint(tank.Team);
     }
 
+    // The round ends when one team is left standing — in FFA every tank is its own team, so this
+    // is also last-tank-standing. Evaluated host-side after each authoritative tick.
+    private void EvaluateRound()
+    {
+        _roundStatus.Clear();
+        foreach (var (_, tank) in _rosterTanks)
+        {
+            _roundStatus.Add((tank.Team, tank.IsAlive));
+        }
+
+        var result = LastStanding.Evaluate(_roundStatus);
+        if (result.Decided)
+        {
+            RoundResult = result;
+            _status.SetStatus(NetStatusOverlay.RoundOverKey);
+        }
+    }
+
     private NetTank EnsureMirroredTank(byte slot)
     {
         if (_tanks.TryGetValue(slot, out var existing))
@@ -383,6 +441,11 @@ public partial class NetArena3DScene : Node3D
         }
 
         var tank = new NetTank(TankMaxHp);
+        if (slot < _roster.Count)
+        {
+            tank.DisplayName = _roster[slot].Name; // a guest names its mirrors from the shared roster
+        }
+
         _tanks[slot] = tank;
         AddTankView(slot, tank);
         return tank;
