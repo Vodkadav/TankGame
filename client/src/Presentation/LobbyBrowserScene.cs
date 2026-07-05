@@ -13,7 +13,10 @@ namespace TankGame.Presentation;
 /// — plus a Create Game panel (map pick, random by default; mode pick, FFA by default). Joining or
 /// creating connects the transport and moves to the room scene. The lobby directory and transport
 /// come from <see cref="NetworkSession"/>'s swappable factories, so every click path tests against
-/// fakes. Labels are translation keys (auto-translated); codes and map names render raw.</summary>
+/// fakes. Map picking lives here too: a Maps button opens the pick-map browser, and on desktop an
+/// Editor button opens the authoring editor (the editor needs the local dev asset library that the
+/// WASM build doesn't bundle, so web omits it). Labels are translation keys (auto-translated);
+/// codes and map names render raw.</summary>
 public partial class LobbyBrowserScene : Control
 {
     public const string RoomScenePath = "res://src/Presentation/LobbyRoom.tscn";
@@ -89,6 +92,19 @@ public partial class LobbyBrowserScene : Control
         _create = Button("CreateGame", "browser.create");
         _create.Pressed += () => _createPanel.Visible = true;
         menu.AddChild(_create);
+
+        // Map picking moved off the title into the lobby (owner ask 2026-07-05). MapSelect's Back
+        // returns to the title — one hop from here, kept simple over threading a return-to-lobby flag.
+        var maps = Button("Maps", "browser.maps");
+        maps.Pressed += () => Go(TitleScene.MapSelectScenePath);
+        menu.AddChild(maps);
+
+        if (!OS.HasFeature("web"))
+        {
+            var editor = Button("Editor", "title.editor");
+            editor.Pressed += () => Go(MapEditorScene.MapEditorScenePath);
+            menu.AddChild(editor);
+        }
 
         var back = Button("Back", "browser.back");
         back.Pressed += () => Go(TitleScenePath);
