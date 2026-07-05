@@ -4,7 +4,6 @@ using System.Threading.Tasks;
 using Godot;
 using TankGame.Domain.Net;
 using TankGame.GameLogic;
-using TankGame.Infrastructure;
 using NetMode = TankGame.Domain.Net.GameMode; // Presentation has its own local-play GameMode enum
 
 namespace TankGame.Presentation;
@@ -24,7 +23,6 @@ public partial class LobbyBrowserScene : Control
     /// built-in arena name.</summary>
     public const string CustomMapPrefix = "custom:";
 
-    private const string MapsDir = "user://maps";
     private static readonly ArenaId[] BuiltInArenas = { ArenaId.DesertWar, ArenaId.CliffsAndValleys };
 
     private ILobbyClient _lobby = null!;
@@ -133,12 +131,9 @@ public partial class LobbyBrowserScene : Control
             _mapIds.Add(arena.ToString());
         }
 
-        foreach (var stored in new MapRepository(ProjectSettings.GlobalizePath(MapsDir)).List())
-        {
-            _mapPick.AddItem(stored.Name);
-            _mapIds.Add(CustomMapPrefix + stored.Id);
-        }
-
+        // Created maps are NOT offered online yet: the wire carries only a map id, and the other
+        // members don't have the creator's map file — syncing map content over the lobby channel
+        // is a follow-up. Offering them here would promise a map the room can't deliver.
         box.AddChild(_mapPick);
 
         var buttons = new HBoxContainer { Alignment = BoxContainer.AlignmentMode.Center };

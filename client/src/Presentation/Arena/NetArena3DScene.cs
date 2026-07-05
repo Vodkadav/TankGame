@@ -57,6 +57,8 @@ public partial class NetArena3DScene : Node3D
     // round state.
     private IReadOnlyList<NetRoster.Seat> _roster = System.Array.Empty<NetRoster.Seat>();
     private IReadOnlyList<(int X, int Y)> _spawns = System.Array.Empty<(int, int)>();
+    private (int X, int Y) _primarySpawn;
+    private (int X, int Y) _secondarySpawn;
     private readonly List<(byte Slot, ITank Tank)> _rosterTanks = new();
     private readonly List<(int Team, bool Alive)> _roundStatus = new();
 
@@ -116,7 +118,42 @@ public partial class NetArena3DScene : Node3D
         _transport = NetworkSession.Active
             ?? throw new System.InvalidOperationException("NetArena3DScene entered without an active session.");
 
-        _level = LevelMap.Parse(Battlefield01.Text);
+        // The room's map (multiplayer plan Phase 7): every member resolves the lobby's map id into
+        // the same level — the Desert seed and the "random" pick both derive from the shared lobby
+        // code, so host truth and guest rendering agree without map bytes on the wire. A session
+        // without a lobby roster (the 2-player era, old tests) keeps the classic battlefield.
+        bool[,] sandbags;
+        if (NetworkSession.StartedLobby is { } lobby)
+        {
+            switch (NetMapPick.Resolve(lobby.Map, NetworkSession.ActiveCode))
+            {
+                case NetMapPick.Cliffs:
+                    var cliffs = CliffsArena.Create();
+                    _level = cliffs.Map;
+                    sandbags = cliffs.Sandbags;
+                    _primarySpawn = cliffs.PlayerSpawn;
+                    _secondarySpawn = cliffs.EnemySpawns[0];
+                    break;
+                default:
+                    var seed = ((NetMapPick.Desert)NetMapPick.Resolve(lobby.Map, NetworkSession.ActiveCode)).Seed;
+                    var dim = Mathf.Max(GameSetup.ArenaWidth, GameSetup.ArenaHeight);
+                    var layout = new ArenaGenerator().Generate(
+                        new ArenaGenParams(dim, dim, seed, EnemyCount: 0, PickupCount: 0));
+                    _level = layout.Map;
+                    sandbags = layout.Sandbags;
+                    _primarySpawn = layout.PlayerSpawn;
+                    _secondarySpawn = layout.Player2Spawn;
+                    break;
+            }
+        }
+        else
+        {
+            _level = LevelMap.Parse(Battlefield01.Text);
+            sandbags = new bool[_level.Width, _level.Height];
+            _primarySpawn = (_level.SpawnX, _level.SpawnY);
+            _secondarySpawn = GuestSpawn;
+        }
+
         _grid = _level.BuildGrid();
         _arena = new GridArena(_grid, TileSize, GridOrigin);
 
@@ -125,7 +162,7 @@ public partial class NetArena3DScene : Node3D
 
         var terrain = new Terrain3DView { Name = "Terrain3DView" };
         AddChild(terrain);
-        terrain.Bind(_grid, _level.Bushes, new bool[_level.Width, _level.Height], TileSize);
+        terrain.Bind(_grid, _level.Bushes, sandbags, TileSize);
 
         _status = new NetStatusOverlay { Name = "NetStatusOverlay" };
         AddChild(_status); // shows "Connecting…" until the welcome arrives
@@ -233,8 +270,7 @@ public partial class NetArena3DScene : Node3D
         _localSlot = slot;
         _roster = NetRoster.Build(
             NetworkSession.StartedLobby, slot, NetworkSession.ActiveCode, LobbyProtocol.MaxPlayers);
-        _spawns = SpawnTable.For(_level.Width, _level.Height,
-            (_level.SpawnX, _level.SpawnY), GuestSpawn,
+        _spawns = SpawnTable.For(_level.Width, _level.Height, _primarySpawn, _secondarySpawn,
             (x, y) => _arena.IsBlocked(CellCentre(x, y)));
         if (slot == HostSlot)
         {

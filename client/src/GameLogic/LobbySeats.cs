@@ -12,7 +12,7 @@ public static class LobbySeats
     /// <summary>One placeholder name per seat, deterministic for a lobby code.</summary>
     public static IReadOnlyList<string> PlaceholderNames(string lobbyCode, int seats)
     {
-        var names = new TankNameGenerator(StableHash(lobbyCode));
+        var names = new TankNameGenerator(StableHash.Of(lobbyCode));
         var placeholders = new string[seats];
         for (var i = 0; i < seats; i++)
         {
@@ -20,21 +20,5 @@ public static class LobbySeats
         }
 
         return placeholders;
-    }
-
-    // FNV-1a over the code's chars: cheap, spreads nearby codes apart, and identical on every
-    // client and platform.
-    private static int StableHash(string value)
-    {
-        unchecked
-        {
-            var hash = (int)2166136261;
-            foreach (var c in value)
-            {
-                hash = (hash ^ c) * 16777619;
-            }
-
-            return hash;
-        }
     }
 }
