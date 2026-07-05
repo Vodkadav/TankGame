@@ -326,4 +326,51 @@ public class CombatResolverTests
         Assert.True(shot.IsAlive); // passes through the downed tank
         Assert.Equal(0, tank.Hp);
     }
+
+    // Regression: on a laggy frame (large delta) a shot's single step can jump clean over a tank,
+    // so sampling only its end position misses — the iPad "shots deal no damage" bug. The resolver
+    // must sweep the segment the shot travelled this step, like the wall raycast already does.
+    [Fact]
+    public void AShot_ThatJumpsPastATankInOneLaggyStep_StillHitsIt()
+    {
+        var tank = TankAt(Vector2.Zero, team: 0);
+        var shot = ShotAt(new Vector2(-100f, 0f), team: 1);
+        shot.Step(1f / 3f); // 600 u/s × ⅓ s = 200 u: lands at (100,0), far beyond the hit radius
+
+        new CombatResolver(HitRadius).Resolve(new List<IEntity> { tank, shot });
+
+        Assert.Equal(tank.MaxHp - 1, tank.Hp); // the swept path crossed the tank
+        Assert.False(shot.IsAlive);
+    }
+
+    [Fact]
+    public void AShot_CrossingTwoTanksInOneStep_StopsOnTheFirstAlongItsPath()
+    {
+        var near = TankAt(Vector2.Zero, team: 0);
+        var far = TankAt(new Vector2(60f, 0f), team: 0); // both crossed, but second along the path
+        var shot = ShotAt(new Vector2(-100f, 0f), team: 1);
+        shot.Step(1f / 3f); // sweeps -100 → 100, crossing both tanks
+
+        // The far tank listed first: entity order must not decide who a swept shot hits.
+        new CombatResolver(HitRadius).Resolve(new List<IEntity> { far, near, shot });
+
+        Assert.Equal(near.MaxHp - 1, near.Hp); // first along the travel path takes the hit
+        Assert.Equal(far.MaxHp, far.Hp);       // the shot was spent before reaching the far tank
+        Assert.False(shot.IsAlive);
+    }
+
+    [Fact]
+    public void APiercingShot_CrossingTwoTanksInOneStep_DamagesBothInPathOrder()
+    {
+        var near = TankAt(Vector2.Zero, team: 0);
+        var far = TankAt(new Vector2(60f, 0f), team: 0);
+        var shot = PiercingShotAt(new Vector2(-100f, 0f), team: 1, pierce: 1);
+        shot.Step(1f / 3f);
+
+        new CombatResolver(HitRadius).Resolve(new List<IEntity> { far, near, shot });
+
+        Assert.Equal(near.MaxHp - 1, near.Hp);
+        Assert.Equal(far.MaxHp - 1, far.Hp);
+        Assert.False(shot.IsAlive); // budget of 1 spent on the first, stopped by the second
+    }
 }
