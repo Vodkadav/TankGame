@@ -16,7 +16,7 @@ public sealed class HostSession
     private readonly IMatchTransport _transport;
     private readonly IWorld _world;
     private readonly IReadOnlyList<(byte Slot, ITank Tank)> _tanks;
-    private readonly RelayedInputSource _guestInput;
+    private readonly IReadOnlyDictionary<byte, RelayedInputSource> _guestInputs;
     private readonly List<WallDelta> _pendingWallDeltas = new();
 
     /// <param name="transport">The relay link: relayed guest inputs in, snapshots out.</param>
@@ -24,22 +24,43 @@ public sealed class HostSession
     /// tank in <paramref name="tanks"/>.</param>
     /// <param name="walls">The shared maze; its change events become the snapshots' wall deltas.</param>
     /// <param name="tanks">Each player's slot and the tank that drives it, in snapshot order.</param>
-    /// <param name="guestInput">The guest tank's input source, fed from the relayed frames.</param>
+    /// <param name="guestInputs">One relayed input source per HUMAN guest slot; each incoming frame
+    /// routes to its sender's source (the relay stamped the slot). AI-filled slots have none.</param>
+    public HostSession(
+        IMatchTransport transport,
+        IWorld world,
+        IWallGrid walls,
+        IReadOnlyList<(byte Slot, ITank Tank)> tanks,
+        IReadOnlyDictionary<byte, RelayedInputSource> guestInputs)
+    {
+        _transport = transport;
+        _world = world;
+        _tanks = tanks;
+        _guestInputs = guestInputs;
+
+        transport.InputReceived += frame =>
+        {
+            if (_guestInputs.TryGetValue(frame.Slot, out var source))
+            {
+                source.Receive(frame); // an unknown slot's frame is dropped (no seat to drive)
+            }
+        };
+        walls.CellChanged += changed => _pendingWallDeltas.Add(new WallDelta(
+            (ushort)changed.X, (ushort)changed.Y, (byte)changed.Cell.Material, (byte)changed.Cell.Hp));
+    }
+
+    /// <summary>The 2-player-era shape: one guest, every frame routed to it whether or not the
+    /// relay stamped a slot (there is only one sender it could be). Kept so the pre-4-player call
+    /// sites and tests stay terse; the roster-driven scene uses the per-slot constructor.</summary>
     public HostSession(
         IMatchTransport transport,
         IWorld world,
         IWallGrid walls,
         IReadOnlyList<(byte Slot, ITank Tank)> tanks,
         RelayedInputSource guestInput)
+        : this(transport, world, walls, tanks,
+            new Dictionary<byte, RelayedInputSource> { [0] = guestInput, [1] = guestInput })
     {
-        _transport = transport;
-        _world = world;
-        _tanks = tanks;
-        _guestInput = guestInput;
-
-        transport.InputReceived += guestInput.Receive;
-        walls.CellChanged += changed => _pendingWallDeltas.Add(new WallDelta(
-            (ushort)changed.X, (ushort)changed.Y, (byte)changed.Cell.Material, (byte)changed.Cell.Hp));
     }
 
     /// <summary>The authoritative tick counter, stamped on each outgoing snapshot.</summary>
@@ -80,6 +101,14 @@ public sealed class HostSession
             }
         }
 
-        _transport.SendSnapshot(new SnapshotFrame(Tick, _guestInput.LastAppliedSeq, states, deltas, projectiles));
+        // One reconciliation anchor per human guest — the snapshot is a broadcast, so every
+        // predicting guest must find its own slot's ack in it.
+        var acks = new List<InputAck>(_guestInputs.Count);
+        foreach (var (slot, source) in _guestInputs)
+        {
+            acks.Add(new InputAck(slot, source.LastAppliedSeq));
+        }
+
+        _transport.SendSnapshot(new SnapshotFrame(Tick, acks, states, deltas, projectiles));
     }
 }

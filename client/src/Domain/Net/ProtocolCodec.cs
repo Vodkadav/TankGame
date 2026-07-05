@@ -11,8 +11,13 @@ namespace TankGame.Domain.Net;
 /// library so the format is explicit and trivially portable (ADR-0005).</summary>
 public static class ProtocolCodec
 {
-    /// <summary>Encoded size of an <see cref="InputFrame"/>: seq(4) + move(4+4) + aim(4) + buttons(1).</summary>
-    public const int InputFrameSize = 17;
+    /// <summary>Encoded size of an <see cref="InputFrame"/>: seq(4) + move(4+4) + aim(4) + buttons(1)
+    /// + slot(1). The slot is deliberately the LAST byte of the message so the relay can overwrite it
+    /// with the sender's real slot without decoding the frame.</summary>
+    public const int InputFrameSize = 18;
+
+    /// <summary>Encoded size of one <see cref="InputAck"/>: slot(1) + seq(4).</summary>
+    public const int InputAckSize = 5;
 
     /// <summary>Encoded size of one <see cref="TankState"/>: slot(1) + 4 floats(16) + hp(1) + team(1)
     /// + shield(1) + layer(1).</summary>
@@ -71,6 +76,7 @@ public static class ProtocolCodec
         BinaryPrimitives.WriteSingleLittleEndian(span[8..], frame.MoveY);
         BinaryPrimitives.WriteSingleLittleEndian(span[12..], frame.Aim);
         span[16] = frame.Buttons;
+        span[17] = frame.Slot;
         return buffer;
     }
 
@@ -86,21 +92,30 @@ public static class ProtocolCodec
             BinaryPrimitives.ReadSingleLittleEndian(data[4..]),
             BinaryPrimitives.ReadSingleLittleEndian(data[8..]),
             BinaryPrimitives.ReadSingleLittleEndian(data[12..]),
-            data[16]);
+            data[16],
+            data[17]);
     }
 
     public static byte[] EncodeSnapshot(SnapshotFrame frame)
     {
-        var size = 4 + 4 + 1 + (frame.Tanks.Count * TankStateSize) + 2 + (frame.WallDeltas.Count * WallDeltaSize)
-            + 2 + (frame.Projectiles.Count * ProjectileStateSize);
+        var size = 4 + 1 + (frame.Acks.Count * InputAckSize) + 1 + (frame.Tanks.Count * TankStateSize)
+            + 2 + (frame.WallDeltas.Count * WallDeltaSize) + 2 + (frame.Projectiles.Count * ProjectileStateSize);
         var buffer = new byte[size];
         var span = buffer.AsSpan();
         var offset = 0;
 
         BinaryPrimitives.WriteUInt32LittleEndian(span[offset..], frame.Tick);
         offset += 4;
-        BinaryPrimitives.WriteUInt32LittleEndian(span[offset..], frame.AckSeq);
-        offset += 4;
+
+        // One reconciliation ack per guest slot (count byte + pairs) — the snapshot is a broadcast,
+        // so every predicting guest must find its own anchor in it.
+        span[offset++] = (byte)frame.Acks.Count;
+        foreach (var ack in frame.Acks)
+        {
+            span[offset++] = ack.Slot;
+            BinaryPrimitives.WriteUInt32LittleEndian(span[offset..], ack.Seq);
+            offset += 4;
+        }
 
         span[offset++] = (byte)frame.Tanks.Count;
         foreach (var tank in frame.Tanks)
@@ -154,8 +169,15 @@ public static class ProtocolCodec
         var offset = 0;
         var tick = BinaryPrimitives.ReadUInt32LittleEndian(data[offset..]);
         offset += 4;
-        var ackSeq = BinaryPrimitives.ReadUInt32LittleEndian(data[offset..]);
-        offset += 4;
+
+        var ackCount = data[offset++];
+        var acks = new List<InputAck>(ackCount);
+        for (var i = 0; i < ackCount; i++)
+        {
+            var ackSlot = data[offset++];
+            acks.Add(new InputAck(ackSlot, BinaryPrimitives.ReadUInt32LittleEndian(data[offset..])));
+            offset += 4;
+        }
 
         var tankCount = data[offset++];
         var tanks = new List<TankState>(tankCount);
@@ -207,6 +229,6 @@ public static class ProtocolCodec
             projectiles.Add(new ProjectileState(x, y, rotation, style, layer));
         }
 
-        return new SnapshotFrame(tick, ackSeq, tanks, walls, projectiles);
+        return new SnapshotFrame(tick, acks, tanks, walls, projectiles);
     }
 }

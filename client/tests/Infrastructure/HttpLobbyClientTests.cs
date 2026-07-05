@@ -72,4 +72,32 @@ public class HttpLobbyClientTests
 
         Assert.False(await client.JoinLobbyAsync("ZZZZZZ"));
     }
+
+    [Fact]
+    public async Task ListOpenLobbiesAsync_GetsTheLobbiesRoute_AndParsesTheRows()
+    {
+        var handler = new CannedHandler(HttpStatusCode.OK,
+            "[{\"code\":\"ABC123\",\"mode\":\"team\",\"players\":2,\"phase\":\"waiting\",\"map\":\"DesertWar\"}," +
+            "{\"code\":\"DEF456\",\"mode\":\"ffa\",\"players\":1,\"phase\":\"waiting\",\"map\":\"\"}]");
+        var client = new HttpLobbyClient("https://lobby.test", handler);
+
+        var open = await client.ListOpenLobbiesAsync();
+
+        Assert.NotNull(open);
+        Assert.Equal(2, open!.Count);
+        Assert.Equal(new TankGame.Domain.Net.OpenLobbyInfo("ABC123", TankGame.Domain.Net.GameMode.Team, 2, "DesertWar"), open[0]);
+        Assert.Equal("", open[1].Map);
+        var request = Assert.Single(handler.Requests);
+        Assert.Equal(HttpMethod.Get, request.Method);
+        Assert.Equal("https://lobby.test/lobbies", request.RequestUri!.ToString());
+    }
+
+    [Fact]
+    public async Task ListOpenLobbiesAsync_ReturnsNull_WhenTheServiceFails()
+    {
+        var handler = new CannedHandler(HttpStatusCode.InternalServerError, "boom");
+        var client = new HttpLobbyClient("https://lobby.test", handler);
+
+        Assert.Null(await client.ListOpenLobbiesAsync());
+    }
 }

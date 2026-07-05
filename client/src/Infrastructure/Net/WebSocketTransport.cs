@@ -18,8 +18,11 @@ public sealed class WebSocketTransport : IMatchTransport
     public event Action<byte>? WelcomeReceived;
     public event Action<SnapshotFrame>? SnapshotReceived;
     public event Action<InputFrame>? InputReceived;
+    public event Action<LobbyView>? LobbyStateReceived;
 
     public void SendInput(InputFrame input) => _socket.Send(ProtocolCodec.EncodeInputMessage(input));
+
+    public void SendLobby(byte[] command) => _socket.Send(command);
 
     public void SendSnapshot(SnapshotFrame snapshot)
     {
@@ -53,6 +56,9 @@ public sealed class WebSocketTransport : IMatchTransport
                     break;
                 case ProtocolCodec.MsgInput:
                     InputReceived?.Invoke(ProtocolCodec.DecodeInput(message.AsSpan(1)));
+                    break;
+                case LobbyProtocol.MsgLobbyState:
+                    LobbyStateReceived?.Invoke(LobbyProtocol.ParseState(message));
                     break;
             }
         }

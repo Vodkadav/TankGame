@@ -3,12 +3,14 @@ using System.Collections.Generic;
 namespace TankGame.Domain.Net;
 
 /// <summary>One client→server input for a simulation tick. <see cref="Seq"/> is the client's
-/// monotonically-increasing input number, echoed back as <see cref="SnapshotFrame.AckSeq"/> so the
+/// monotonically-increasing input number, echoed back in <see cref="SnapshotFrame.Acks"/> so the
 /// client can discard acknowledged inputs and re-predict the rest (reconciliation). Move is the
 /// raw stick/keys intent; <see cref="Aim"/> is the turret angle in radians; <see cref="Buttons"/>
-/// is a bitfield (<see cref="FireBit"/>). The wire layout is fixed and mirrored byte-for-byte by
-/// the TypeScript server (see <c>server/worker/src/protocol/</c> and ADR-0005).</summary>
-public readonly record struct InputFrame(uint Seq, float MoveX, float MoveY, float Aim, byte Buttons)
+/// is a bitfield (<see cref="FireBit"/>). <see cref="Slot"/> is the sender — with up to 4 players
+/// the host must attribute each relayed frame; the relay overwrites it with the sender socket's
+/// real slot, so a client can only ever act as itself. The wire layout is fixed and mirrored
+/// byte-for-byte by the TypeScript server (see <c>server/worker/src/protocol/</c> and ADR-0005).</summary>
+public readonly record struct InputFrame(uint Seq, float MoveX, float MoveY, float Aim, byte Buttons, byte Slot = 0)
 {
     /// <summary><see cref="Buttons"/> bit set while fire is held.</summary>
     public const byte FireBit = 1 << 0;
@@ -45,19 +47,51 @@ public readonly record struct WallDelta(ushort CellX, ushort CellY, byte Materia
 /// rides (ADR-0018).</summary>
 public readonly record struct ProjectileState(float X, float Y, float Rotation, byte Style, byte Layer);
 
-/// <summary>One server→client world snapshot at <see cref="Tick"/>. <see cref="AckSeq"/> is the
-/// last <see cref="InputFrame.Seq"/> the server applied for the receiving client (the
-/// reconciliation anchor). Carries the full tank set, the live projectiles, plus any wall changes
-/// this snapshot.</summary>
+/// <summary>The last <see cref="InputFrame.Seq"/> the host applied for one guest slot — the
+/// snapshot is a broadcast, so every predicting guest finds its own reconciliation anchor here.</summary>
+public readonly record struct InputAck(byte Slot, uint Seq);
+
+/// <summary>One server→client world snapshot at <see cref="Tick"/>. <see cref="Acks"/> carries a
+/// per-guest-slot reconciliation anchor (the snapshot is broadcast to all guests, so each finds its
+/// own — see <see cref="AckFor"/>). Carries the full tank set, the live projectiles, plus any wall
+/// changes this snapshot.</summary>
 public sealed record SnapshotFrame(
-    uint Tick, uint AckSeq, IReadOnlyList<TankState> Tanks, IReadOnlyList<WallDelta> WallDeltas,
-    IReadOnlyList<ProjectileState> Projectiles)
+    uint Tick, IReadOnlyList<InputAck> Acks, IReadOnlyList<TankState> Tanks,
+    IReadOnlyList<WallDelta> WallDeltas, IReadOnlyList<ProjectileState> Projectiles)
 {
-    /// <summary>A snapshot with no projectiles — the pre-step-4 shape, kept so the many call sites and
-    /// tests that predate networked shots stay terse.</summary>
+    /// <summary>A snapshot acking the single 2-player-era guest — kept so the many call sites and
+    /// tests that predate 4-player rooms stay terse. The one ack is anchored on both low slots,
+    /// because in the 2-player era "the guest" is whichever of them the receiver happens to be.</summary>
+    public SnapshotFrame(
+        uint tick, uint ackSeq, IReadOnlyList<TankState> tanks, IReadOnlyList<WallDelta> wallDeltas,
+        IReadOnlyList<ProjectileState> projectiles)
+        : this(tick, new[] { new InputAck(0, ackSeq), new InputAck(1, ackSeq) }, tanks, wallDeltas, projectiles)
+    {
+    }
+
+    /// <summary>A snapshot with no projectiles — the pre-step-4 shape, kept for the same reason.</summary>
     public SnapshotFrame(
         uint tick, uint ackSeq, IReadOnlyList<TankState> tanks, IReadOnlyList<WallDelta> wallDeltas)
         : this(tick, ackSeq, tanks, wallDeltas, System.Array.Empty<ProjectileState>())
     {
+    }
+
+    /// <summary>The 2-player-era single ack: the first (and, pre-4-player, only) entry. Legacy
+    /// call sites and tests read this; new code asks <see cref="AckFor"/> its own slot.</summary>
+    public uint AckSeq => Acks.Count > 0 ? Acks[0].Seq : 0;
+
+    /// <summary>The reconciliation anchor for <paramref name="slot"/>, or 0 when this snapshot
+    /// carries none for it (the guest simply replays all pending inputs).</summary>
+    public uint AckFor(byte slot)
+    {
+        foreach (var ack in Acks)
+        {
+            if (ack.Slot == slot)
+            {
+                return ack.Seq;
+            }
+        }
+
+        return 0;
     }
 }

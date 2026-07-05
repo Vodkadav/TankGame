@@ -1,0 +1,233 @@
+using System;
+using System.Collections.Generic;
+using Godot;
+using Chickensoft.GoDotTest;
+using TankGame.Domain.Net;
+using TankGame.GameLogic;
+using TankGame.Infrastructure;
+using TankGame.Presentation;
+using NetMode = TankGame.Domain.Net.GameMode;
+
+namespace TankGame.Tests.Presentation;
+
+// Drives the game room (plan Phase 5) over a fake transport pushing authoritative LobbyViews — no
+// socket. Seats, placeholders, host-only Start, countdown, and the started hand-off all assert here.
+public class LobbyRoomSceneTests : TestClass
+{
+    private sealed class FakeTransport : IMatchTransport
+    {
+        public List<byte[]> SentLobby { get; } = new();
+        public event Action<byte>? WelcomeReceived;
+        public event Action<SnapshotFrame> SnapshotReceived { add { } remove { } }
+        public event Action<LobbyView>? LobbyStateReceived;
+
+        public void SendInput(InputFrame input) { }
+        public void Poll() { }
+        public void SendLobby(byte[] command) => SentLobby.Add(command);
+
+        public void RaiseWelcome(byte slot) => WelcomeReceived?.Invoke(slot);
+        public void RaiseLobby(LobbyView view) => LobbyStateReceived?.Invoke(view);
+    }
+
+    private Func<string, IMatchTransport> _originalTransportFactory = default!;
+    private FakeTransport _transport = default!;
+    private Control _scene = default!;
+
+    public LobbyRoomSceneTests(Node testScene) : base(testScene) { }
+
+    [Setup]
+    public void Setup()
+    {
+        TranslationLoader.EnsureLoaded();
+        _originalTransportFactory = NetworkSession.TransportFactory;
+        _transport = new FakeTransport();
+        NetworkSession.Reset();
+        NetworkSession.TransportFactory = _ => _transport;
+        NetworkSession.Join("ABC123"); // the room reads NetworkSession.Active + ActiveCode
+
+        GameSetup.PlayerName = "Ada";
+        _scene = GD.Load<PackedScene>("res://src/Presentation/LobbyRoom.tscn").Instantiate<Control>();
+        TestScene.AddChild(_scene); // runs _Ready, which builds the seats over the transport
+    }
+
+    [Cleanup]
+    public void Cleanup()
+    {
+        _scene.QueueFree();
+        NetworkSession.TransportFactory = _originalTransportFactory;
+        NetworkSession.Reset();
+    }
+
+    [Test]
+    public void EmptySeats_ShowTheGrayPlaceholderCast()
+    {
+        var expected = LobbySeats.PlaceholderNames("ABC123", LobbyProtocol.MaxPlayers);
+        for (var seat = 0; seat < LobbyProtocol.MaxPlayers; seat++)
+        {
+            if (Find($"Seat{seat}") is not Label label)
+            {
+                throw new Exception($"The room must show a row per seat (missing 'Seat{seat}').");
+            }
+
+            if (label.Text != expected[seat])
+            {
+                throw new Exception(
+                    $"Seat {seat} must show its placeholder '{expected[seat]}'; showed '{label.Text}'.");
+            }
+        }
+    }
+
+    [Test]
+    public void AJoinedPlayer_ReplacesTheirSeatPlaceholder()
+    {
+        Seat(slot: 1, View(LobbyPhase.Waiting, hostSlot: 0,
+            new LobbyPlayer(0, "Ada", 0, false),
+            new LobbyPlayer(1, "Bea", 1, false)));
+
+        var seat1 = Find("Seat1") as Label ?? throw new Exception("Missing 'Seat1'.");
+        if (seat1.Text != "Bea")
+        {
+            throw new Exception($"A joined player's real name must replace the placeholder; showed '{seat1.Text}'.");
+        }
+
+        var seat2 = Find("Seat2") as Label ?? throw new Exception("Missing 'Seat2'.");
+        var placeholders = LobbySeats.PlaceholderNames("ABC123", LobbyProtocol.MaxPlayers);
+        if (seat2.Text != placeholders[2])
+        {
+            throw new Exception("An un-joined seat must keep its placeholder.");
+        }
+    }
+
+    [Test]
+    public void SeatingIntroduces_TheBattleName_Once()
+    {
+        Seat(slot: 1, View(LobbyPhase.Waiting, hostSlot: 0, new LobbyPlayer(1, "Player", 1, false)));
+        Seat(slot: 1, View(LobbyPhase.Waiting, hostSlot: 0, new LobbyPlayer(1, "Ada", 1, false)));
+
+        if (!ContainsCommand(LobbyProtocol.EncodeSetName("Ada")))
+        {
+            throw new Exception("Seating must introduce the player's battle name to the room.");
+        }
+
+        if (CountCommand(LobbyProtocol.EncodeSetName("Ada")) != 1)
+        {
+            throw new Exception("The introduction must be sent exactly once, not per push.");
+        }
+    }
+
+    [Test]
+    public void TheCreator_AppliesTheirStagedModeAndMapPicks()
+    {
+        NetworkSession.PendingMode = NetMode.Team;
+        NetworkSession.PendingMap = "DesertWar";
+
+        Seat(slot: 0, View(LobbyPhase.Waiting, hostSlot: 0, new LobbyPlayer(0, "Player", 0, false)));
+
+        if (!ContainsCommand(LobbyProtocol.EncodeSetMode(NetMode.Team))
+            || !ContainsCommand(LobbyProtocol.EncodeSetMap("DesertWar")))
+        {
+            throw new Exception("The creator must apply the staged mode/map once seated as host.");
+        }
+
+        if (NetworkSession.PendingMode is not null || NetworkSession.PendingMap is not null)
+        {
+            throw new Exception("The staged picks must clear after they are applied.");
+        }
+    }
+
+    [Test]
+    public void Start_IsHostOnly_AndSendsTheStartCommand()
+    {
+        Seat(slot: 1, View(LobbyPhase.Waiting, hostSlot: 0,
+            new LobbyPlayer(0, "Ada", 0, false),
+            new LobbyPlayer(1, "Bea", 1, false)));
+        if (Find("Start") is not Button { Visible: false })
+        {
+            throw new Exception("A guest must not see the Start button.");
+        }
+
+        _transport.RaiseLobby(View(LobbyPhase.Waiting, hostSlot: 1,
+            new LobbyPlayer(1, "Bea", 1, false)));
+        var start = Find("Start") as Button ?? throw new Exception("Missing 'Start'.");
+        if (!start.Visible)
+        {
+            throw new Exception("The host must see the Start button while the room waits.");
+        }
+
+        start.EmitSignal(BaseButton.SignalName.Pressed);
+        if (!ContainsCommand(LobbyProtocol.EncodeStart()))
+        {
+            throw new Exception("Pressing Start must send the start command.");
+        }
+    }
+
+    [Test]
+    public void TheCountdown_RendersEachTick()
+    {
+        Seat(slot: 0, View(LobbyPhase.Countdown, hostSlot: 0, new LobbyPlayer(0, "Ada", 0, true)));
+
+        var countdown = Find("Countdown") as Label ?? throw new Exception("Missing 'Countdown'.");
+        if (!countdown.Text.Contains('3'))
+        {
+            throw new Exception($"The countdown must show the seconds left; showed '{countdown.Text}'.");
+        }
+    }
+
+    [Test]
+    public void Started_SnapshotsTheRosterForThePlayScene()
+    {
+        var final = View(LobbyPhase.Started, hostSlot: 0,
+            new LobbyPlayer(0, "Ada", 0, true),
+            new LobbyPlayer(2, "Cara", 2, true));
+        Seat(slot: 0, final);
+
+        if (!ReferenceEquals(NetworkSession.StartedLobby, final))
+        {
+            throw new Exception("Start must snapshot the final roster for the networked play scene.");
+        }
+    }
+
+    [Test]
+    public void Leave_DropsTheTransport()
+    {
+        Press("Leave");
+
+        if (NetworkSession.Active is not null)
+        {
+            throw new Exception("Leaving the room must drop the active transport.");
+        }
+    }
+
+    private static LobbyView View(LobbyPhase phase, int hostSlot, params LobbyPlayer[] players) =>
+        new(NetMode.Ffa, phase, hostSlot, phase == LobbyPhase.Countdown ? 3 : 0, players);
+
+    private void Seat(byte slot, LobbyView view)
+    {
+        _transport.RaiseWelcome(slot);
+        _transport.RaiseLobby(view);
+    }
+
+    private bool ContainsCommand(byte[] expected) => CountCommand(expected) > 0;
+
+    private int CountCommand(byte[] expected)
+    {
+        var count = 0;
+        foreach (var sent in _transport.SentLobby)
+        {
+            if (sent.AsSpan().SequenceEqual(expected))
+            {
+                count++;
+            }
+        }
+
+        return count;
+    }
+
+    private Node? Find(string name) => _scene.FindChild(name, recursive: true, owned: false);
+
+    private void Press(string buttonName)
+    {
+        var button = Find(buttonName) as Button ?? throw new Exception($"Missing '{buttonName}' button.");
+        button.EmitSignal(BaseButton.SignalName.Pressed);
+    }
+}

@@ -1,6 +1,7 @@
 using System;
 using TankGame.Domain.Net;
 using TankGame.Infrastructure.Net;
+using NetMode = TankGame.Domain.Net.GameMode; // Presentation has its own local-play GameMode enum
 
 namespace TankGame.Presentation;
 
@@ -26,10 +27,37 @@ public static class NetworkSession
     /// reads this.</summary>
     public static IMatchTransport? Active { get; private set; }
 
+    /// <summary>The lobby code <see cref="Active"/> is connected to ("" before a join) — the room
+    /// scene seeds its placeholder cast from it so every member sees the same names.</summary>
+    public static string ActiveCode { get; private set; } = "";
+
+    /// <summary>The mode the creator picked in the browser's create panel, applied by the room
+    /// scene once the server seats it as host, then cleared. Null when joining someone else's room.</summary>
+    public static NetMode? PendingMode { get; set; }
+
+    /// <summary>The map id the creator picked ("" = random); same lifecycle as <see cref="PendingMode"/>.</summary>
+    public static string? PendingMap { get; set; }
+
+    /// <summary>The lobby's final roster, snapshotted by the room scene the moment the server said
+    /// "started" — the networked play scene reads slots/names/teams/mode/map from it.</summary>
+    public static LobbyView? StartedLobby { get; set; }
+
     /// <summary>Joins <paramref name="code"/> by building (and, for the live factory, connecting) its
     /// transport, and records it as <see cref="Active"/>.</summary>
-    public static IMatchTransport Join(string code) => Active = TransportFactory(code);
+    public static IMatchTransport Join(string code)
+    {
+        ActiveCode = code;
+        return Active = TransportFactory(code);
+    }
 
-    /// <summary>Drops the active transport — leaving a match, or a test resetting the seam.</summary>
-    public static void Reset() => Active = null;
+    /// <summary>Drops the active transport and every per-match leftover — leaving a match, or a
+    /// test resetting the seam.</summary>
+    public static void Reset()
+    {
+        Active = null;
+        ActiveCode = "";
+        PendingMode = null;
+        PendingMap = null;
+        StartedLobby = null;
+    }
 }

@@ -94,7 +94,8 @@ public sealed class PredictedTank
         Shield = authoritative.Shield;
         Layer = authoritative.Layer;
 
-        _pending.RemoveAll(frame => frame.Seq <= snapshot.AckSeq);
+        var acked = snapshot.AckFor(Slot); // the broadcast carries one anchor per guest — read ours
+        _pending.RemoveAll(frame => frame.Seq <= acked);
         foreach (var frame in _pending)
         {
             ApplyMovement(frame);

@@ -225,7 +225,8 @@ public class NetArena3DSceneTests : TestClass
     {
         _transport.DeliverWelcome(0);
         var guestStart = _scene.Tanks[1].Position;
-        _transport.DeliverInput(new InputFrame(Seq: 1, MoveX: 1f, MoveY: 0f, Aim: 0f, Buttons: 0));
+        // Slot 1: the relay stamps the sender's slot on every input, so the host routes it there.
+        _transport.DeliverInput(new InputFrame(Seq: 1, MoveX: 1f, MoveY: 0f, Aim: 0f, Buttons: 0, Slot: 1));
 
         for (var i = 0; i < 4; i++)
         {

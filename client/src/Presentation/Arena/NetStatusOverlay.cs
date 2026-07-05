@@ -11,6 +11,7 @@ public partial class NetStatusOverlay : CanvasLayer
     public const string ConnectingKey = "net.connecting";
     public const string ConnectedKey = "net.connected";
     public const string Player2JoinedKey = "net.player2_joined";
+    public const string RoundOverKey = "net.round_over";
 
     private Label _label = null!;
 
