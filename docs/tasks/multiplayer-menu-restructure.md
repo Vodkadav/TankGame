@@ -98,6 +98,16 @@ Claude Code after Fable's code lands** — out of scope here.
   green before merge — see repo CLAUDE.md branch-protection rules).
 - **No behaviour change to `PlatformExit`** — label only.
 
+## Implementation notes (2026-07-05, done)
+
+- Implemented as specced; suite green (GoDotTest 172✓, was 167 + 5 red-first).
+- **MapSelect Back stays → Title** (the spec's "simpler" option) — both screens are one hop apart;
+  no return-to-lobby flag threaded.
+- The lobby's Editor button **reuses `title.editor`**; only new i18n key is `browser.maps`
+  (EN "Maps" / ES "Mapas" / DA "Baner", i18n-agent checked).
+- The lobby Editor button's absence on web can't be simulated by the test harness
+  (`OS.HasFeature` is read-only) — verify manually on the deployed arcade.
+
 ## Handled by Claude Code after this lands (NOT Fable)
 
 1. Reconcile `p8/web-export-refresh` onto `main` so the web build gets this + the modern lobby browser.

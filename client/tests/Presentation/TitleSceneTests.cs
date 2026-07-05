@@ -31,7 +31,7 @@ public class TitleSceneTests : TestClass
     [Test]
     public void Title_OffersTheSlimmedMenu()
     {
-        foreach (var name in new[] { "Solo", "Multiplayer", "SelectMap", "Editor", "Exit" })
+        foreach (var name in new[] { "Solo", "Multiplayer", "Settings", "Exit" })
         {
             if (_title.FindChild(name, recursive: true, owned: false) is not Button)
             {
@@ -43,7 +43,7 @@ public class TitleSceneTests : TestClass
     [Test]
     public void Title_DropsTheOldModeAndNetButtons()
     {
-        foreach (var name in new[] { "Coop", "Versus", "JoinTest", "ThreeD", "OnePlayer", "TeamVsTeam" })
+        foreach (var name in new[] { "Coop", "Versus", "JoinTest", "ThreeD", "OnePlayer", "TeamVsTeam", "SelectMap", "Editor" })
         {
             if (_title.FindChild(name, recursive: true, owned: false) is Button)
             {
@@ -107,13 +107,14 @@ public class TitleSceneTests : TestClass
         button.EmitSignal(BaseButton.SignalName.Pressed);
     }
 
+    // The last button's label is platform-aware (title.back_to_arcade on web, title.exit elsewhere);
+    // the test host is desktop, so it must render the Danish "Exit".
     [Test]
     public void Title_RendersTheMenuLabelsInDanish()
     {
         TranslationServer.SetLocale("dk");
         AssertButton("Solo", "Solo");
-        AssertButton("SelectMap", "Vælg bane");
-        AssertButton("Editor", "Baneeditor");
+        AssertButton("Settings", "Indstillinger");
         AssertButton("Exit", "Afslut");
     }
 

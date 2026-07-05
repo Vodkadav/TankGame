@@ -91,6 +91,7 @@ browser.gone,"That game is no longer open","Esa partida ya no está abierta","De
 browser.mode_ffa,"FFA","Todos contra todos","Alle mod alle"
 browser.mode_team,"Team vs Team","Equipo vs equipo","Hold mod hold"
 browser.map_random,"Random map","Mapa aleatorio","Tilfældig bane"
+browser.maps,"Maps","Mapas","Baner"
 create.heading,"Create game","Crear partida","Opret spil"
 create.mode,"Mode","Modo","Tilstand"
 create.map,"Map","Mapa","Bane"

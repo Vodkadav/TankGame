@@ -5,9 +5,10 @@ using TankGame.Infrastructure;
 
 namespace TankGame.Presentation;
 
-/// <summary>The start screen. Offers the two play modes (Solo, and Multiplayer via the lobby
-/// browser — multiplayer plan Phase 2), a Select Map browser, and Exit. Solo launches the 3D arena —
-/// the game's main presentation (ADR-0017). Button labels are translation keys (Godot auto-translates).</summary>
+/// <summary>The start screen — a slim menu: Solo, Multiplayer (→ the lobby browser, where map
+/// picking and the desktop editor now live), Settings, and Exit (labelled "Back to Arcade" on web,
+/// where it returns to the arcade site instead of quitting). Solo launches the 3D arena — the game's
+/// main presentation (ADR-0017). Button labels are translation keys (Godot auto-translates).</summary>
 public partial class TitleScene : Control
 {
     public const string ArenaScenePath = "res://src/Presentation/Arena/Arena3D.tscn";
@@ -58,24 +59,14 @@ public partial class TitleScene : Control
         multiplayer.MouseEntered += () => _sfx.PlayHover();
         menu.AddChild(multiplayer);
 
-        var selectMap = Button("SelectMap", "title.select_map");
-        selectMap.Pressed += () => { _sfx.PlayUi(SfxKind.UiClick); Go(MapSelectScenePath); };
-        selectMap.MouseEntered += () => _sfx.PlayHover();
-        menu.AddChild(selectMap);
-
-        // Authoring is its own activity, not a step of choosing what to play — the editor gets its
-        // own menu entry (owner feedback 2026-06-11).
-        var editor = Button("Editor", "title.editor");
-        editor.Pressed += () => { _sfx.PlayUi(SfxKind.UiClick); Go(MapEditorScene.MapEditorScenePath); };
-        editor.MouseEntered += () => _sfx.PlayHover();
-        menu.AddChild(editor);
-
         var settings = Button("Settings", "title.settings");
         settings.Pressed += () => { _sfx.PlayUi(SfxKind.UiClick); _settingsOverlay.Open(_sfx); };
         settings.MouseEntered += () => _sfx.PlayHover();
         menu.AddChild(settings);
 
-        var exit = Button("Exit", "title.exit");
+        // Same node name and behaviour everywhere (PlatformExit already quits on desktop and returns
+        // to the arcade on web) — only the visible label says which one will happen.
+        var exit = Button("Exit", OS.HasFeature("web") ? "title.back_to_arcade" : "title.exit");
         exit.Pressed += () => { _sfx.PlayUi(SfxKind.UiClick); PlatformExit.Run(GetTree()); };
         exit.MouseEntered += () => _sfx.PlayHover();
         menu.AddChild(exit);

@@ -117,14 +117,41 @@ public class LobbyBrowserSceneTests : TestClass
     }
 
     [Test]
-    public void Browser_OffersCreateRefreshAndBack()
+    public void Browser_OffersMapsCreateRefreshAndBack()
     {
-        foreach (var name in new[] { "CreateGame", "Refresh", "Back" })
+        foreach (var name in new[] { "Maps", "CreateGame", "Refresh", "Back" })
         {
             if (Find(name) is not Button)
             {
                 throw new Exception($"The browser must offer a '{name}' button.");
             }
+        }
+    }
+
+    // Map picking lives inside the lobby now (owner ask 2026-07-05) — the title menu is slim. The
+    // press goes through the guarded Go, so under the runner (the browser is a child, not the
+    // current scene) nothing swaps; the wiring target is MapSelect.
+    [Test]
+    public void Maps_IsEnabled_AndPressingItIsSafeUnderTheRunner()
+    {
+        var maps = Find("Maps") as Button ?? throw new Exception("Missing 'Maps' button.");
+        if (maps.Disabled)
+        {
+            throw new Exception("Maps must be enabled — it opens the map browser.");
+        }
+
+        maps.EmitSignal(BaseButton.SignalName.Pressed);
+    }
+
+    // The editor needs the local dev asset library that isn't bundled into the WASM build, so it is
+    // desktop-only. The test host is desktop, so the button must exist; its absence on web can't be
+    // simulated here (OS.HasFeature is read-only) and is verified manually on the deployed arcade.
+    [Test]
+    public void Browser_OffersTheEditor_OnDesktop()
+    {
+        if (Find("Editor") is not Button)
+        {
+            throw new Exception("The browser must offer an 'Editor' button on desktop.");
         }
     }
 
@@ -262,6 +289,13 @@ public class LobbyBrowserSceneTests : TestClass
             if (rendered == create.Text || rendered.Length == 0)
             {
                 throw new Exception($"'browser.create' must have a Danish translation; rendered '{rendered}'.");
+            }
+
+            var maps = Find("Maps") as Button ?? throw new Exception("Missing 'Maps'.");
+            var mapsRendered = maps.Tr(maps.Text).ToString();
+            if (mapsRendered == maps.Text || mapsRendered.Length == 0)
+            {
+                throw new Exception($"'browser.maps' must have a Danish translation; rendered '{mapsRendered}'.");
             }
         }
         finally
