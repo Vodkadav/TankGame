@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Globalization;
 using Godot;
 using TankGame.Domain;
 using TankGame.Domain.Net;
@@ -62,9 +63,9 @@ public partial class NetArena3DScene : Node3D
     private readonly List<(byte Slot, ITank Tank)> _rosterTanks = new();
     private readonly List<(int Team, bool Alive)> _roundStatus = new();
 
-    /// <summary>The decided round (FFA: last tank standing; Team: last team standing), evaluated
-    /// by the host each tick. Null while the round is still being fought — and always null on a
-    /// guest, which learns the outcome from the frozen snapshots for now.</summary>
+    /// <summary>The decided round (FFA: last tank standing; Team: last team standing). The host
+    /// evaluates it each authoritative tick; a guest derives the same verdict from the snapshot's
+    /// tank states, so both roles show the winner banner. Null while the round is being fought.</summary>
     public (bool Decided, int WinningTeam)? RoundResult { get; private set; }
 
     // Host role: the authoritative world and its session.
@@ -405,6 +406,7 @@ public partial class NetArena3DScene : Node3D
         }
 
         MirrorProjectiles(snapshot.Projectiles);
+        DetectRoundOverFromSnapshot(snapshot);
     }
 
     // Rebuild the guest's shot views from the snapshot's live projectile set (ADR-0019 step 4). The
@@ -465,8 +467,57 @@ public partial class NetArena3DScene : Node3D
         if (result.Decided)
         {
             RoundResult = result;
-            _status.SetStatus(NetStatusOverlay.RoundOverKey);
+            _status.SetStatus(RoundOverText(result.WinningTeam));
         }
+    }
+
+    // A guest has no world, but the snapshot carries every tank's hp and team — the same
+    // last-standing rule the host runs gives it the same verdict at the same moment. Hp 0 means
+    // out for good: net tanks have a single life (no respawns in a networked round).
+    private void DetectRoundOverFromSnapshot(SnapshotFrame snapshot)
+    {
+        if (RoundResult is not null || snapshot.Tanks.Count < 2)
+        {
+            return;
+        }
+
+        _roundStatus.Clear();
+        foreach (var state in snapshot.Tanks)
+        {
+            _roundStatus.Add((state.Team, state.Hp > 0));
+        }
+
+        var result = LastStanding.Evaluate(_roundStatus);
+        if (result.Decided)
+        {
+            RoundResult = result;
+            _status.SetStatus(RoundOverText(result.WinningTeam));
+        }
+    }
+
+    // "{name} wins!" when one tank owns the winning team (always true in FFA), "Team N wins!"
+    // for a multi-tank team, and the plain round-over banner for a drawn round (nobody left).
+    private string RoundOverText(int winningTeam)
+    {
+        if (winningTeam == LastStanding.NoWinner)
+        {
+            return Tr(NetStatusOverlay.RoundOverKey);
+        }
+
+        string? soleWinner = null;
+        var teamSize = 0;
+        foreach (var seat in _roster)
+        {
+            if (seat.Team == winningTeam)
+            {
+                soleWinner = seat.Name;
+                teamSize++;
+            }
+        }
+
+        return teamSize == 1 && soleWinner is not null
+            ? string.Format(CultureInfo.InvariantCulture, Tr("net.round_winner"), soleWinner)
+            : string.Format(CultureInfo.InvariantCulture, Tr("net.round_winner_team"), winningTeam + 1);
     }
 
     private NetTank EnsureMirroredTank(byte slot)

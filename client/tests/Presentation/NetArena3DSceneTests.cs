@@ -221,6 +221,32 @@ public class NetArena3DSceneTests : TestClass
     }
 
     [Test]
+    public void GuestSnapshot_DetectsTheDecidedRound_AndNamesTheWinner()
+    {
+        _transport.DeliverWelcome(1);
+
+        // Both tanks standing: still fighting.
+        _transport.DeliverSnapshot(new SnapshotFrame(1, 0,
+            new List<TankState> { new(0, 96f, 160f, 0f, 0f, 8, 0), new(1, 200f, 96f, 0f, 0f, 8, 1) },
+            new List<WallDelta>()));
+        if (_scene.RoundResult is not null)
+        {
+            throw new Exception("Two tanks standing must not end the round.");
+        }
+
+        // The guest (slot 1, team 1) falls: the host's tank is the last one standing.
+        _transport.DeliverSnapshot(new SnapshotFrame(2, 0,
+            new List<TankState> { new(0, 96f, 160f, 0f, 0f, 8, 0), new(1, 200f, 96f, 0f, 0f, 0, 1) },
+            new List<WallDelta>()));
+
+        if (_scene.RoundResult is not { Decided: true, WinningTeam: 0 })
+        {
+            throw new Exception(
+                $"A snapshot with one team left must decide the round on the guest; got {_scene.RoundResult}.");
+        }
+    }
+
+    [Test]
     public void HostTick_DrivesTheGuestTank_FromARelayedInput()
     {
         _transport.DeliverWelcome(0);
