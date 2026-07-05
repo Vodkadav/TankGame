@@ -153,7 +153,7 @@ public partial class LobbyRoomScene : Control
         }
 
         _modeLabel.Text = view?.Mode == NetMode.Team ? "browser.mode_team" : "browser.mode_ffa";
-        _mapLabel.Text = view is { Map.Length: > 0 } ? view.Map : "browser.map_random";
+        _mapLabel.Text = LobbyBrowserScene.MapLabel(view?.Map ?? "");
         _countdown.Text = view?.Phase == LobbyPhase.Countdown
             ? string.Format(CultureInfo.InvariantCulture, Tr("room.starting"), view.Countdown)
             : string.Empty;
@@ -194,5 +194,7 @@ public partial class LobbyRoomScene : Control
         }
     }
 
-    private static Button Button(string name, string textKey) => new() { Name = name, Text = textKey };
+    // ≥44 px tall (a11y touch-target baseline) — the arcade is played on phones and iPads.
+    private static Button Button(string name, string textKey) =>
+        new() { Name = name, Text = textKey, CustomMinimumSize = new Vector2(0f, 48f) };
 }

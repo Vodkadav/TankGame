@@ -116,18 +116,18 @@ public partial class LobbyBrowserScene : Control
         });
 
         box.AddChild(new Label { Text = "create.mode" });
-        _modePick = new OptionButton { Name = "ModePick" };
+        _modePick = new OptionButton { Name = "ModePick", CustomMinimumSize = TouchTarget };
         _modePick.AddItem(Tr("browser.mode_ffa"));  // index 0 = FFA, the default
         _modePick.AddItem(Tr("browser.mode_team")); // index 1 = Team vs Team
         box.AddChild(_modePick);
 
         box.AddChild(new Label { Text = "create.map" });
-        _mapPick = new OptionButton { Name = "MapPick" };
+        _mapPick = new OptionButton { Name = "MapPick", CustomMinimumSize = TouchTarget };
         _mapPick.AddItem(Tr("browser.map_random")); // index 0 = random, the default
         _mapIds.Add("");
         foreach (var arena in BuiltInArenas)
         {
-            _mapPick.AddItem(arena.ToString());
+            _mapPick.AddItem(Tr(MapLabel(arena.ToString())));
             _mapIds.Add(arena.ToString());
         }
 
@@ -189,7 +189,7 @@ public partial class LobbyBrowserScene : Control
         row.AddChild(new Label
         {
             Name = "Map",
-            Text = lobby.Map.Length == 0 ? "browser.map_random" : DisplayMapName(lobby.Map),
+            Text = MapLabel(lobby.Map),
         });
         row.AddChild(new Label
         {
@@ -237,11 +237,18 @@ public partial class LobbyBrowserScene : Control
         Go(RoomScenePath);
     }
 
-    /// <summary>A raw map id shown to players: a custom map's id sans prefix; a built-in's enum name.</summary>
-    private static string DisplayMapName(string mapId) =>
-        mapId.StartsWith(CustomMapPrefix, System.StringComparison.Ordinal)
-            ? mapId[CustomMapPrefix.Length..]
-            : mapId;
+    /// <summary>What to show for a map id — a translation key for the built-ins/random, the raw
+    /// name (prefix stripped) for a custom map. Shared with the room scene so the two never
+    /// disagree about a map's label.</summary>
+    public static string MapLabel(string mapId) => mapId switch
+    {
+        "" => "browser.map_random",
+        "DesertWar" => "map.desert_war",
+        "CliffsAndValleys" => "map.cliffs_and_valleys",
+        _ when mapId.StartsWith(CustomMapPrefix, System.StringComparison.Ordinal) =>
+            mapId[CustomMapPrefix.Length..],
+        _ => mapId,
+    };
 
     // Guarded so the GoDotTest click-path (which adds the browser as a child, not the active scene)
     // can assert the wiring without the runner swapping its whole scene out from under it.
@@ -253,5 +260,9 @@ public partial class LobbyBrowserScene : Control
         }
     }
 
-    private static Button Button(string name, string textKey) => new() { Name = name, Text = textKey };
+    // ≥44 px tall (a11y touch-target baseline) — the arcade is played on phones and iPads.
+    private static readonly Vector2 TouchTarget = new(0f, 48f);
+
+    private static Button Button(string name, string textKey) =>
+        new() { Name = name, Text = textKey, CustomMinimumSize = TouchTarget };
 }

@@ -94,9 +94,20 @@ public class LobbyBrowserSceneTests : TestClass
             throw new Exception("A row must badge its game mode (Team vs Team).");
         }
 
-        if (row.FindChild("Join", recursive: true, owned: false) is not Button)
+        if (row.FindChild("Join", recursive: true, owned: false) is not Button join)
         {
             throw new Exception("Every row needs its Join button.");
+        }
+
+        if (join.CustomMinimumSize.Y < 44f)
+        {
+            throw new Exception("Join must be at least 44 px tall for touch (a11y baseline).");
+        }
+
+        if (row.FindChild("Map", recursive: true, owned: false) is not Label map
+            || map.Text != "map.desert_war")
+        {
+            throw new Exception("A row's built-in map must show its localized name key.");
         }
 
         if (Find("Empty") is not Label { Visible: false })

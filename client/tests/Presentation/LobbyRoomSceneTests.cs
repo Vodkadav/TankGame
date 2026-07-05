@@ -188,6 +188,31 @@ public class LobbyRoomSceneTests : TestClass
     }
 
     [Test]
+    public void TheMapLabel_UsesTheLocalizedBuiltInKey()
+    {
+        Seat(slot: 0, new LobbyView(NetMode.Ffa, LobbyPhase.Waiting, 0, 0,
+            new[] { new LobbyPlayer(0, "Ada", 0, false) }, Map: "DesertWar"));
+
+        var map = Find("MapLabel") as Label ?? throw new Exception("Missing 'MapLabel'.");
+        if (map.Text != "map.desert_war")
+        {
+            throw new Exception($"A built-in map must show its localized name key; showed '{map.Text}'.");
+        }
+    }
+
+    [Test]
+    public void TheButtons_MeetTheTouchTargetBaseline()
+    {
+        foreach (var name in new[] { "Start", "Leave" })
+        {
+            if (Find(name) is not Button button || button.CustomMinimumSize.Y < 44f)
+            {
+                throw new Exception($"'{name}' must be at least 44 px tall for touch (a11y baseline).");
+            }
+        }
+    }
+
+    [Test]
     public void Leave_DropsTheTransport()
     {
         Press("Leave");
