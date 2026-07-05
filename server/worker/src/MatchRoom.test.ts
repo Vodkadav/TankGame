@@ -100,12 +100,15 @@ describe("MatchRoom (relay)", () => {
     expect(await welcomeOf(host)).toBe(0);
     expect(await welcomeOf(guest)).toBe(1);
 
-    const frame: InputFrame = { seq: 7, moveX: 1, moveY: 0, aim: 0.5, buttons: 1 };
+    // The guest lies about its slot (0 = the host's): the relay must stamp the sender's REAL slot
+    // over the frame's last byte, so the host attributes the input correctly and nobody can act
+    // as anyone else.
+    const frame: InputFrame = { seq: 7, moveX: 1, moveY: 0, aim: 0.5, buttons: 1, slot: 0 };
     guest.ws.send(encodeInputMessage(frame));
 
     const received = await nextGame(host);
     expect(received[0]).toBe(MSG_INPUT);
-    expect(decodeInput(received.subarray(1))).toEqual(frame);
+    expect(decodeInput(received.subarray(1))).toEqual({ ...frame, slot: 1 });
 
     host.ws.close();
     guest.ws.close();
@@ -119,7 +122,7 @@ describe("MatchRoom (relay)", () => {
 
     const snapshot: SnapshotFrame = {
       tick: 3,
-      ackSeq: 2,
+      acks: [{ slot: 1, seq: 2 }],
       tanks: [{ slot: 0, x: 64, y: 128, rotation: 0, turretRotation: 0.5, hp: 8, team: 0, shield: 0, layer: 0 }],
       wallDeltas: [],
       projectiles: [],
@@ -140,7 +143,7 @@ describe("MatchRoom (relay)", () => {
     expect(await welcomeOf(host)).toBe(0);
     expect(await welcomeOf(guest)).toBe(1);
 
-    guest.ws.send(encodeInputMessage({ seq: 1, moveX: 1, moveY: 0, aim: 0, buttons: 0 }));
+    guest.ws.send(encodeInputMessage({ seq: 1, moveX: 1, moveY: 0, aim: 0, buttons: 0, slot: 1 }));
 
     // The host receives the input; the guest must NOT receive its own frame echoed back. Race the
     // guest's next game frame against the host's: the host's relayed input must arrive first.

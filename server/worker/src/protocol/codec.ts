@@ -8,6 +8,9 @@ export interface InputFrame {
   moveY: number;
   aim: number;
   buttons: number;
+  // The sender's slot — with up to 4 players the host must attribute each relayed frame. The relay
+  // overwrites this byte with the sender socket's real slot, so a client can only act as itself.
+  slot: number;
 }
 
 export interface TankState {
@@ -42,15 +45,25 @@ export interface ProjectileState {
   layer: number;
 }
 
+// The last input seq the host applied for one guest slot — the snapshot is a broadcast, so every
+// predicting guest finds its own reconciliation anchor in the list.
+export interface InputAck {
+  slot: number;
+  seq: number;
+}
+
 export interface SnapshotFrame {
   tick: number;
-  ackSeq: number;
+  acks: InputAck[];
   tanks: TankState[];
   wallDeltas: WallDelta[];
   projectiles: ProjectileState[];
 }
 
-export const INPUT_FRAME_SIZE = 17;
+// seq(4) + move(4+4) + aim(4) + buttons(1) + slot(1). The slot is deliberately the LAST byte of the
+// message so the relay can overwrite it without decoding the frame.
+export const INPUT_FRAME_SIZE = 18;
+export const INPUT_ACK_SIZE = 5;
 export const TANK_STATE_SIZE = 21;
 export const WALL_DELTA_SIZE = 6;
 export const PROJECTILE_STATE_SIZE = 14;
@@ -128,6 +141,7 @@ export function encodeInput(frame: InputFrame): Uint8Array {
   view.setFloat32(8, frame.moveY, true);
   view.setFloat32(12, frame.aim, true);
   view.setUint8(16, frame.buttons);
+  view.setUint8(17, frame.slot);
   return buffer;
 }
 
@@ -139,13 +153,15 @@ export function decodeInput(data: Uint8Array): InputFrame {
     moveY: view.getFloat32(8, true),
     aim: view.getFloat32(12, true),
     buttons: view.getUint8(16),
+    slot: view.getUint8(17),
   };
 }
 
 export function encodeSnapshot(frame: SnapshotFrame): Uint8Array {
   const size =
     4 +
-    4 +
+    1 +
+    frame.acks.length * INPUT_ACK_SIZE +
     1 +
     frame.tanks.length * TANK_STATE_SIZE +
     2 +
@@ -158,8 +174,16 @@ export function encodeSnapshot(frame: SnapshotFrame): Uint8Array {
 
   view.setUint32(offset, frame.tick, true);
   offset += 4;
-  view.setUint32(offset, frame.ackSeq, true);
-  offset += 4;
+
+  // One reconciliation ack per guest slot (count byte + pairs).
+  view.setUint8(offset, frame.acks.length);
+  offset += 1;
+  for (const ack of frame.acks) {
+    view.setUint8(offset, ack.slot);
+    offset += 1;
+    view.setUint32(offset, ack.seq, true);
+    offset += 4;
+  }
 
   view.setUint8(offset, frame.tanks.length);
   offset += 1;
@@ -221,8 +245,17 @@ export function decodeSnapshot(data: Uint8Array): SnapshotFrame {
 
   const tick = view.getUint32(offset, true);
   offset += 4;
-  const ackSeq = view.getUint32(offset, true);
-  offset += 4;
+
+  const ackCount = view.getUint8(offset);
+  offset += 1;
+  const acks: InputAck[] = [];
+  for (let i = 0; i < ackCount; i++) {
+    const slot = view.getUint8(offset);
+    offset += 1;
+    const seq = view.getUint32(offset, true);
+    offset += 4;
+    acks.push({ slot, seq });
+  }
 
   const tankCount = view.getUint8(offset);
   offset += 1;
@@ -281,5 +314,5 @@ export function decodeSnapshot(data: Uint8Array): SnapshotFrame {
     projectiles.push({ x, y, rotation, style, layer });
   }
 
-  return { tick, ackSeq, tanks, wallDeltas, projectiles };
+  return { tick, acks, tanks, wallDeltas, projectiles };
 }

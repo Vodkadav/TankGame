@@ -14,6 +14,8 @@ import {
   encodeLobbyState,
   decodeLobbyJson,
   MSG_LOBBY_CMD,
+  MSG_INPUT,
+  INPUT_FRAME_SIZE,
 } from "./protocol/codec";
 import {
   emptyLobby,
@@ -95,6 +97,12 @@ export class MatchRoom implements DurableObject {
       const command = decodeLobbyJson<LobbyCommand>(bytes);
       await this.apply({ ...command, slot: slotOf(sender) } as LobbyCommand);
       return;
+    }
+
+    // Same authority rule for game inputs: the sender's real slot is stamped over the frame's
+    // last byte (placed there so no decode is needed), so the host attributes it correctly.
+    if (bytes[0] === MSG_INPUT && bytes.length >= 1 + INPUT_FRAME_SIZE) {
+      bytes[INPUT_FRAME_SIZE] = slotOf(sender);
     }
 
     for (const target of this.relayTargets(slotOf(sender))) {

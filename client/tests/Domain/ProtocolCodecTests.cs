@@ -10,12 +10,15 @@ public class ProtocolCodecTests
     [Fact]
     public void InputFrame_RoundTrips()
     {
-        var original = new InputFrame(Seq: 42, MoveX: 0.25f, MoveY: -0.5f, Aim: 1.5f, Buttons: InputFrame.FireBit);
+        // Slot rides the frame so the host can attribute a relayed input among up to 4 players.
+        var original = new InputFrame(Seq: 42, MoveX: 0.25f, MoveY: -0.5f, Aim: 1.5f,
+            Buttons: InputFrame.FireBit, Slot: 3);
 
         var decoded = ProtocolCodec.DecodeInput(ProtocolCodec.EncodeInput(original));
 
         Assert.Equal(original, decoded);
         Assert.True(decoded.Fire);
+        Assert.Equal(3, decoded.Slot);
     }
 
     [Fact]
@@ -23,7 +26,7 @@ public class ProtocolCodecTests
     {
         var original = new SnapshotFrame(
             Tick: 100,
-            AckSeq: 41,
+            Acks: new List<InputAck> { new(1, 41) },
             Tanks: new List<TankState>
             {
                 new(Slot: 0, X: 64f, Y: 128f, Rotation: 0f, TurretRotation: 0.5f, Hp: 3, Team: 0, Shield: 4, Layer: 1),
@@ -62,7 +65,7 @@ public class ProtocolCodecTests
     {
         var original = new SnapshotFrame(
             Tick: 9,
-            AckSeq: 3,
+            Acks: new List<InputAck> { new(1, 3) },
             Tanks: new List<TankState>(),
             WallDeltas: new List<WallDelta>(),
             Projectiles: new List<ProjectileState>
@@ -76,13 +79,32 @@ public class ProtocolCodecTests
         Assert.Equal(original.Projectiles, decoded.Projectiles);
     }
 
+    [Fact]
+    public void Snapshot_CarriesOneAckPerGuestSlot_AndAckForFindsEachOwn()
+    {
+        // The snapshot is a broadcast: with 4 players every predicting guest must find its OWN
+        // reconciliation anchor in it, not share a single 2-player-era ack.
+        var original = new SnapshotFrame(
+            Tick: 5,
+            Acks: new List<InputAck> { new(1, 10), new(2, 20), new(3, 30) },
+            Tanks: new List<TankState>(),
+            WallDeltas: new List<WallDelta>(),
+            Projectiles: new List<ProjectileState>());
+
+        var decoded = ProtocolCodec.DecodeSnapshot(ProtocolCodec.EncodeSnapshot(original));
+
+        Assert.Equal(original.Acks, decoded.Acks);
+        Assert.Equal(20u, decoded.AckFor(2));
+        Assert.Equal(0u, decoded.AckFor(0)); // no anchor for the host — nothing to replay
+    }
+
     // Cross-language parity anchor: the TypeScript codec MUST produce these exact bytes for the
     // same frame (server/worker/src/protocol/codec.test.ts asserts the identical vector). All
     // float values are exact in IEEE-754 single precision so the bytes are unambiguous.
     [Fact]
     public void InputFrame_EncodesToTheCanonicalByteVector()
     {
-        var frame = new InputFrame(Seq: 1, MoveX: 1f, MoveY: -1f, Aim: 0.5f, Buttons: 1);
+        var frame = new InputFrame(Seq: 1, MoveX: 1f, MoveY: -1f, Aim: 0.5f, Buttons: 1, Slot: 2);
 
         var bytes = ProtocolCodec.EncodeInput(frame);
 
@@ -93,6 +115,7 @@ public class ProtocolCodecTests
             0x00, 0x00, 0x80, 0xBF, // moveY = -1.0
             0x00, 0x00, 0x00, 0x3F, // aim = 0.5
             0x01,                   // buttons = fire
+            0x02,                   // slot = 2 — LAST so the relay can stamp it without decoding
         }, bytes);
     }
 
@@ -101,7 +124,7 @@ public class ProtocolCodecTests
     [Fact]
     public void InputMessage_EncodesToTheTaggedCanonicalByteVector()
     {
-        var frame = new InputFrame(Seq: 1, MoveX: 1f, MoveY: -1f, Aim: 0.5f, Buttons: 1);
+        var frame = new InputFrame(Seq: 1, MoveX: 1f, MoveY: -1f, Aim: 0.5f, Buttons: 1, Slot: 2);
 
         var bytes = ProtocolCodec.EncodeInputMessage(frame);
 
@@ -113,6 +136,7 @@ public class ProtocolCodecTests
             0x00, 0x00, 0x80, 0xBF, // moveY = -1.0
             0x00, 0x00, 0x00, 0x3F, // aim = 0.5
             0x01,                   // buttons = fire
+            0x02,                   // slot = 2 (the relay overwrites this byte with the sender's)
         }, bytes);
         Assert.Equal(frame, ProtocolCodec.DecodeInput(bytes.AsSpan(1)));
     }
@@ -131,7 +155,7 @@ public class ProtocolCodecTests
     {
         var frame = new SnapshotFrame(
             Tick: 2,
-            AckSeq: 1,
+            Acks: new List<InputAck> { new(Slot: 1, Seq: 1) },
             Tanks: new List<TankState> { new(Slot: 0, X: 64f, Y: 128f, Rotation: 0f, TurretRotation: 0.5f, Hp: 3, Team: 1, Shield: 0, Layer: 0) },
             WallDeltas: new List<WallDelta> { new(CellX: 5, CellY: 6, Material: 1, Hp: 2) },
             Projectiles: new List<ProjectileState>());
@@ -141,7 +165,9 @@ public class ProtocolCodecTests
         Assert.Equal(new byte[]
         {
             0x02, 0x00, 0x00, 0x00, // tick = 2
-            0x01, 0x00, 0x00, 0x00, // ackSeq = 1
+            0x01,                   // ackCount = 1 (one anchor per guest slot)
+            0x01,                   // ack slot = 1
+            0x01, 0x00, 0x00, 0x00, // ack seq = 1
             0x01,                   // tankCount = 1
             0x00,                   // slot = 0
             0x00, 0x00, 0x80, 0x42, // x = 64.0

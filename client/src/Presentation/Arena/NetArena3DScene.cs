@@ -199,7 +199,7 @@ public partial class NetArena3DScene : Node3D
         {
             var input = _guestLocalInput.Read();
             var frame = new InputFrame(++_inputSeq, input.Move.X, input.Move.Y, input.Aim,
-                input.Fire ? InputFrame.FireBit : (byte)0);
+                input.Fire ? InputFrame.FireBit : (byte)0, _localSlot ?? 0);
             _transport.SendInput(frame);
             _predicted.Predict(frame);
             SyncLocalFromPrediction();
