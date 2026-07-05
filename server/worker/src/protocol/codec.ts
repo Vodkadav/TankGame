@@ -65,6 +65,38 @@ export const MSG_WELCOME = 1;
 export const MSG_SNAPSHOT = 2;
 export const MSG_INPUT = 3;
 
+// Lobby control rides the same socket as the game relay but is JSON, not fixed-layout binary: the
+// pre-game flow is low-rate and shape-churning, so a readable JSON payload behind a tag byte is the
+// right trade (the fixed binary frames above stay byte-parity-locked with C#). The DO consumes a
+// MSG_LOBBY_CMD itself (never relays it) and answers every member with MSG_LOBBY_STATE.
+export const MSG_LOBBY_STATE = 0x10; // server → all members: the current LobbyState as JSON
+export const MSG_LOBBY_CMD = 0x11; // client → server: a LobbyCommand as JSON (server stamps the slot)
+
+const LOBBY_TEXT = { encoder: new TextEncoder(), decoder: new TextDecoder() };
+
+function encodeTaggedJson(tag: number, value: unknown): Uint8Array {
+  const json = LOBBY_TEXT.encoder.encode(JSON.stringify(value));
+  const message = new Uint8Array(json.length + 1);
+  message[0] = tag;
+  message.set(json, 1);
+  return message;
+}
+
+/** `[MSG_LOBBY_STATE, ...utf8(JSON)]` — the lobby snapshot the DO pushes to every member. */
+export function encodeLobbyState(state: unknown): Uint8Array {
+  return encodeTaggedJson(MSG_LOBBY_STATE, state);
+}
+
+/** `[MSG_LOBBY_CMD, ...utf8(JSON)]` — a control command a client puts on the socket. */
+export function encodeLobbyCommand(command: unknown): Uint8Array {
+  return encodeTaggedJson(MSG_LOBBY_CMD, command);
+}
+
+/** Parse a tagged lobby message's JSON payload (drops the leading tag byte). */
+export function decodeLobbyJson<T>(message: Uint8Array): T {
+  return JSON.parse(LOBBY_TEXT.decoder.decode(message.subarray(1))) as T;
+}
+
 /** A welcome message: `[MSG_WELCOME, slot]`. Tells a freshly-joined client which slot it controls. */
 export function encodeWelcome(slot: number): Uint8Array {
   return new Uint8Array([MSG_WELCOME, slot & 0xff]);

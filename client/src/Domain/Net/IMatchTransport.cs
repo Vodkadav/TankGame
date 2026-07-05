@@ -43,4 +43,19 @@ public interface IMatchTransport
         add { }
         remove { }
     }
+
+    // ── Pre-game lobby (multiplayer milestone): the same socket carries the JSON lobby channel before
+    // the match starts. Default members so the many match-only fakes in tests stay untouched.
+
+    /// <summary>Raised when the server pushes a new lobby snapshot (slots/ready/mode/countdown).</summary>
+    event Action<LobbyView> LobbyStateReceived
+    {
+        add { }
+        remove { }
+    }
+
+    /// <summary>Sends a pre-game lobby command (already tag-encoded by <see cref="LobbyProtocol"/>).</summary>
+    void SendLobby(byte[] command)
+    {
+    }
 }
