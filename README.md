@@ -28,3 +28,22 @@ TankGame/
 ├── scripts/                 Developer tooling (Pester tests, hook installers)
 └── .github/workflows/       CI (ci.yml) and deploy (deploy.yml) pipelines
 ```
+
+## Branches
+
+- **`main`** — primary development line. A fresh clone lands here.
+- **`p8/web-export-refresh`** — long-lived branch that holds the browser/WASM
+  export of the game (Godot web build, deployed to Firebase Hosting via the
+  ProjectX arcade). Kept reconciled onto `main`'s gameplay batches.
+
+To continue web-export work on another machine, clone and check out the branch:
+
+```sh
+git clone https://github.com/Vodkadav/TankGame.git
+cd TankGame
+git checkout p8/web-export-refresh
+```
+
+(Locally it is often kept as a separate git worktree alongside `main` — e.g.
+`TankGame-web-export/` — but that is a per-machine convenience and does not need
+to be recreated; the branch carries everything.)
