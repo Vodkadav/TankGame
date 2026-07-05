@@ -151,6 +151,23 @@ public partial class TitleScene : Control
     private void PromptForName(System.Action proceed)
     {
         _afterNamePrompt = proceed;
+
+        // iPad Safari never raises a soft keyboard for a focused canvas LineEdit, so the in-game
+        // panel is un-typeable there — the browser's native prompt is the only way to a keyboard.
+        if (WebTextEntry.NeedsNativePrompt(OS.HasFeature("web"), DisplayServer.IsTouchscreenAvailable()))
+        {
+            var name = WebTextEntry.Prompt(Tr("title.name_prompt"), GameSetup.PlayerName);
+            if (name is null)
+            {
+                CancelNamePrompt();
+                return;
+            }
+
+            _nameEntry.Text = name;
+            ConfirmName();
+            return;
+        }
+
         _nameEntry.Text = GameSetup.PlayerName;
         _namePrompt.Visible = true;
         _nameEntry.GrabFocus();
