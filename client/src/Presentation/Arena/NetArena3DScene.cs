@@ -172,6 +172,15 @@ public partial class NetArena3DScene : Node3D
 
         _transport.WelcomeReceived += OnWelcome;
         _transport.SnapshotReceived += OnSnapshot;
+
+        // The welcome is a one-shot fired on connect — during the lobby, before this scene existed.
+        // The room scene carried our slot across the handoff, so adopt it now rather than waiting for
+        // a second welcome that never comes. (A live test still drives OnWelcome via the transport;
+        // that path sets LocalSlot itself, so both routes converge.)
+        if (NetworkSession.LocalSlot is byte carried)
+        {
+            OnWelcome(carried);
+        }
     }
 
     // A versus match has no pause (you can't freeze the other player), so the pause-menu route to an
@@ -268,6 +277,11 @@ public partial class NetArena3DScene : Node3D
     // table, so host truth and guest prediction agree from the first tick.
     private void OnWelcome(byte slot)
     {
+        if (_localSlot is not null)
+        {
+            return; // already welcomed (slot carried from the lobby, or a duplicate push) — one setup only
+        }
+
         _localSlot = slot;
         _roster = NetRoster.Build(
             NetworkSession.StartedLobby, slot, NetworkSession.ActiveCode, LobbyProtocol.MaxPlayers);
