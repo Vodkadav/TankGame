@@ -24,9 +24,24 @@ interface Env {
 
 const JOIN_ROUTE = /^\/lobby\/([^/]+)\/join$/;
 
+// The WASM client on lundrea-arcade.web.app calls the lobby routes cross-origin; without these
+// headers the browser blocks every response. Public game API, no credentials — "*" is right.
+const CORS = { "Access-Control-Allow-Origin": "*" };
+
 const handler: ExportedHandler<Env> = {
   async fetch(request, env, _ctx) {
     const url = new URL(request.url);
+
+    if (request.method === "OPTIONS") {
+      return new Response(null, {
+        status: 204,
+        headers: {
+          ...CORS,
+          "Access-Control-Allow-Methods": "GET, POST",
+          "Access-Control-Allow-Headers": "Content-Type",
+        },
+      });
+    }
 
     if (request.method === "GET" && url.pathname === "/healthz") {
       return new Response("ok", { status: 200 });
@@ -38,18 +53,20 @@ const handler: ExportedHandler<Env> = {
     // Lobby registry (M3-T4): create a lobby code, or validate a join.
     if (request.method === "POST" && url.pathname === "/lobby") {
       const lobby = await createLobby(env.LOBBY_KV, env.MATCH_ROOM);
-      return Response.json(lobby, { status: 201 });
+      return Response.json(lobby, { status: 201, headers: CORS });
     }
 
     // Lobby browser (multiplayer milestone): every currently-joinable lobby, for the in-client list.
     if (request.method === "GET" && url.pathname === "/lobbies") {
       const open = await listOpenLobbies(env.LOBBY_KV as unknown as LobbyMetaStore);
-      return Response.json(open);
+      return Response.json(open, { headers: CORS });
     }
     const joinMatch = JOIN_ROUTE.exec(url.pathname);
     if (request.method === "POST" && joinMatch) {
       const joined = await joinLobby(env.LOBBY_KV, joinMatch[1]);
-      return joined ? Response.json(joined) : new Response("no such lobby", { status: 404 });
+      return joined
+        ? Response.json(joined, { headers: CORS })
+        : new Response("no such lobby", { status: 404, headers: CORS });
     }
 
     // /room/:code → the lobby's Durable Object (one DO per code). The DO handles the WebSocket
