@@ -13,9 +13,11 @@ namespace TankGame.Tests.Presentation;
 // Drives the lobby browser (plan Phases 3–4) against a fake directory and a fake transport — no
 // HTTP, no socket. The fakes complete synchronously, so the async click handlers run to completion
 // within the press call and the asserts can run straight after.
-public class LobbyBrowserSceneTests : TestClass
+public partial class LobbyBrowserSceneTests : TestClass
 {
-    private sealed class FakeLobby : ILobbyClient
+    // A Node, like the web build's GodotHttpLobbyClient — so these tests also cover the browser
+    // parenting a Node-based client into the tree (without a parent its requests never pump).
+    private sealed partial class FakeLobby : Node, ILobbyClient
     {
         public string? CodeToMint { get; set; } = "NEW001";
         public bool KnowsEveryCode { get; set; } = true;
@@ -113,6 +115,17 @@ public class LobbyBrowserSceneTests : TestClass
         if (Find("Empty") is not Label { Visible: false })
         {
             throw new Exception("The empty-list note must hide when games are listed.");
+        }
+    }
+
+    [Test]
+    public void ANodeLobbyClient_IsParentedIntoTheTree()
+    {
+        if (_lobby.GetParent() is null)
+        {
+            throw new Exception(
+                "A Node-based lobby client (the web build's GodotHttpLobbyClient) must be added " +
+                "to the tree, or its HTTP requests never pump.");
         }
     }
 
