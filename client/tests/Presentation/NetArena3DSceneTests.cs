@@ -220,6 +220,37 @@ public class NetArena3DSceneTests : TestClass
         }
     }
 
+    // Regression: the welcome is a one-shot fired on connect, during the lobby — long before this
+    // scene exists. Production hands off with the slot carried on NetworkSession and NO second welcome
+    // on the wire; the scene must still initialize from the carried slot (else: no tanks, stuck
+    // "Connecting…", "pressing start does nothing"). A fresh scene is built here so its _Ready runs
+    // after the slot is set, matching the real handoff order.
+    [Test]
+    public void CarriedSlot_InitializesTheMatch_WithoutASecondWelcome()
+    {
+        NetworkSession.LocalSlot = 0;
+        var scene = GD.Load<PackedScene>("res://src/Presentation/Arena/NetArena3D.tscn")
+            .Instantiate<NetArena3DScene>();
+        TestScene.AddChild(scene);
+
+        try
+        {
+            if (scene.LocalSlot != 0)
+            {
+                throw new Exception($"The carried lobby slot must be adopted on ready; got {scene.LocalSlot}.");
+            }
+
+            if (!scene.Tanks.ContainsKey(0) || !scene.Tanks.ContainsKey(1))
+            {
+                throw new Exception("Adopting the carried slot must build the authoritative match tanks.");
+            }
+        }
+        finally
+        {
+            scene.Free();
+        }
+    }
+
     [Test]
     public void GuestSnapshot_DetectsTheDecidedRound_AndNamesTheWinner()
     {
