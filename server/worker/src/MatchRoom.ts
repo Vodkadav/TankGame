@@ -24,7 +24,7 @@ import {
   type LobbyState,
   type LobbyCommand,
 } from "./lobbyState";
-import { publishLobby, type LobbyMetaStore } from "./lobbyDirectory";
+import { publishToDirectory } from "./lobbyDirectory";
 
 const LOBBY_KEY = "lobby";
 const CODE_KEY = "code";
@@ -36,6 +36,7 @@ interface Attachment {
 
 interface RoomEnv {
   LOBBY_KV: KVNamespace;
+  LOBBY_DIRECTORY: DurableObjectNamespace;
 }
 
 export class MatchRoom implements DurableObject {
@@ -140,7 +141,8 @@ export class MatchRoom implements DurableObject {
 
     // Keep this room's entry in the lobby browser in step with its joinability.
     if (this.code !== "") {
-      await publishLobby(this.env.LOBBY_KV as unknown as LobbyMetaStore, this.lobby, this.code);
+      const directory = this.env.LOBBY_DIRECTORY.get(this.env.LOBBY_DIRECTORY.idFromName("global"));
+      await publishToDirectory(directory, this.lobby, this.code);
     }
 
     if (this.lobby.phase === "countdown") {
