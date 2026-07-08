@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 using TankGame.Domain;
 using TankGame.GameLogic;
 using Xunit;
@@ -135,6 +136,96 @@ public class CliffsArenaTests
             Assert.DoesNotContain((pad.AX, pad.AY), layout.EnemySpawns);
             Assert.DoesNotContain((pad.BX, pad.BY), layout.EnemySpawns);
         }
+    }
+
+    // ── Scaled to seat 8 players (issue #5, ADD-8) ──
+    [Fact]
+    public void Create_ScalesTheFieldToRoughlyDouble()
+    {
+        var map = CliffsArena.Create().Map;
+
+        Assert.Equal(40, map.Width);
+        Assert.Equal(32, map.Height);
+    }
+
+    [Fact]
+    public void Create_ProvidesEightDistinctReachableSpawns()
+    {
+        var layout = CliffsArena.Create();
+        var map = layout.Map;
+
+        var starts = new List<(int X, int Y)> { layout.PlayerSpawn };
+        starts.AddRange(layout.EnemySpawns);
+        Assert.Equal(8, starts.Count);
+        Assert.Equal(8, new HashSet<(int, int)>(starts).Count); // all distinct
+
+        var reachable = ReachableFromSpawn(map, layout.PlayerSpawn);
+        foreach (var (sx, sy) in starts)
+        {
+            Assert.Equal(CellMaterial.Floor, map.Materials[sx, sy]);
+            Assert.Equal(0, map.LayerAt(sx, sy)); // every start on the valley floor
+            Assert.True(reachable.Contains((sx, sy)), $"start ({sx},{sy}) is walled off");
+        }
+    }
+
+    [Fact]
+    public void Create_SpawnsArePointSymmetric_SoNoSideHasAnUnfairStart()
+    {
+        var layout = CliffsArena.Create();
+        var map = layout.Map;
+
+        var starts = new HashSet<(int, int)> { layout.PlayerSpawn };
+        foreach (var e in layout.EnemySpawns)
+        {
+            starts.Add(e);
+        }
+
+        // The whole start set is invariant under a 180° rotation about the field centre.
+        foreach (var (x, y) in starts)
+        {
+            Assert.Contains((map.Width - 1 - x, map.Height - 1 - y), starts);
+        }
+
+        // …and the raised plateau is centred: every layer-1 cell's rotation is also layer-1.
+        for (var x = 0; x < map.Width; x++)
+        {
+            for (var y = 0; y < map.Height; y++)
+            {
+                if (map.LayerAt(x, y) == 1)
+                {
+                    Assert.Equal(1, map.LayerAt(map.Width - 1 - x, map.Height - 1 - y));
+                }
+            }
+        }
+    }
+
+    [Fact]
+    public void Create_ProducesAMapThatPassesTheValidator()
+    {
+        var layout = CliffsArena.Create();
+        var map = layout.Map;
+
+        var layers = new int[map.Width, map.Height];
+        var ramps = new bool[map.Width, map.Height];
+        var sandbags = new bool[map.Width, map.Height];
+        for (var x = 0; x < map.Width; x++)
+        {
+            for (var y = 0; y < map.Height; y++)
+            {
+                layers[x, y] = map.LayerAt(x, y);
+                ramps[x, y] = map.IsRamp(x, y);
+            }
+        }
+
+        var definition = new MapDefinition(
+            "Cliffs", map.Materials, map.Bushes, sandbags,
+            layout.PlayerSpawn, layout.EnemySpawns,
+            layout.Powerups.Select(p => new PowerupSpawn(p.Kind, p.X, p.Y)).ToList(),
+            layout.Pads, layers, ramps);
+
+        var result = MapValidator.Validate(definition);
+
+        Assert.True(result.IsValid, string.Join(", ", result.Errors));
     }
 
     // Layer-aware flood fill: a tank moves between two adjacent floor cells only when their layers
