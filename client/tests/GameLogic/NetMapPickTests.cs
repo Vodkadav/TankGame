@@ -34,4 +34,16 @@ public class NetMapPickTests
     {
         Assert.IsType<NetMapPick.Desert>(NetMapPick.Resolve("custom:my-maze", "ABC123"));
     }
+
+    [Theory]
+    [InlineData("Forest")]
+    [InlineData("Volcano")]
+    [InlineData("City")]
+    [InlineData("Frozen")]
+    [InlineData("Canyon")]
+    public void ARegisteredCodeArena_ResolvesToBuiltIn_SoEveryMemberBuildsIt(string arenaId)
+    {
+        var choice = Assert.IsType<NetMapPick.BuiltIn>(NetMapPick.Resolve(arenaId, "ABC123"));
+        Assert.Equal(arenaId, choice.ArenaId);
+    }
 }

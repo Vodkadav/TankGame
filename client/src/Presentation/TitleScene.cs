@@ -202,7 +202,11 @@ public partial class TitleScene : Control
     }
 
     private const string MapsDir = "user://maps";
-    private static readonly ArenaId[] BuiltInArenas = { ArenaId.DesertWar, ArenaId.CliffsAndValleys };
+    private static readonly ArenaId[] BuiltInArenas =
+    {
+        ArenaId.DesertWar, ArenaId.CliffsAndValleys,
+        ArenaId.Forest, ArenaId.Volcano, ArenaId.City, ArenaId.Frozen, ArenaId.Canyon,
+    };
     private static readonly Random SoloMapRng = new();
 
     private void StartSolo()

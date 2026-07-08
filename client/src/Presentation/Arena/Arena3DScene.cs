@@ -100,6 +100,7 @@ public partial class Arena3DScene : Node3D
     private Teleporter _teleporter = null!;
     private readonly List<TeleportPad3DView> _padViews = new();
     private IReadOnlyList<TeleportPadLink> _authoredPads = Array.Empty<TeleportPadLink>();
+    private GroundTheme _groundTheme = GroundTheme.Sand;
     /// <summary>Per-tank combat stats for this match — the end-of-match screen reads it.</summary>
     public BattleStats Stats { get; private set; } = null!;
 
@@ -608,6 +609,19 @@ public partial class Arena3DScene : Node3D
             _powerupPlacements = cliffs.Powerups;
             _authoredPads = cliffs.Pads; // the cross-layer valley↔plateau pair (teleport pads T3)
         }
+        else if (ArenaBuilders.TryGet(GameSetup.Arena.ToString(), out var builder))
+        {
+            // A themed code arena (Forest/Volcano/City/Frozen/Canyon): the builder seam returns a whole
+            // layout the same shape as Cliffs, so guests and host build the identical level.
+            var layout = builder.Build();
+            level = layout.Map;
+            sandbags = layout.Sandbags;
+            _playerSpawn = layout.PlayerSpawn;
+            _enemySpawns = layout.EnemySpawns;
+            _powerupPlacements = layout.Powerups;
+            _authoredPads = layout.Pads;
+            _groundTheme = layout.GroundTheme;
+        }
         else
         {
             var dim = Mathf.Max(GameSetup.ArenaWidth, GameSetup.ArenaHeight); // a square arena, not oblong
@@ -1040,8 +1054,9 @@ public partial class Arena3DScene : Node3D
         var w = widthCells * TileSize;
         var h = heightCells * TileSize;
 
-        // A custom map brings its authored ground tileset; the built-in arenas keep the sandy look.
-        var theme = GameSetup.CustomMap?.GroundTheme ?? GroundTheme.Sand;
+        // A custom map brings its authored ground tileset; a themed code arena carries its own theme;
+        // the classic built-ins (Desert/Cliffs) keep the sandy look.
+        var theme = GameSetup.CustomMap?.GroundTheme ?? _groundTheme;
         var ground = new MeshInstance3D
         {
             Name = "Ground",

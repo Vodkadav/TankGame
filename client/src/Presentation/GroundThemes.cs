@@ -57,6 +57,13 @@ public static class GroundThemes
             new Color(0.52f, 0.52f, 0.53f), // worn asphalt
             new Color(0.40f, 0.40f, 0.41f), // patch repair
         },
+        GroundTheme.Volcano => new[]
+        {
+            new Color(0.08f, 0.07f, 0.07f), // scorched basalt
+            new Color(0.14f, 0.10f, 0.09f), // cooled crust
+            new Color(0.28f, 0.12f, 0.06f), // dull ember glow
+            new Color(0.11f, 0.09f, 0.08f), // charred ash
+        },
         _ => new[] // Sand — the launch patchwork
         {
             new Color(0.40f, 0.47f, 0.30f), // green

@@ -16,6 +16,10 @@ public static class NetMapPick
     /// <summary>The hand-authored Cliffs &amp; Valleys map — deterministic from code alone.</summary>
     public sealed record Cliffs : Choice;
 
+    /// <summary>A registered code arena (<see cref="ArenaBuilders"/>) built by its id name — deterministic
+    /// from code alone, so a guest builds the very same level the host chose.</summary>
+    public sealed record BuiltIn(string ArenaId) : Choice;
+
     public static Choice Resolve(string map, string lobbyCode)
     {
         var seed = StableHash.Of(lobbyCode);
@@ -24,6 +28,7 @@ public static class NetMapPick
             "CliffsAndValleys" => new Cliffs(),
             "DesertWar" => new Desert(seed),
             "" => (seed & 1) == 0 ? new Desert(seed) : new Cliffs(), // random: a shared coin flip
+            _ when ArenaBuilders.Has(map) => new BuiltIn(map), // a themed code arena — same on every member
             _ => new Desert(seed),
         };
     }

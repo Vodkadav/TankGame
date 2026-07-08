@@ -26,7 +26,11 @@ public partial class LobbyBrowserScene : Control
     /// built-in arena name.</summary>
     public const string CustomMapPrefix = "custom:";
 
-    private static readonly ArenaId[] BuiltInArenas = { ArenaId.DesertWar, ArenaId.CliffsAndValleys };
+    private static readonly ArenaId[] BuiltInArenas =
+    {
+        ArenaId.DesertWar, ArenaId.CliffsAndValleys,
+        ArenaId.Forest, ArenaId.Volcano, ArenaId.City, ArenaId.Frozen, ArenaId.Canyon,
+    };
 
     private ILobbyClient _lobby = null!;
     private VBoxContainer _list = null!;
@@ -291,6 +295,11 @@ public partial class LobbyBrowserScene : Control
         "" => "browser.map_random",
         "DesertWar" => "map.desert_war",
         "CliffsAndValleys" => "map.cliffs_and_valleys",
+        "Forest" => "map.forest",
+        "Volcano" => "map.volcano",
+        "City" => "map.city",
+        "Frozen" => "map.frozen",
+        "Canyon" => "map.canyon",
         _ when mapId.StartsWith(CustomMapPrefix, System.StringComparison.Ordinal) =>
             mapId[CustomMapPrefix.Length..],
         _ => mapId,

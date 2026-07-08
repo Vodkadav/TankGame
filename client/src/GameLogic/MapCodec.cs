@@ -40,6 +40,7 @@ public static class MapCodec
             [CellMaterial.Bridge] = '=',
             [CellMaterial.Mountain] = '^',
             [CellMaterial.Building] = 'B',
+            [CellMaterial.Lava] = 'L',
         };
 
     private static readonly IReadOnlyDictionary<char, CellMaterial> GlyphMaterial = InvertGlyphs();

@@ -25,6 +25,11 @@ public enum CellMaterial
 
     /// <summary>A building — a solid, indestructible block; generated as small rectangles.</summary>
     Building,
+
+    /// <summary>Lava — a lethal hazard: passable to movement and shots (like water lets shots fly over),
+    /// but a tank that drives onto a lava cell is destroyed. A bridge over lava crosses it safely.
+    /// Appended last so its wire byte (the enum ordinal, HostSession) stays stable.</summary>
+    Lava,
 }
 
 /// <summary>Per-material blocking rules. A cell can block movement, shots, both, or neither, so terrain
@@ -35,16 +40,22 @@ public static class CellMaterials
     /// <summary>Whether a tank cannot drive onto this material.</summary>
     public static bool BlocksMovement(CellMaterial material) => material switch
     {
-        CellMaterial.Floor or CellMaterial.Bridge => false,
+        // Floor and bridges are open; lava is drivable-onto (but lethal — the tank resolves the kill).
+        CellMaterial.Floor or CellMaterial.Bridge or CellMaterial.Lava => false,
         _ => true, // brick, steel, crate, water (and future solids) all stop a tank
     };
 
     /// <summary>Whether a shot cannot pass over this material.</summary>
     public static bool BlocksShots(CellMaterial material) => material switch
     {
-        CellMaterial.Floor or CellMaterial.Bridge or CellMaterial.Water => false,
-        _ => true, // brick, steel, crate (and future solids) stop a shot; water lets it fly over
+        // Water and lava let a shot fly over; bridges and floor are open.
+        CellMaterial.Floor or CellMaterial.Bridge or CellMaterial.Water or CellMaterial.Lava => false,
+        _ => true, // brick, steel, crate (and future solids) stop a shot
     };
+
+    /// <summary>Whether standing on this material kills a tank (lava). Pure rule so the tank's
+    /// step can resolve the lethal hazard without knowing about materials elsewhere.</summary>
+    public static bool IsLethal(CellMaterial material) => material == CellMaterial.Lava;
 }
 
 /// <summary>One cell of the wall grid: its material and remaining hit points. A
