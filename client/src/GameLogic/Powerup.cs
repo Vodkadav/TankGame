@@ -47,7 +47,7 @@ public sealed class Powerup : IPowerup
         float pickupRadius, bool dropOnCarrierDeath = false, float respawnCooldown = 0f,
         float despawnAfter = 0f)
     {
-        Id = Guid.NewGuid();
+        Id = EntityId.Next();
         _world = world;
         Position = position;
         Kind = kind;

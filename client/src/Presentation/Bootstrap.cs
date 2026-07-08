@@ -1,6 +1,6 @@
 using Godot;
 using TankGame.Infrastructure;
-#if DEBUG
+#if DEBUG && !GODOT_WEB
 using System.Reflection;
 using Chickensoft.GoDotTest;
 #endif
@@ -14,13 +14,13 @@ namespace TankGame.Presentation;
 // the runner. Test wiring is DEBUG-only, so ExportRelease builds exclude it.
 public partial class Bootstrap : Node
 {
-#if DEBUG
+#if DEBUG && !GODOT_WEB
     private TestEnvironment _environment = default!;
 #endif
 
     public override void _Ready()
     {
-#if DEBUG
+#if DEBUG && !GODOT_WEB
         _environment = TestEnvironment.From(OS.GetCmdlineArgs());
         if (_environment.ShouldRunTests)
         {
@@ -29,7 +29,9 @@ public partial class Bootstrap : Node
         }
 #endif
         // App init happens once here (the composition root), then the play scene loads.
-        SentryBootstrap.Init();
+#if !GODOT_WEB
+        SentryBootstrap.Init(); // Sentry's .NET SDK isn't WASM-compatible; web builds skip it.
+#endif
         TranslationLoader.EnsureLoaded();
 
         // Deferred: the scene tree is mid-add during _Ready and rejects an
@@ -38,7 +40,7 @@ public partial class Bootstrap : Node
             SceneTree.MethodName.ChangeSceneToFile, "res://src/Presentation/Title.tscn");
     }
 
-#if DEBUG
+#if DEBUG && !GODOT_WEB
     private void RunTests()
         => _ = GoTest.RunTests(Assembly.GetExecutingAssembly(), this, _environment);
 #endif

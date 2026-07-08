@@ -17,7 +17,9 @@ public static class TranslationLoader
         var file = FileAccess.Open(CsvPath, FileAccess.ModeFlags.Read);
         if (file is null)
         {
-            GD.PushError($"TranslationLoader: cannot open {CsvPath}");
+            // Exported builds (e.g. web) don't ship the raw CSV — Godot imports it to
+            // per-locale .translation resources and only those are packed. Load them.
+            LoadImportedTranslations();
             return;
         }
 
@@ -64,6 +66,21 @@ public static class TranslationLoader
         foreach (var translation in translations)
         {
             TranslationServer.AddTranslation(translation);
+        }
+
+        _loaded = true;
+    }
+
+    // The CSV header order is keys,en,es,dk; the importer emits one .translation per locale.
+    private static void LoadImportedTranslations()
+    {
+        foreach (var locale in new[] { "en", "es", "dk" })
+        {
+            var translation = GD.Load<Translation>($"res://i18n/strings.{locale}.translation");
+            if (translation is not null)
+            {
+                TranslationServer.AddTranslation(translation);
+            }
         }
 
         _loaded = true;

@@ -105,7 +105,7 @@ public static class GameSetup
     {
         Mode = mode;
         Series = new SeriesTracker(RoundsToWin);
-        ArenaSeed = Guid.NewGuid().GetHashCode();
+        ArenaSeed = EntityId.Next().GetHashCode(); // Guid.NewGuid is constant on WASM (no crypto RNG)
         CustomMap = null; // a fresh match defaults to the built-in arena; My Maps sets it back after
     }
 

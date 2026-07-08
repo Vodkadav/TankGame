@@ -11,7 +11,7 @@ namespace TankGame.GameLogic;
 /// always true (the scene shows or hides shots by rebuilding from each snapshot, not by reaping).</summary>
 public sealed class NetProjectile : IProjectile
 {
-    public Guid Id { get; } = Guid.NewGuid();
+    public Guid Id { get; } = EntityId.Next();
     public Vector2 Position { get; set; }
     public Vector2 Direction { get; set; }
     public int Team { get; set; }

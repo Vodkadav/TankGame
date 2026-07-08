@@ -68,7 +68,7 @@ public sealed class Tank : ITank
         string displayName = "",
         Func<Vector2>? respawnPoint = null)
     {
-        Id = Guid.NewGuid();
+        Id = EntityId.Next();
         MaxHp = maxHp;
         Hp = maxHp;
         Team = team;
