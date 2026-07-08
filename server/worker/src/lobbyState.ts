@@ -1,7 +1,8 @@
 // The pre-game lobby state machine (multiplayer milestone, web-export.md §5). One MatchRoom DO owns a
 // LobbyState; clients send LobbyCommands over a JSON control channel and the DO broadcasts the new
-// state. Up to 4 players pick a mode (free-for-all or two teams), ready up, and any player can start
-// the match — a short countdown then hands off to the binary game relay. This module is the pure,
+// state. Up to 8 players pick a mode (free-for-all or two teams), ready up, and any player can start
+// the match — a short countdown, then a loading handshake, then a hand-off to the binary game relay.
+// This module is the pure,
 // engine-free heart of that flow so it is exhaustively unit-testable (the DO is a thin shell over it).
 
 // 8 seats per room (owner ask 2026-07-08, raised from 4): the client room UI, the spawn table
@@ -107,11 +108,14 @@ function leave(state: LobbyState, slot: number): LobbyState {
   // loading handshake), sending the room back to waiting with the load flags + seed cleared.
   const aborts =
     (state.phase === "countdown" || state.phase === "loading") && players.length < MIN_PLAYERS_TO_START;
+  // If the player who left was the last one still loading, everyone remaining is loaded — start now
+  // rather than hang forever waiting for a "loaded" command that will never arrive.
+  const finishesLoading = !aborts && state.phase === "loading" && players.every((p) => p.loaded);
   return {
     ...state,
     players: aborts ? players.map((p) => ({ ...p, loaded: false })) : players,
     hostSlot,
-    phase: aborts ? "waiting" : state.phase,
+    phase: aborts ? "waiting" : finishesLoading ? "started" : state.phase,
     countdown: aborts ? 0 : state.countdown,
     seed: aborts ? 0 : state.seed,
   };

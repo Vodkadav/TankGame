@@ -167,6 +167,19 @@ describe("lobby state reducer", () => {
     expect(state.phase).toBe("started"); // all seated players loaded
   });
 
+  it("starts when the last un-loaded player leaves and everyone remaining is loaded", () => {
+    // Two seated, in loading, slot 0 loaded but slot 1 not. If slot 1 disconnects, the remaining
+    // players are all loaded — the room must start rather than hang waiting for a "loaded" that
+    // never comes (leave-during-loading deadlock).
+    let state = run(joinN(2), { type: "setReady", slot: 1, ready: true }, { type: "start", slot: 0 });
+    for (let i = 0; i < COUNTDOWN_SECONDS; i++) state = reduce(state, { type: "tick" });
+    state = reduce(state, { type: "loaded", slot: 0 });
+    expect(state.phase).toBe("loading"); // slot 1 still loading
+
+    state = reduce(state, { type: "leave", slot: 1 });
+    expect(state.phase).toBe("started");
+  });
+
   it("ignores a loaded command outside the loading phase", () => {
     const waiting = reduce(joinN(2), { type: "loaded", slot: 0 });
     expect(waiting.players[0].loaded).toBe(false);

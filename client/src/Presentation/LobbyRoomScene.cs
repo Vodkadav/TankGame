@@ -172,10 +172,14 @@ public partial class LobbyRoomScene : Control
             _lastHostSlot = view.HostSlot;
         }
 
-        if (_controller.HasStarted)
+        // Hand off as soon as the room enters loading (not started): each client leaves the room here
+        // to build its arena, reports "loaded" when ready, and the arena holds on a loading banner
+        // until the server sees every seated player loaded and flips to started. (HasStarted is kept
+        // for a client that somehow only observes the started push — e.g. a dropped loading frame.)
+        if (_controller.IsLoading || _controller.HasStarted)
         {
-            // Snapshot the final roster (slots, names, teams, mode, map) and our own slot for the play
-            // scene — the welcome that carried the slot is a one-shot that already fired here.
+            // Snapshot the final roster (slots, names, teams, mode, map, seed) and our own slot for the
+            // play scene — the welcome that carried the slot is a one-shot that already fired here.
             NetworkSession.StartedLobby = _controller.State;
             NetworkSession.LocalSlot = _controller.LocalSlot;
             Go(NetArenaScenePath);

@@ -53,6 +53,11 @@ public partial class NetArena3DScene : Node3D
     private float _accumulator;
     private byte? _localSlot;
 
+    // The loading handshake (issue #2): when we enter during the lobby's "loading" phase we report our
+    // arena is built and then hold — no ticks, no snapshots — until the server flips to "started"
+    // (every seated player loaded). A session with no lobby (old 2-player tests) plays immediately.
+    private bool _awaitingStart;
+
     // The seating plan from the lobby's final roster (placeholder-named AI on empty seats), the
     // shared four-cell spawn table both roles derive identically, and the host's authoritative
     // round state.
@@ -172,6 +177,10 @@ public partial class NetArena3DScene : Node3D
 
         _transport.WelcomeReceived += OnWelcome;
         _transport.SnapshotReceived += OnSnapshot;
+        _transport.LobbyStateReceived += OnLobbyState;
+
+        // If the room handed off during "loading", hold the match until every seated player is in.
+        _awaitingStart = NetworkSession.StartedLobby?.Phase == LobbyPhase.Loading;
 
         // The welcome is a one-shot fired on connect — during the lobby, before this scene existed.
         // The room scene carried our slot across the handoff, so adopt it now rather than waiting for
@@ -180,6 +189,23 @@ public partial class NetArena3DScene : Node3D
         if (NetworkSession.LocalSlot is byte carried)
         {
             OnWelcome(carried);
+        }
+
+        // Our arena is fully built — report loaded so the server can start once everyone else is too.
+        if (_awaitingStart)
+        {
+            _transport.SendLobby(LobbyProtocol.EncodeLoaded());
+        }
+    }
+
+    // The lobby keeps pushing state through the loading phase; the flip to "started" (all seated
+    // players loaded, or the last laggard left — server-side) releases the match to run.
+    private void OnLobbyState(LobbyView view)
+    {
+        if (_awaitingStart && view.Phase == LobbyPhase.Started)
+        {
+            _awaitingStart = false;
+            _status.SetStatus(NetStatusOverlay.ConnectedKey);
         }
     }
 
@@ -231,9 +257,9 @@ public partial class NetArena3DScene : Node3D
     {
         _transport.Poll();
 
-        if (_localSlot is null)
+        if (_localSlot is null || _awaitingStart)
         {
-            return; // not yet welcomed
+            return; // not yet welcomed, or holding on the loading banner until every player is in
         }
 
         _accumulator += delta;
@@ -296,7 +322,7 @@ public partial class NetArena3DScene : Node3D
             BecomeGuest(slot);
         }
 
-        _status.SetStatus(NetStatusOverlay.ConnectedKey);
+        _status.SetStatus(_awaitingStart ? NetStatusOverlay.LoadingKey : NetStatusOverlay.ConnectedKey);
     }
 
     private void BecomeHost()
