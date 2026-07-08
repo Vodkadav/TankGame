@@ -1,28 +1,33 @@
+import { env } from "cloudflare:test";
 import { describe, it, expect } from "vitest";
 import {
   summarize,
-  publishLobby,
+  publishToDirectory,
   listOpenLobbies,
-  OPEN_PREFIX,
-  type LobbyMetaStore,
+  type DirectoryStub,
   type OpenLobby,
 } from "./lobbyDirectory";
 import { emptyLobby, reduce, MAX_PLAYERS, type LobbyState } from "./lobbyState";
 
-class FakeMetaStore implements LobbyMetaStore {
-  readonly map = new Map<string, OpenLobby>();
-  async list(options: { prefix: string }) {
-    return {
-      keys: [...this.map.entries()]
-        .filter(([name]) => name.startsWith(options.prefix))
-        .map(([name, metadata]) => ({ name, metadata })),
-    };
-  }
-  async put(key: string, _value: string, options: { metadata: OpenLobby }) {
-    this.map.set(key, options.metadata);
-  }
-  async delete(key: string) {
-    this.map.delete(key);
+// An honest fake of the LobbyDirectory DO: same /publish + /list contract as the real class, so a
+// test that passes against it would pass against the deployed DO. (Rule: honest fakes over mocks.)
+class FakeDirectory implements DirectoryStub {
+  readonly entries = new Map<string, OpenLobby>();
+  async fetch(input: string, init?: RequestInit): Promise<Response> {
+    const url = new URL(input);
+    if (init?.method === "POST" && url.pathname === "/publish") {
+      const { code, summary } = JSON.parse(init.body as string) as { code: string; summary: OpenLobby | null };
+      if (summary) {
+        this.entries.set(code, summary);
+      } else {
+        this.entries.delete(code);
+      }
+      return new Response(null, { status: 204 });
+    }
+    if (url.pathname === "/list") {
+      return Response.json([...this.entries.values()]);
+    }
+    return new Response("not found", { status: 404 });
   }
 }
 
@@ -34,7 +39,7 @@ function lobbyWith(players: number, mode: "ffa" | "team" = "ffa"): LobbyState {
   return state;
 }
 
-describe("lobby directory", () => {
+describe("lobby directory summary", () => {
   it("summarizes a joinable waiting lobby", () => {
     expect(summarize(lobbyWith(2, "team"), "ABCDEF")).toEqual({
       code: "ABCDEF",
@@ -62,26 +67,41 @@ describe("lobby directory", () => {
     const counting = reduce(lobbyWith(2), { type: "start", slot: 0 });
     expect(summarize(counting, "GO0001")).toBeNull();
   });
+});
 
+describe("directory publish/list against a fake stub", () => {
   it("publishes a joinable lobby and withdraws it once it is no longer joinable", async () => {
-    const store = new FakeMetaStore();
+    const dir = new FakeDirectory();
 
-    await publishLobby(store, lobbyWith(2), "ROOM01");
-    expect(store.map.has(OPEN_PREFIX + "ROOM01")).toBe(true);
+    await publishToDirectory(dir, lobbyWith(2), "ROOM01");
+    expect(dir.entries.has("ROOM01")).toBe(true);
 
     // Filling the room withdraws it from the browser.
-    await publishLobby(store, lobbyWith(MAX_PLAYERS), "ROOM01");
-    expect(store.map.has(OPEN_PREFIX + "ROOM01")).toBe(false);
+    await publishToDirectory(dir, lobbyWith(MAX_PLAYERS), "ROOM01");
+    expect(dir.entries.has("ROOM01")).toBe(false);
   });
 
-  it("lists every open lobby's summary from a single metadata read", async () => {
-    const store = new FakeMetaStore();
-    await publishLobby(store, lobbyWith(2, "ffa"), "AAAAAA");
-    await publishLobby(store, lobbyWith(3, "team"), "BBBBBB");
-    store.map.set("lobby:CCCCCC", { code: "x", mode: "ffa", players: 0, phase: "waiting" }); // non-open key ignored
+  it("lists every open lobby's summary", async () => {
+    const dir = new FakeDirectory();
+    await publishToDirectory(dir, lobbyWith(2, "ffa"), "AAAAAA");
+    await publishToDirectory(dir, lobbyWith(3, "team"), "BBBBBB");
 
-    const open = await listOpenLobbies(store);
+    const open = await listOpenLobbies(dir);
     expect(open.map((l) => l.code).sort()).toEqual(["AAAAAA", "BBBBBB"]);
     expect(open.find((l) => l.code === "BBBBBB")).toMatchObject({ mode: "team", players: 3 });
+  });
+});
+
+describe("LobbyDirectory Durable Object (real, strongly consistent)", () => {
+  function directoryStub(): DirectoryStub {
+    return env.LOBBY_DIRECTORY.get(env.LOBBY_DIRECTORY.idFromName("test-global")) as unknown as DirectoryStub;
+  }
+
+  it("a published lobby is visible on the very next list (read-your-writes, unlike KV)", async () => {
+    const dir = directoryStub();
+    await publishToDirectory(dir, lobbyWith(2, "team"), "LIVE01");
+
+    const open = await listOpenLobbies(dir);
+    expect(open.find((l) => l.code === "LIVE01")).toMatchObject({ mode: "team", players: 2 });
   });
 });
