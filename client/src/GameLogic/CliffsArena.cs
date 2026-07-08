@@ -22,15 +22,16 @@ public sealed record CliffsLayout(
 /// <see cref="GridArena"/>, ramp transitions in <see cref="Tank"/>) does the rest.</summary>
 public static class CliffsArena
 {
-    private const int Width = 20;
-    private const int Height = 16;
+    // ~2x the original 20x16 field (issue #5, ADD-8) so it seats 8 players like the themed maps.
+    private const int Width = 40;
+    private const int Height = 32;
 
-    // The raised plateau is a rectangle of layer-1 floor in the middle of the field. Ramps sit on its
-    // four mid-edges (at layer 0) so a tank can climb up from any side.
-    private const int PlateauMinX = 7;
-    private const int PlateauMaxX = 12; // inclusive
-    private const int PlateauMinY = 5;
-    private const int PlateauMaxY = 10; // inclusive
+    // The raised plateau is a rectangle of layer-1 floor in the middle of the field, scaled with it.
+    // Ramps sit on its four mid-edges (at layer 0) so a tank can climb up from any side.
+    private const int PlateauMinX = 14;
+    private const int PlateauMaxX = 25; // inclusive
+    private const int PlateauMinY = 10;
+    private const int PlateauMaxY = 21; // inclusive
 
     public static CliffsLayout Create()
     {
@@ -75,11 +76,19 @@ public static class CliffsArena
         bushes[3, Height - 3] = true;
         bushes[Width - 4, 2] = true;
 
+        // Eight starts (player + seven enemies), as four point-symmetric pairs about the field centre
+        // so no side has an unfair start. All sit on the valley floor (layer 0), well apart, clear of
+        // the corner bricks/bushes and the teleport pads.
         var playerSpawn = (1, 1);
-        var enemySpawns = new[] { (Width - 2, Height - 2), (Width - 2, 1), (1, Height - 2) };
+        var enemySpawns = new[]
+        {
+            (Width - 2, Height - 2), (Width - 2, 1), (1, Height - 2), // three field corners
+            (Width / 2 - 1, 1), (Width / 2, Height - 2),              // top-mid / bottom-mid pair
+            (1, Height / 2 - 1), (Width - 2, Height / 2),             // left-mid / right-mid pair
+        };
 
-        // One pickup on the high ground (a prize for taking the plateau) and the rest spread round the
-        // valley so the fight flows between floors.
+        // One pickup on the high ground (a prize for taking the plateau), four round the valley edges,
+        // and a symmetric quad in the quadrants — more pads to suit the doubled field.
         var powerups = new[]
         {
             (PowerupKind.Repair, (PlateauMinX + PlateauMaxX) / 2, (PlateauMinY + PlateauMaxY) / 2), // atop the plateau
@@ -87,12 +96,16 @@ public static class CliffsArena
             (PowerupKind.Missile, Width - 3, Height / 2),
             (PowerupKind.SpeedBoost, Width / 2, 2),
             (PowerupKind.RapidFire, Width / 2, Height - 3),
+            (PowerupKind.Repair, Width / 4, Height / 4),
+            (PowerupKind.Shield, 3 * Width / 4, 3 * Height / 4),
+            (PowerupKind.Missile, Width / 4, 3 * Height / 4),
+            (PowerupKind.SpeedBoost, 3 * Width / 4, Height / 4),
         };
 
         // A cross-layer teleport pad pair (T3): a valley corner pad warps straight up onto the plateau
         // (and back), a flanking route past the defended ramps. Each pad's layer is derived from the
-        // cell it sits on, so the link data stays plain cells.
-        var pads = new[] { new TeleportPadLink(2, 2, 11, 9) };
+        // cell it sits on, so the link data stays plain cells. Scaled onto the larger plateau.
+        var pads = new[] { new TeleportPadLink(2, 2, 22, 18) };
 
         var map = LevelMap.FromCells(materials, bushes, playerSpawn.Item1, playerSpawn.Item2, layers, ramps);
         return new CliffsLayout(map, playerSpawn, enemySpawns, powerups, sandbags, pads);

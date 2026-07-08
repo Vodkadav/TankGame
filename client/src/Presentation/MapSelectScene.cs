@@ -23,6 +23,11 @@ public partial class MapSelectScene : Control
     {
         new(ArenaId.DesertWar, "DesertWar", "map.desert_war", PreviewDir + "DesertWar.png", true),
         new(ArenaId.CliffsAndValleys, "CliffsAndValleys", "map.cliffs_and_valleys", PreviewDir + "CliffsAndValleys.png", true),
+        new(ArenaId.Forest, "Forest", "map.forest", PreviewDir + "Forest.png", true),
+        new(ArenaId.Volcano, "Volcano", "map.volcano", PreviewDir + "Volcano.png", true),
+        new(ArenaId.City, "City", "map.city", PreviewDir + "City.png", true),
+        new(ArenaId.Frozen, "Frozen", "map.frozen", PreviewDir + "Frozen.png", true),
+        new(ArenaId.Canyon, "Canyon", "map.canyon", PreviewDir + "Canyon.png", true),
     };
 
     private TextureRect _preview = null!;

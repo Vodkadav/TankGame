@@ -104,6 +104,9 @@ public partial class Terrain3DView : Node3D
             case CellMaterial.Water:
                 AddWater(centre, $"Water_{x}_{y}");
                 return;
+            case CellMaterial.Lava:
+                AddLava(centre, $"Lava_{x}_{y}");
+                return;
             case CellMaterial.Bridge:
                 AddRoad(centre, $"Bridge_{x}_{y}"); // a flat road tile, flush with the ground (no raised deck)
                 return;
@@ -172,6 +175,25 @@ public partial class Terrain3DView : Node3D
             Mesh = new PlaneMesh { Size = new Vector2(_tileSize, _tileSize) },
             Position = new Vector3(centre.X, WaterY, centre.Y),
             MaterialOverride = new StandardMaterial3D { AlbedoColor = new Color(0.20f, 0.42f, 0.66f), Roughness = 0.3f },
+        });
+
+    // A molten lava pool: a glowing red plane sitting near the ground, emissive so it reads as hot even
+    // in shadow. Flush enough that a bridge tile (drawn just above) sits over it.
+    private void AddLava(NVector2 centre, string name) =>
+        AddChild(new MeshInstance3D
+        {
+            Name = name,
+            Mesh = new PlaneMesh { Size = new Vector2(_tileSize, _tileSize) },
+            Position = new Vector3(centre.X, 0.6f, centre.Y),
+            MaterialOverride = new StandardMaterial3D
+            {
+                AlbedoColor = new Color(0.85f, 0.18f, 0.05f),
+                EmissionEnabled = true,
+                Emission = new Color(0.95f, 0.30f, 0.05f),
+                EmissionEnergyMultiplier = 2.5f,
+                Roughness = 0.6f,
+                SpecularMode = BaseMaterial3D.SpecularModeEnum.Disabled,
+            },
         });
 
     // A flat road tile flush with the ground (the bridge crossing over water).

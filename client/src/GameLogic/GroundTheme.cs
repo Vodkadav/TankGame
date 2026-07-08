@@ -16,4 +16,7 @@ public enum GroundTheme
 
     /// <summary>Gray asphalt with darker small speckles, like pebbles.</summary>
     ParkingLot,
+
+    /// <summary>Charred volcanic ground — dark scorched basalt with dull ember glow.</summary>
+    Volcano,
 }

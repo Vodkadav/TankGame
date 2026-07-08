@@ -291,6 +291,27 @@ public partial class LobbyBrowserSceneTests : TestClass
     }
 
     [Test]
+    public void Browser_AutoRefreshesTheList_OnARepeatingTimer()
+    {
+        // Autostart is consumed on ready (Godot starts it, then clears the flag), so assert it is
+        // actually running and repeating rather than reading the spent Autostart property.
+        var timer = Find("AutoRefresh") as Timer ?? throw new Exception("Missing 'AutoRefresh' timer.");
+        if (timer.OneShot || timer.IsStopped() || timer.WaitTime <= 0)
+        {
+            throw new Exception("The browser must re-poll open games on a running, repeating timer.");
+        }
+
+        // A tick must reload the list — a room that appeared since the last poll shows up without a tap.
+        _lobby.Open = new List<OpenLobbyInfo> { new("ZZZ999", NetMode.Ffa, 2, "") };
+        timer.EmitSignal(Timer.SignalName.Timeout);
+
+        if (Find("RowZZZ999") is null)
+        {
+            throw new Exception("An auto-refresh tick must reload the open-games list.");
+        }
+    }
+
+    [Test]
     public void Browser_RendersItsLabelsInDanish()
     {
         var original = TranslationServer.GetLocale();

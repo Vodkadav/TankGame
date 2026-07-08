@@ -32,6 +32,11 @@ public interface IArena
     /// playable space). Used to stop a tank from driving through walls.</summary>
     bool IsBlocked(Vector2 point);
 
+    /// <summary>The material of the cell at <paramref name="point"/> — used to resolve terrain
+    /// underfoot (e.g. a tank standing on lethal lava). Defaults to <see cref="CellMaterial.Floor"/>
+    /// so an open box and every existing fake keep working; a grid-backed arena overrides it.</summary>
+    CellMaterial MaterialAt(Vector2 point) => CellMaterial.Floor;
+
     // ── Layer-aware overloads (ADR-0018 step 2) ──
     // Walls, the boundary, and destructible cells are resolved for the querying entity's elevation
     // layer: the edge of a plateau is a wall to a tank on it and empty space to a tank below. These are

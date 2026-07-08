@@ -1,9 +1,9 @@
 // MatchRoom — one lobby's room, as a Durable Object (one DO per lobby code). It plays two roles over
 // the same socket (ADR-0019 + multiplayer milestone, web-export.md §5):
-//   1. PRE-GAME LOBBY — it owns a LobbyState (up to 4 slots, FFA/Team, ready, host). Clients send
+//   1. PRE-GAME LOBBY — it owns a LobbyState (up to 8 slots, FFA/Team, ready, host). Clients send
 //      JSON `MSG_LOBBY_CMD`s; the DO stamps the sender's slot, runs the pure reducer, persists, and
 //      pushes `MSG_LOBBY_STATE` to every member. Any player can start → a per-second countdown
-//      (driven by the DO alarm) → phase "started".
+//      (driven by the DO alarm) → phase "loading" (the loaded handshake) → phase "started".
 //   2. IN-GAME RELAY — once started it is a PURE byte relay: the host (slot 0 / the lobby host)
 //      broadcasts SnapshotFrames to guests; a guest sends InputFrames to the host. It never simulates.
 // State survives hibernation: the per-socket slot via the socket attachment, the LobbyState via DO
@@ -59,8 +59,10 @@ export class MatchRoom implements DurableObject {
     if (request.headers.get("Upgrade") !== "websocket") {
       return new Response("expected a websocket upgrade", { status: 426 });
     }
-    if (this.lobby.phase === "started") {
-      return new Response("match already started", { status: 409 });
+    if (this.lobby.phase !== "waiting") {
+      // Only a waiting room is joinable: once it is counting down, loading, or started, the roster is
+      // locked so no one arrives mid-launch.
+      return new Response("match already launching", { status: 409 });
     }
     if (this.state.getWebSockets().length >= MAX_PLAYERS) {
       return new Response("room full", { status: 503 });

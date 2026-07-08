@@ -10,6 +10,7 @@ public partial class NetStatusOverlay : CanvasLayer
 {
     public const string ConnectingKey = "net.connecting";
     public const string ConnectedKey = "net.connected";
+    public const string LoadingKey = "net.loading"; // held during the loading handshake, until every seated player is in
     public const string Player2JoinedKey = "net.player2_joined";
     public const string RoundOverKey = "net.round_over";
 

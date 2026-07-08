@@ -29,8 +29,11 @@ public partial class LobbyRoomScene : Control
     private Label _modeLabel = null!;
     private Label _mapLabel = null!;
     private Label _countdown = null!;
+    private Label _hostNotice = null!;
+    private Button _ready = null!;
     private Button _start = null!;
     private bool _introduced; // name + the creator's mode/map picks sent once, on first seating
+    private int? _lastHostSlot; // to notice when the server hands the host role to another seat
 
     public override void _Ready()
     {
@@ -62,6 +65,15 @@ public partial class LobbyRoomScene : Control
         };
         heading.AddThemeFontSizeOverride("font_size", 34);
         menu.AddChild(heading);
+
+        // Transient line that announces a host hand-off (the previous host left the room).
+        _hostNotice = new Label
+        {
+            Name = "HostNotice",
+            Text = string.Empty,
+            HorizontalAlignment = HorizontalAlignment.Center,
+        };
+        menu.AddChild(_hostNotice);
 
         // Each seat is an icon (human vs AI) + the name, so it's clear at a glance who is a real
         // player and who is a computer-controlled tank.
@@ -96,6 +108,18 @@ public partial class LobbyRoomScene : Control
             HorizontalAlignment = HorizontalAlignment.Center,
         };
         menu.AddChild(_countdown);
+
+        // Guests ready up; the host readies by starting, so the host never sees this toggle.
+        _ready = new Button
+        {
+            Name = "Ready",
+            Text = "room.ready",
+            ToggleMode = true,
+            Visible = false,
+            CustomMinimumSize = new Vector2(0f, 48f),
+        };
+        _ready.Toggled += on => _controller.SetReady(on);
+        menu.AddChild(_ready);
 
         _start = Button("Start", "room.start");
         _start.Visible = false; // revealed once the server seats this client as host
@@ -138,10 +162,24 @@ public partial class LobbyRoomScene : Control
             }
         }
 
-        if (_controller.HasStarted)
+        if (_controller.State is { } view)
         {
-            // Snapshot the final roster (slots, names, teams, mode, map) and our own slot for the play
-            // scene — the welcome that carried the slot is a one-shot that already fired here.
+            if (_lastHostSlot is { } prev && prev != view.HostSlot && !_controller.HasStarted)
+            {
+                AnnounceHostChange(view);
+            }
+
+            _lastHostSlot = view.HostSlot;
+        }
+
+        // Hand off as soon as the room enters loading (not started): each client leaves the room here
+        // to build its arena, reports "loaded" when ready, and the arena holds on a loading banner
+        // until the server sees every seated player loaded and flips to started. (HasStarted is kept
+        // for a client that somehow only observes the started push — e.g. a dropped loading frame.)
+        if (_controller.IsLoading || _controller.HasStarted)
+        {
+            // Snapshot the final roster (slots, names, teams, mode, map, seed) and our own slot for the
+            // play scene — the welcome that carried the slot is a one-shot that already fired here.
             NetworkSession.StartedLobby = _controller.State;
             NetworkSession.LocalSlot = _controller.LocalSlot;
             Go(NetArenaScenePath);
@@ -162,7 +200,9 @@ public partial class LobbyRoomScene : Control
             var label = _seatNames[seat];
             if (player is { } p)
             {
-                label.Text = p.Slot == view!.HostSlot ? p.Name + " ★" : p.Name;
+                // Host wears the star; a readied-up guest wears a tick.
+                var badge = p.Slot == view!.HostSlot ? " ★" : p.Ready ? " ✓" : string.Empty;
+                label.Text = p.Name + badge;
                 label.AddThemeColorOverride("font_color", JoinedWhite);
                 _seatIcons[seat].IsHuman = true;
             }
@@ -179,7 +219,56 @@ public partial class LobbyRoomScene : Control
         _countdown.Text = view?.Phase == LobbyPhase.Countdown
             ? string.Format(CultureInfo.InvariantCulture, Tr("room.starting"), view.Countdown)
             : string.Empty;
-        _start.Visible = _controller.IsHost && view?.Phase == LobbyPhase.Waiting;
+
+        var waiting = view?.Phase == LobbyPhase.Waiting;
+        var local = _controller.LocalPlayer;
+        _ready.Visible = local is { } lp && lp.Slot != view!.HostSlot && waiting;
+        if (local is { } l)
+        {
+            _ready.SetPressedNoSignal(l.Ready); // reflect the server's truth without echoing a command
+        }
+
+        _start.Visible = _controller.IsHost && waiting;
+        _start.Disabled = !AllGuestsReady(view); // the host can't launch until every guest is ready
+    }
+
+    // Empty seats are AI-filled at launch, so they never gate the start; only seated guests must ready
+    // up (the host's readiness is pressing Start). A lone host has no guests, so this is vacuously true.
+    private static bool AllGuestsReady(LobbyView? view)
+    {
+        if (view is null)
+        {
+            return false;
+        }
+
+        foreach (var player in view.Players)
+        {
+            if (player.Slot != view.HostSlot && !player.Ready)
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private void AnnounceHostChange(LobbyView view)
+    {
+        var host = PlayerAt(view, view.HostSlot);
+        if (host is not { } h)
+        {
+            return;
+        }
+
+        _hostNotice.Text = string.Format(CultureInfo.InvariantCulture, Tr("room.host_left"), h.Name);
+        var timer = GetTree().CreateTimer(4.0); // clear the banner after a few seconds
+        timer.Timeout += () =>
+        {
+            if (IsInstanceValid(_hostNotice))
+            {
+                _hostNotice.Text = string.Empty;
+            }
+        };
     }
 
     private static LobbyPlayer? PlayerAt(LobbyView? view, int seat)

@@ -20,11 +20,17 @@ public enum LobbyPhase
 {
     Waiting,
     Countdown,
+
+    /// <summary>Countdown finished; the room waits for every seated player to report its arena is built
+    /// (the "loaded" handshake) before the match starts.</summary>
+    Loading,
+
     Started,
 }
 
-/// <summary>One seat in the lobby.</summary>
-public readonly record struct LobbyPlayer(int Slot, string Name, int Team, bool Ready);
+/// <summary>One seat in the lobby. <paramref name="Loaded"/> is the loading-phase handshake flag —
+/// trailing default so existing positional call sites keep compiling.</summary>
+public readonly record struct LobbyPlayer(int Slot, string Name, int Team, bool Ready, bool Loaded = false);
 
 /// <summary>The client's view of a lobby — the C# mirror of the worker's <c>LobbyState</c> JSON,
 /// pushed over the socket as a <see cref="LobbyProtocol.MsgLobbyState"/> message. Read-only: the
@@ -37,7 +43,8 @@ public sealed record LobbyView(
     int HostSlot,
     int Countdown,
     IReadOnlyList<LobbyPlayer> Players,
-    string Map = "");
+    string Map = "",
+    int Seed = 0);
 
 /// <summary>The lobby control protocol — the C# mirror of the worker's JSON lobby channel
 /// (<c>codec.ts</c> / <c>lobbyState.ts</c>). The server pushes <see cref="MsgLobbyState"/> snapshots
@@ -46,9 +53,9 @@ public sealed record LobbyView(
 /// Pure — no Godot — so the parse/encode round-trips are unit-tested without a runtime.</summary>
 public static class LobbyProtocol
 {
-    /// <summary>Seats per room — mirrors the worker's <c>MAX_PLAYERS</c> (owner ask: 4, extendable
-    /// later). The room UI, placeholder cast, and spawn table all size off this.</summary>
-    public const int MaxPlayers = 4;
+    /// <summary>Seats per room — mirrors the worker's <c>MAX_PLAYERS</c> (owner ask: 8, raised from 4).
+    /// The room UI, placeholder cast, and spawn table all size off this.</summary>
+    public const int MaxPlayers = 8;
 
     /// <summary>Leading kind byte of a server→client lobby-state push.</summary>
     public const byte MsgLobbyState = 0x10;
@@ -69,7 +76,8 @@ public static class LobbyProtocol
                 p.GetProperty("slot").GetInt32(),
                 p.GetProperty("name").GetString() ?? "Player",
                 p.GetProperty("team").GetInt32(),
-                p.GetProperty("ready").GetBoolean()));
+                p.GetProperty("ready").GetBoolean(),
+                p.TryGetProperty("loaded", out var loaded) && loaded.GetBoolean()));
         }
 
         return new LobbyView(
@@ -78,7 +86,8 @@ public static class LobbyProtocol
             root.GetProperty("hostSlot").GetInt32(),
             root.GetProperty("countdown").GetInt32(),
             players,
-            root.TryGetProperty("map", out var map) ? map.GetString() ?? "" : "");
+            root.TryGetProperty("map", out var map) ? map.GetString() ?? "" : "",
+            root.TryGetProperty("seed", out var seed) ? seed.GetInt32() : 0);
     }
 
     public static byte[] EncodeSetName(string name) => Tag(w =>
@@ -113,6 +122,9 @@ public static class LobbyProtocol
 
     public static byte[] EncodeStart() => Tag(w => w.WriteString("type", "start"));
 
+    /// <summary>The loading-phase handshake: this client reports its arena is built and ready.</summary>
+    public static byte[] EncodeLoaded() => Tag(w => w.WriteString("type", "loaded"));
+
     // Hand-write the command JSON with a Utf8JsonWriter (a forward-only writer, no reflection) rather
     // than JsonSerializer over an anonymous type: the trimmed WebAssembly runtime disables
     // reflection-based serialization (throws JsonSerializerIsReflectionDisabled), which killed EVERY
@@ -139,6 +151,7 @@ public static class LobbyProtocol
     private static LobbyPhase ParsePhase(string? phase) => phase switch
     {
         "countdown" => LobbyPhase.Countdown,
+        "loading" => LobbyPhase.Loading,
         "started" => LobbyPhase.Started,
         _ => LobbyPhase.Waiting,
     };

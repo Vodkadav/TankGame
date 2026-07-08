@@ -95,6 +95,14 @@ public class AiInputSourceTests
         return ai;
     }
 
+    // Binds a pre-built source to its tank (for the seed/personality tests that construct the source
+    // themselves rather than via the AiDriving convenience).
+    private static AiInputSource Bound(AiInputSource ai, StubTank self)
+    {
+        ai.Bind(self);
+        return ai;
+    }
+
     [Fact]
     public void RoutesAroundAWall_TowardAGoal_InsteadOfDrivingIntoIt()
     {
@@ -220,18 +228,128 @@ public class AiInputSourceTests
     }
 
     [Fact]
-    public void Targets_TheNearestEnemy()
+    public void Engages_OneOfTwoVisibleEnemies()
     {
+        // Weighted-random target selection (biased toward the nearer) replaced always-nearest, so the AI
+        // may pick either — but it must lock onto ONE real enemy and fire, never split the difference.
         var world = new World();
         var self = new StubTank(Vector2.Zero, team: 1);
         world.Spawn(self);
-        world.Spawn(new StubTank(new Vector2(0f, 300f), team: 0)); // farther, +Y
-        world.Spawn(new StubTank(new Vector2(200f, 0f), team: 0)); // nearer, +X
+        world.Spawn(new StubTank(new Vector2(0f, 300f), team: 0)); // +Y  → aim ≈ π/2
+        world.Spawn(new StubTank(new Vector2(200f, 0f), team: 0)); // +X  → aim ≈ 0
         var ai = AiDriving(self, world);
 
         var intent = ai.Read();
 
-        Assert.Equal(0f, intent.Aim, precision: 3); // aims at the nearer (+X) enemy
+        Assert.True(intent.Fire);
+        var aimsAtAnEnemy = MathF.Abs(intent.Aim) < 0.001f || MathF.Abs(intent.Aim - MathF.PI / 2f) < 0.001f;
+        Assert.True(aimsAtAnEnemy, $"expected aim at one of the two enemies, got {intent.Aim}");
+    }
+
+    [Fact]
+    public void SameSeed_ProducesIdenticalDecisions()
+    {
+        // Reproducibility for tests: two sources with the same seed and world decide identically tick-by-tick.
+        static AiInputSource Seeded(StubTank self, IWorld world) =>
+            Bound(new AiInputSource(world, new OpenArena(), seed: 12345), self);
+
+        var world = new World();
+        var self = new StubTank(Vector2.Zero, team: 1);
+        world.Spawn(self); // empty field → wander, driven purely by the seeded RNG
+        var a = Seeded(self, world);
+        var b = Seeded(self, world);
+
+        for (var i = 0; i < 8; i++)
+        {
+            Assert.Equal(a.Read(), b.Read());
+        }
+    }
+
+    [Fact]
+    public void Personalities_RolledFromDifferentSeeds_Differ()
+    {
+        var rolled = new System.Collections.Generic.HashSet<AiPersonality>();
+        for (var seed = 1; seed <= 8; seed++)
+        {
+            rolled.Add(AiPersonality.Roll(new Random(seed)));
+        }
+
+        Assert.True(rolled.Count > 1, "seeded personality rolls should not all be identical");
+    }
+
+    [Fact]
+    public void DifferentSeeds_CanPickDifferentTargets()
+    {
+        // Two enemies equidistant on opposite sides: closeness-weighted-random picks 50/50, so across many
+        // seeds both get chosen — proving target selection actually varies (the core variety win).
+        var aims = new System.Collections.Generic.HashSet<int>();
+        for (var seed = 0; seed < 16; seed++)
+        {
+            var world = new World();
+            var self = new StubTank(Vector2.Zero, team: 1);
+            world.Spawn(self);
+            world.Spawn(new StubTank(new Vector2(200f, 0f), team: 0));  // aim 0
+            world.Spawn(new StubTank(new Vector2(-200f, 0f), team: 0)); // aim ±π
+            var ai = Bound(new AiInputSource(world, new OpenArena(), seed: seed), self);
+
+            aims.Add((int)MathF.Round(ai.Read().Aim));
+        }
+
+        Assert.True(aims.Count > 1, "across seeds the AI should sometimes pick each of the two enemies");
+    }
+
+    [Fact]
+    public void CommitsToAWanderHeading_AcrossTicks()
+    {
+        // Hysteresis: with nothing to do the AI holds one heading rather than re-rolling every tick.
+        var world = new World();
+        var self = new StubTank(Vector2.Zero, team: 1);
+        world.Spawn(self);
+        var ai = Bound(new AiInputSource(world, new OpenArena(), seed: 7), self);
+
+        var first = ai.Read().Move;
+        for (var i = 0; i < 4; i++)
+        {
+            Assert.Equal(first, ai.Read().Move); // same committed heading
+        }
+
+        Assert.NotEqual(Vector2.Zero, first);
+    }
+
+    [Fact]
+    public void CommitsToOneTarget_AcrossTicks()
+    {
+        // Two visible enemies out of fire range → Hunt state; the AI locks onto one and keeps aiming at
+        // it across ticks instead of re-rolling the target every frame.
+        var world = new World();
+        var self = new StubTank(Vector2.Zero, team: 1);
+        world.Spawn(self);
+        world.Spawn(new StubTank(new Vector2(500f, 0f), team: 0)); // seen, beyond fire range, aim 0
+        world.Spawn(new StubTank(new Vector2(0f, 500f), team: 0)); // seen, beyond fire range, aim π/2
+        var ai = Bound(new AiInputSource(world, new OpenArena(), seed: 3), self);
+
+        var first = ai.Read().Aim;
+        for (var i = 0; i < 4; i++)
+        {
+            Assert.Equal(first, ai.Read().Aim, precision: 3); // same enemy tracked
+        }
+    }
+
+    [Fact]
+    public void FiresAtAVisibleEnemy_ThenHoldsOnceDead()
+    {
+        var world = new World();
+        var self = new StubTank(Vector2.Zero, team: 1);
+        world.Spawn(self);
+        world.Spawn(new StubTank(new Vector2(120f, 0f), team: 0)); // in fire range on +X
+        var ai = AiDriving(self, world);
+
+        Assert.True(ai.Read().Fire); // engages while alive
+
+        self.IsAlive = false;
+        var dead = ai.Read();
+        Assert.Equal(Vector2.Zero, dead.Move); // downed → holds
+        Assert.False(dead.Fire);
     }
 
     [Fact]

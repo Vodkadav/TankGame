@@ -697,6 +697,7 @@ public partial class MapEditorScene : Node3D
             (CellMaterial.Crate, "editor.crate"), (CellMaterial.Steel, "editor.steel"),
             (CellMaterial.Water, "editor.water"), (CellMaterial.Bridge, "editor.bridge"),
             (CellMaterial.Mountain, "editor.mountain"), (CellMaterial.Building, "editor.building"),
+            (CellMaterial.Lava, "editor.lava"),
         })
         {
             var m = material;

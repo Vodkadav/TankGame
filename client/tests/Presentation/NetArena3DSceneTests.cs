@@ -17,17 +17,21 @@ public class NetArena3DSceneTests : TestClass
     {
         public List<InputFrame> SentInputs { get; } = new();
         public List<SnapshotFrame> Broadcast { get; } = new();
+        public List<byte[]> SentLobby { get; } = new();
         public event Action<byte>? WelcomeReceived;
         public event Action<SnapshotFrame>? SnapshotReceived;
         public event Action<InputFrame>? InputReceived;
+        public event Action<LobbyView>? LobbyStateReceived;
 
         public void SendInput(InputFrame input) => SentInputs.Add(input);
         public void SendSnapshot(SnapshotFrame snapshot) => Broadcast.Add(snapshot);
+        public void SendLobby(byte[] command) => SentLobby.Add(command);
         public void Poll() { }
 
         public void DeliverWelcome(byte slot) => WelcomeReceived?.Invoke(slot);
         public void DeliverSnapshot(SnapshotFrame snapshot) => SnapshotReceived?.Invoke(snapshot);
         public void DeliverInput(InputFrame frame) => InputReceived?.Invoke(frame);
+        public void DeliverLobby(LobbyView view) => LobbyStateReceived?.Invoke(view);
     }
 
     private Func<string, IMatchTransport> _originalFactory = default!;
@@ -243,6 +247,74 @@ public class NetArena3DSceneTests : TestClass
             if (!scene.Tanks.ContainsKey(0) || !scene.Tanks.ContainsKey(1))
             {
                 throw new Exception("Adopting the carried slot must build the authoritative match tanks.");
+            }
+        }
+        finally
+        {
+            scene.Free();
+        }
+    }
+
+    // Regression for the loading-handshake deadlock: after the countdown the room hands off during the
+    // "loading" phase. The scene MUST report "loaded" (else the server never starts — every net match
+    // hangs) and MUST hold the match on the loading banner until the server flips to "started".
+    [Test]
+    public void LoadingHandoff_ReportsLoaded_ThenHoldsUntilStarted()
+    {
+        NetworkSession.StartedLobby = new LobbyView(TankGame.Domain.Net.GameMode.Ffa, LobbyPhase.Loading, 0, 0,
+            new List<LobbyPlayer> { new(0, "Host", 0, true), new(1, "Guest", 1, true) });
+        NetworkSession.LocalSlot = 0;
+        var scene = GD.Load<PackedScene>("res://src/Presentation/Arena/NetArena3D.tscn")
+            .Instantiate<NetArena3DScene>();
+        TestScene.AddChild(scene);
+
+        try
+        {
+            if (_transport.SentLobby.Count != 1)
+            {
+                throw new Exception(
+                    $"Entering during loading must report loaded exactly once; sent {_transport.SentLobby.Count}.");
+            }
+
+            scene.Tick(0.1f); // held: a tick before "started" must not broadcast
+            if (_transport.Broadcast.Count != 0)
+            {
+                throw new Exception("The match must hold (no snapshots) until the server flips to started.");
+            }
+
+            _transport.DeliverLobby(new LobbyView(TankGame.Domain.Net.GameMode.Ffa, LobbyPhase.Started, 0, 0,
+                new List<LobbyPlayer> { new(0, "Host", 0, true, true), new(1, "Guest", 1, true, true) }));
+            scene.Tick(0.1f);
+            if (_transport.Broadcast.Count == 0)
+            {
+                throw new Exception("Once started, the host must run its world and broadcast snapshots.");
+            }
+        }
+        finally
+        {
+            scene.Free();
+        }
+    }
+
+    // A themed built-in (Volcano has lava + bridges) picked in a net lobby must build in the net scene,
+    // not crash casting the map choice to Desert. Host builds the authoritative world for the full roster.
+    [Test]
+    public void ThemedMap_BuildsTheNetArena_ForTheFullRoster()
+    {
+        NetworkSession.StartedLobby = new LobbyView(TankGame.Domain.Net.GameMode.Ffa, LobbyPhase.Started, 0, 0,
+            new List<LobbyPlayer> { new(0, "Host", 0, true, true) }, Map: "Volcano");
+        NetworkSession.LocalSlot = 0;
+        var scene = GD.Load<PackedScene>("res://src/Presentation/Arena/NetArena3D.tscn")
+            .Instantiate<NetArena3DScene>();
+        TestScene.AddChild(scene);
+
+        try
+        {
+            // Host fills every empty seat with AI, so a themed net match seats the full room.
+            if (scene.Tanks.Count != LobbyProtocol.MaxPlayers)
+            {
+                throw new Exception(
+                    $"A themed net map must build the authoritative roster; saw {scene.Tanks.Count} tanks.");
             }
         }
         finally

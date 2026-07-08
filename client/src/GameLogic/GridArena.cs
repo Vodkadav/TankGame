@@ -146,6 +146,12 @@ public sealed class GridArena : IArena
         _grid.DamageCell(cellX, cellY, amount);
     }
 
+    public CellMaterial MaterialAt(Vector2 point)
+    {
+        var local = point - _origin;
+        return _grid.GetCell(FloorDiv(local.X), FloorDiv(local.Y)).Material;
+    }
+
     public bool IsBlocked(Vector2 point) => IsBlocked(point, OnAnyLayer);
 
     public bool IsBlocked(Vector2 point, int layer)

@@ -338,6 +338,14 @@ public sealed class Tank : ITank
 
         PushAgainstWall(wallX, wallY, move, deltaSeconds);
 
+        // Lethal terrain underfoot (lava): a grounded tank whose cell is lethal is destroyed outright —
+        // the shield can't soak it. A tank falling over lava (airborne) is spared until it lands. Shots
+        // fly over lava (BlocksShots is false), and a bridge cell reads as Bridge, so it crosses safely.
+        if (!_airborne && CellMaterials.IsLethal(_arena.MaterialAt(Position)))
+        {
+            TakeDamage(Hp + Shield);
+        }
+
         if (move != Vector2.Zero)
         {
             Rotation = MathF.Atan2(move.Y, move.X); // chassis keeps its last facing when idle

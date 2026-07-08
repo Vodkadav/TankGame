@@ -26,7 +26,8 @@ public partial class SfxPool : Node
     private static readonly Dictionary<SfxKind, string> SfxFiles = new()
     {
         [SfxKind.Fire]      = "fire.ogg",
-        [SfxKind.WallBreak] = "wall_break.ogg",
+        // placeholder: barrier-break SFX removed pending a better fit
+        [SfxKind.WallBreak] = "",
         [SfxKind.Victory]   = "victory.ogg",
         [SfxKind.UiClick]   = "ui_click.ogg",
         [SfxKind.UiHover]   = "ui_hover.ogg",
@@ -76,7 +77,8 @@ public partial class SfxPool : Node
         AddChild(_voicePlayer);
 
         foreach (var (kind, file) in SfxFiles)
-            _streams[kind] = LoadOgg(SfxDir + file);
+            // An empty path is a deliberate silent placeholder: leave the stream null so PlayAt no-ops.
+            _streams[kind] = string.IsNullOrEmpty(file) ? null : LoadOgg(SfxDir + file);
     }
 
     // Load an OGG file via FileAccess + LoadFromBuffer — bypasses the Godot import/resource

@@ -123,6 +123,43 @@ public class TankTests
         Assert.True(tank.Position.X > 200f, "the tank climbed up onto the plateau");
     }
 
+    [Fact]
+    public void Step_DrivingOntoLava_DestroysTheTank()
+    {
+        // A two-cell row: floor (col 0) then lava (col 1). Lava does not block movement, so the tank
+        // drives onto it — and the lethal-terrain hook kills it that tick.
+        var grid = WallGrid.FromMaterials(new[,] { { CellMaterial.Floor }, { CellMaterial.Lava } });
+        var arena = new GridArena(grid, tileSize: 100f, Vector2.Zero);
+        var input = new ScriptedInput(new TankInput(new Vector2(1f, 0f), Aim: 0f, Fire: false));
+        var tank = new Tank(input, new World(), arena, new Vector2(50f, 50f), Speed, FireInterval, ProjectileSpeed);
+
+        for (var i = 0; i < 20; i++)
+        {
+            tank.Step(0.1f); // drive +X off the floor onto the lava
+        }
+
+        Assert.True(tank.Position.X >= 100f, "the tank drove onto the lava cell");
+        Assert.Equal(0, tank.Hp);
+        Assert.False(tank.IsAlive); // one life, spent — no respawn
+    }
+
+    [Fact]
+    public void Step_StayingOnFloor_TakesNoLavaDamage()
+    {
+        // Same grid, but the tank sits still on the floor cell — it must not be harmed.
+        var grid = WallGrid.FromMaterials(new[,] { { CellMaterial.Floor }, { CellMaterial.Lava } });
+        var arena = new GridArena(grid, tileSize: 100f, Vector2.Zero);
+        var input = new ScriptedInput(new TankInput(Vector2.Zero, Aim: 0f, Fire: false));
+        var tank = new Tank(input, new World(), arena, new Vector2(50f, 50f), Speed, FireInterval, ProjectileSpeed);
+
+        for (var i = 0; i < 10; i++)
+        {
+            tank.Step(0.1f);
+        }
+
+        Assert.Equal(tank.MaxHp, tank.Hp);
+    }
+
     // ── Drop-off ledges (ADR-0020 Wave B step 4) ──
     // A single row: a raised plateau (cols 0-2, layer 1) ending in a cliff down to open ground (cols 3-7).
     private static GridArena PlateauThenGround()

@@ -65,8 +65,8 @@ public sealed class AmmoPickup : IPickupEffect
 /// Spawns the strike into the world the pickup hands it.</summary>
 public sealed class AirstrikePickup : IPickupEffect
 {
-    /// <summary>Roughly how many blast cells the strike drops (jittered a little per call for variety).</summary>
-    public const int TargetCells = 30;
+    /// <summary>Roughly how many blast cells the strike drops (about 6; jittered a little per call for variety).</summary>
+    public const int TargetCells = 6;
 
     private readonly Vector2 _min;
     private readonly Vector2 _max;
@@ -117,7 +117,7 @@ public sealed class AirstrikePickup : IPickupEffect
         var sx = System.Math.Clamp((int)((start.X - _min.X) / spacing), 0, cols - 1);
         var sy = System.Math.Clamp((int)((start.Y - _min.Y) / spacing), 0, rows - 1);
 
-        var target = TargetCells + rng.Next(-2, 3); // ~30 (28–32): a slightly different size each call
+        var target = TargetCells + rng.Next(-1, 2); // ~6 (5–7): a slightly different size each call
         var cells = AirstrikeSpread.Grow(sx, sy, cols, rows, target, rng);
 
         var order = new List<Vector2>(cells.Count);

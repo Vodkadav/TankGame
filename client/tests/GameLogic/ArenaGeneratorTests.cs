@@ -323,6 +323,47 @@ public class ArenaGeneratorTests
         Assert.True(hasInteriorSteel, "a generated arena should have permanent steel cover");
     }
 
+    // ── ~2x field with 8 tank spawns (issue #5, ADD-8) ──
+    // The scene may request a doubled arena (e.g. 56x56) with seven enemies; the generator must yield a
+    // player spawn plus seven well-separated, reachable enemy spawns and still validate — the same eight
+    // starts the themed maps seat.
+    [Fact]
+    public void Generate_AtDoubleSize_YieldsEightDistinctReachableSpawns_ThatValidate()
+    {
+        var arena = new ArenaGenerator().Generate(new ArenaGenParams(56, 56, Seed: 9, EnemyCount: 7, PickupCount: 7));
+
+        var starts = new List<(int X, int Y)> { arena.PlayerSpawn };
+        starts.AddRange(arena.EnemySpawns);
+        Assert.Equal(8, starts.Count);
+        Assert.Equal(8, new HashSet<(int, int)>(starts).Count); // player + 7 enemies, all distinct
+
+        var reached = ReachableSet(arena.Map);
+        foreach (var (x, y) in starts)
+        {
+            Assert.Equal(CellMaterial.Floor, arena.Map.Materials[x, y]);
+            Assert.True(reached[x, y], $"start ({x},{y}) is not reachable from the player spawn");
+        }
+
+        // The eight starts pass the map validator as a real 8-player arena (player + 7 enemies).
+        var definition = new MapDefinition(
+            "Desert", arena.Map.Materials, arena.Map.Bushes, arena.Sandbags,
+            arena.PlayerSpawn, arena.EnemySpawns,
+            System.Array.Empty<PowerupSpawn>());
+        var result = MapValidator.Validate(definition);
+        Assert.True(result.IsValid, string.Join(", ", result.Errors));
+    }
+
+    [Fact]
+    public void Generate_AtDoubleSize_IsDeterministic_ForAGivenSeed()
+    {
+        var p = new ArenaGenParams(56, 56, Seed: 9, EnemyCount: 7, PickupCount: 7);
+        var a = new ArenaGenerator().Generate(p);
+        var b = new ArenaGenerator().Generate(p);
+
+        Assert.Equal(a.PlayerSpawn, b.PlayerSpawn);
+        Assert.Equal(a.EnemySpawns, b.EnemySpawns);
+    }
+
     private static bool[,] ReachableSet(LevelMap map)
     {
         var seen = new bool[map.Width, map.Height];

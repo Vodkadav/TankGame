@@ -7,11 +7,27 @@ namespace TankGame.Tests.GameLogic;
 public class SpawnTableTests
 {
     [Fact]
-    public void AnOpenField_UsesTheDeclaredCells_AndTheirMirrors()
+    public void AnOpenField_YieldsEightDistinctSpawns_LedByTheDeclaredCells()
     {
         var spawns = SpawnTable.For(30, 16, primary: (2, 7), secondary: (25, 7), (_, _) => false);
 
-        Assert.Equal(new List<(int X, int Y)> { (2, 7), (25, 7), (27, 8), (4, 8) }, spawns);
+        // The two declared cells lead; the rest are their reflections across the centre and both axes.
+        Assert.Equal(new List<(int X, int Y)>
+        {
+            (2, 7), (25, 7), (27, 8), (4, 8), (2, 8), (27, 7), (25, 8), (4, 7),
+        }, spawns);
+    }
+
+    [Fact]
+    public void EightPlayers_AllGetADistinctOpenCell_EvenWhenCandidatesCollide()
+    {
+        // A tight field where several reflections land on the same cell: the taken-set still nudges
+        // each to its own open cell, so eight tanks never share a spawn.
+        var spawns = SpawnTable.For(8, 8, primary: (1, 1), secondary: (6, 6), (_, _) => false);
+
+        Assert.Equal(8, spawns.Count);
+        Assert.Equal(8, new HashSet<(int, int)>(spawns).Count); // all distinct
+        Assert.All(spawns, s => Assert.True(s.X is >= 0 and < 8 && s.Y is >= 0 and < 8));
     }
 
     [Fact]
@@ -27,6 +43,17 @@ public class SpawnTableTests
         Assert.True(System.Math.Max(System.Math.Abs(dx), System.Math.Abs(dy)) == 1,
             $"the nudge must land on an adjacent cell; landed {spawns[0]}");
         Assert.Equal((25, 7), spawns[1]); // the open candidates never move
+    }
+
+    [Fact]
+    public void AFullyBlockedField_StillYieldsDistinctSpawns_RatherThanDuplicates()
+    {
+        // Every cell blocked: the ring search finds nothing, so the fallthrough must still hand out
+        // eight DISTINCT cells — two tanks sharing one spawn is worse than a spawn on a blocked tile.
+        var spawns = SpawnTable.For(8, 8, primary: (1, 1), secondary: (6, 6), (_, _) => true);
+
+        Assert.Equal(8, spawns.Count);
+        Assert.Equal(8, new HashSet<(int, int)>(spawns).Count);
     }
 
     [Fact]

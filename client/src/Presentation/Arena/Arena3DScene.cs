@@ -21,7 +21,7 @@ public partial class Arena3DScene : Node3D
     private const float TankSpeed = 200f;
     private const float EnemySpeed = 140f;
     private const float ProjectileSpeed = 600f;
-    private const float FireInterval = 0.3f;
+    private const float FireInterval = 0.6f; // half the old rate of fire (owner ask 2026-07-08)
     private const float TileSize = 64f;
     private const float CombatHitRadius = 28f;
     private const int PlayerTeam = 0;
@@ -43,10 +43,10 @@ public partial class Arena3DScene : Node3D
     private const int ShieldAmount = 3;
     private const int PowerupCount = 9;
     private const float AirstrikeZoneRadius = 70f;
-    private const float AirstrikeArmWindow = 3f; // all zones light up within 3s, expanding outward
-    private const float AirstrikeDelay = 3f;     // each zone detonates 3s after it lit
+    private const float AirstrikeArmWindow = 5f; // all zones telegraph red within ~5s, expanding outward
+    private const float AirstrikeDelay = 0.5f;   // brief hold once fully telegraphed, then zones detonate in order
     private const int AirstrikeDamage = 3;
-    private const float AirstrikeCooldown = 120f; // the airstrike station refills every 2 minutes
+    private const float AirstrikeCooldown = 50f; // the airstrike station refills every 50s (owner ask 2026-07-08)
 
     private IReadOnlyDictionary<PowerupKind, IPickupEffect> _powerupEffects = null!;
     private IReadOnlyList<(PowerupKind Kind, int X, int Y)> _powerupPlacements = Array.Empty<(PowerupKind, int, int)>();
@@ -100,6 +100,7 @@ public partial class Arena3DScene : Node3D
     private Teleporter _teleporter = null!;
     private readonly List<TeleportPad3DView> _padViews = new();
     private IReadOnlyList<TeleportPadLink> _authoredPads = Array.Empty<TeleportPadLink>();
+    private GroundTheme _groundTheme = GroundTheme.Sand;
     /// <summary>Per-tank combat stats for this match — the end-of-match screen reads it.</summary>
     public BattleStats Stats { get; private set; } = null!;
 
@@ -608,6 +609,19 @@ public partial class Arena3DScene : Node3D
             _powerupPlacements = cliffs.Powerups;
             _authoredPads = cliffs.Pads; // the cross-layer valley↔plateau pair (teleport pads T3)
         }
+        else if (ArenaBuilders.TryGet(GameSetup.Arena.ToString(), out var builder))
+        {
+            // A themed code arena (Forest/Volcano/City/Frozen/Canyon): the builder seam returns a whole
+            // layout the same shape as Cliffs, so guests and host build the identical level.
+            var layout = builder.Build();
+            level = layout.Map;
+            sandbags = layout.Sandbags;
+            _playerSpawn = layout.PlayerSpawn;
+            _enemySpawns = layout.EnemySpawns;
+            _powerupPlacements = layout.Powerups;
+            _authoredPads = layout.Pads;
+            _groundTheme = layout.GroundTheme;
+        }
         else
         {
             var dim = Mathf.Max(GameSetup.ArenaWidth, GameSetup.ArenaHeight); // a square arena, not oblong
@@ -1040,8 +1054,9 @@ public partial class Arena3DScene : Node3D
         var w = widthCells * TileSize;
         var h = heightCells * TileSize;
 
-        // A custom map brings its authored ground tileset; the built-in arenas keep the sandy look.
-        var theme = GameSetup.CustomMap?.GroundTheme ?? GroundTheme.Sand;
+        // A custom map brings its authored ground tileset; a themed code arena carries its own theme;
+        // the classic built-ins (Desert/Cliffs) keep the sandy look.
+        var theme = GameSetup.CustomMap?.GroundTheme ?? _groundTheme;
         var ground = new MeshInstance3D
         {
             Name = "Ground",
@@ -1084,14 +1099,13 @@ public partial class Arena3DScene : Node3D
 
     private void SpawnTanks()
     {
-        // An authored map deals its spawn markers randomly (owner feedback): the player and every AI
-        // draw a distinct cell from the combined marker pool, and each respawn re-rolls from the same
-        // pool. Seeded by the arena so a best-of-N series is reproducible; the built-in arenas keep
-        // their fixed spawns.
+        // Every match deals its spawn markers randomly (issue #4): the player and every AI draw a
+        // distinct cell from the combined marker pool, and each respawn re-rolls from the same pool.
+        // Seeded by the arena so a best-of-N series is reproducible. (Procedural Desert already varies
+        // by seed; shuffling its distinct spawns too is harmless and keeps every map consistent.)
         var playerCell = _playerSpawn;
         var enemyCells = _enemySpawns;
         Func<NVector2>? respawnPoint = null;
-        if (GameSetup.CustomMap is not null)
         {
             var pool = new List<(int X, int Y)> { _playerSpawn };
             pool.AddRange(_enemySpawns);
@@ -1129,8 +1143,11 @@ public partial class Arena3DScene : Node3D
         var enemyIndex = 0;
         foreach (var (ex, ey) in enemyCells)
         {
-            var ambusher = enemyIndex % 2 == 1;
-            var ai = new AiInputSource(_world, _arena, _bushes, ambusher, _grid, TileSize, GridOrigin);
+            // Seed each bot from the per-match arena seed so temperaments (and which bots ambush) differ
+            // every match instead of repeating the same cast — issue #3, less predictable AI.
+            var seed = GameSetup.ArenaSeed ^ ((enemyIndex + 1) * 0x51ED2701);
+            var ambusher = (seed & 4) != 0;
+            var ai = new AiInputSource(_world, _arena, _bushes, ambusher, _grid, TileSize, GridOrigin, seed: seed);
             var enemy = new Tank(ai, _world, _arena, CellCentre(ex, ey),
                 EnemySpeed, FireInterval, ProjectileSpeed, maxHp: TankMaxHp, team: EnemyTeam, lives: StartingLives,
                 terrain: _sandbags, teleporter: _teleporter, displayName: names.Next(), respawnPoint: respawnPoint);

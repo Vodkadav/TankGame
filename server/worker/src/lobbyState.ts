@@ -1,12 +1,13 @@
 // The pre-game lobby state machine (multiplayer milestone, web-export.md §5). One MatchRoom DO owns a
 // LobbyState; clients send LobbyCommands over a JSON control channel and the DO broadcasts the new
-// state. Up to 4 players pick a mode (free-for-all or two teams), ready up, and any player can start
-// the match — a short countdown then hands off to the binary game relay. This module is the pure,
+// state. Up to 8 players pick a mode (free-for-all or two teams), ready up, and any player can start
+// the match — a short countdown, then a loading handshake, then a hand-off to the binary game relay.
+// This module is the pure,
 // engine-free heart of that flow so it is exhaustively unit-testable (the DO is a thin shell over it).
 
-// 4 seats per room (owner ask 2026-07-05, "extendable later"): the client room UI, the spawn table
+// 8 seats per room (owner ask 2026-07-08, raised from 4): the client room UI, the spawn table
 // and the relay cap all size themselves off this one constant.
-export const MAX_PLAYERS = 4;
+export const MAX_PLAYERS = 8;
 export const COUNTDOWN_SECONDS = 3;
 
 // 1, not 2: pressing Start fills every empty seat with an AI tank (owner ask), so a lone player
@@ -14,13 +15,18 @@ export const COUNTDOWN_SECONDS = 3;
 export const MIN_PLAYERS_TO_START = 1;
 
 export type GameMode = "ffa" | "team";
-export type LobbyPhase = "waiting" | "countdown" | "started";
+// countdown → loading → started: after the countdown the room waits for every seated player to report
+// its arena is built (the "loaded" handshake) before the match truly starts, so no one is mid-load
+// when the first snapshot arrives. Empty seats are AI-filled and never connect, so only seated players
+// gate the loading→started transition.
+export type LobbyPhase = "waiting" | "countdown" | "loading" | "started";
 
 export interface Player {
   slot: number;
   name: string;
   team: number; // FFA: team === slot (everyone their own); Team: 0 or 1
   ready: boolean;
+  loaded: boolean; // has this player's arena finished building? (the loading-phase handshake)
 }
 
 export interface LobbyState {
@@ -29,6 +35,7 @@ export interface LobbyState {
   hostSlot: number;
   countdown: number; // seconds left while phase === "countdown"; 0 otherwise
   map: string; // map id the host picked; "" = random, resolved by the host client at launch
+  seed: number; // match seed stamped at the waiting→countdown transition; feeds spawn shuffle + AI
   players: Player[]; // always sorted by slot
 }
 
@@ -41,10 +48,11 @@ export type LobbyCommand =
   | { type: "setMode"; slot: number; mode: GameMode }
   | { type: "setMap"; slot: number; map: string }
   | { type: "start"; slot: number }
+  | { type: "loaded"; slot: number }
   | { type: "tick" };
 
 export function emptyLobby(mode: GameMode = "ffa", map = ""): LobbyState {
-  return { mode, phase: "waiting", hostSlot: 0, countdown: 0, map, players: [] };
+  return { mode, phase: "waiting", hostSlot: 0, countdown: 0, map, seed: 0, players: [] };
 }
 
 export function reduce(state: LobbyState, command: LobbyCommand): LobbyState {
@@ -67,6 +75,8 @@ export function reduce(state: LobbyState, command: LobbyCommand): LobbyState {
       return setMap(state, command.slot, command.map);
     case "start":
       return start(state, command.slot);
+    case "loaded":
+      return markLoaded(state, command.slot);
     case "tick":
       return tick(state);
   }
@@ -79,7 +89,7 @@ function join(state: LobbyState, slot: number, name: string): LobbyState {
 
   const firstIn = state.players.length === 0;
   const team = state.mode === "ffa" ? slot : smallerTeam(state.players);
-  const players = sortBySlot([...state.players, { slot, name: cleanName(name), team, ready: false }]);
+  const players = sortBySlot([...state.players, { slot, name: cleanName(name), team, ready: false, loaded: false }]);
   return { ...state, players, hostSlot: firstIn ? slot : state.hostSlot };
 }
 
@@ -94,14 +104,20 @@ function leave(state: LobbyState, slot: number): LobbyState {
   }
 
   const hostSlot = slot === state.hostSlot ? players[0].slot : state.hostSlot;
-  // A departure that drops below the start threshold aborts an in-progress countdown.
-  const aborts = state.phase === "countdown" && players.length < MIN_PLAYERS_TO_START;
+  // A departure that drops below the start threshold aborts an in-progress launch (countdown or the
+  // loading handshake), sending the room back to waiting with the load flags + seed cleared.
+  const aborts =
+    (state.phase === "countdown" || state.phase === "loading") && players.length < MIN_PLAYERS_TO_START;
+  // If the player who left was the last one still loading, everyone remaining is loaded — start now
+  // rather than hang forever waiting for a "loaded" command that will never arrive.
+  const finishesLoading = !aborts && state.phase === "loading" && players.every((p) => p.loaded);
   return {
     ...state,
-    players,
+    players: aborts ? players.map((p) => ({ ...p, loaded: false })) : players,
     hostSlot,
-    phase: aborts ? "waiting" : state.phase,
+    phase: aborts ? "waiting" : finishesLoading ? "started" : state.phase,
     countdown: aborts ? 0 : state.countdown,
+    seed: aborts ? 0 : state.seed,
   };
 }
 
@@ -127,7 +143,26 @@ function start(state: LobbyState, slot: number): LobbyState {
   if (!hasSlot(state, slot) || state.phase !== "waiting" || state.players.length < MIN_PLAYERS_TO_START) {
     return state;
   }
-  return { ...state, phase: "countdown", countdown: COUNTDOWN_SECONDS };
+  // Every guest must have readied up first; the host pressing Start is their own readiness, so a lone
+  // host still launches instantly (owner ask). Empty seats are AI-filled at launch and never gate it.
+  if (state.players.some((p) => p.slot !== state.hostSlot && !p.ready)) {
+    return state;
+  }
+  // Stamp the match seed here so it broadcasts through countdown/loading/started to every client.
+  const seed = (Math.random() * 0x80000000) | 0;
+  return { ...state, phase: "countdown", countdown: COUNTDOWN_SECONDS, seed };
+}
+
+// The loading handshake: a seated player reports its arena is built. Once EVERY seated player has
+// loaded, the match truly starts. (Empty seats are AI-filled and never connect, so we gate on the
+// seated players, not MAX_PLAYERS.)
+function markLoaded(state: LobbyState, slot: number): LobbyState {
+  if (state.phase !== "loading" || !hasSlot(state, slot)) {
+    return state;
+  }
+  const players = state.players.map((p) => (p.slot === slot ? { ...p, loaded: true } : p));
+  const allLoaded = players.every((p) => p.loaded);
+  return { ...state, players, phase: allLoaded ? "started" : "loading" };
 }
 
 function tick(state: LobbyState): LobbyState {
@@ -135,8 +170,9 @@ function tick(state: LobbyState): LobbyState {
     return state;
   }
   const countdown = state.countdown - 1;
+  // Countdown ends in "loading", NOT "started": the room now waits for the loaded handshake.
   return countdown <= 0
-    ? { ...state, phase: "started", countdown: 0 }
+    ? { ...state, phase: "loading", countdown: 0 }
     : { ...state, countdown };
 }
 

@@ -25,7 +25,7 @@ public partial class NetArena3DScene : Node3D
     // Match PredictedTank's movement model (200 u/s) so guest prediction replays the host's real
     // Tank faithfully; combat numbers mirror Arena3DScene.
     private const float TankSpeed = 200f;
-    private const float FireInterval = 0.3f;
+    private const float FireInterval = 0.6f; // half the old rate of fire (owner ask 2026-07-08)
     private const float ProjectileSpeed = 600f;
     private const float CombatHitRadius = 28f;
     private const int TankMaxHp = 8;
@@ -52,6 +52,12 @@ public partial class NetArena3DScene : Node3D
     private readonly Dictionary<byte, Tank3DView> _tankViews = new();
     private float _accumulator;
     private byte? _localSlot;
+    private int _matchSeed; // the lobby's match seed: drives the spawn shuffle and per-bot AI seeding
+
+    // The loading handshake (issue #2): when we enter during the lobby's "loading" phase we report our
+    // arena is built and then hold — no ticks, no snapshots — until the server flips to "started"
+    // (every seated player loaded). A session with no lobby (old 2-player tests) plays immediately.
+    private bool _awaitingStart;
 
     // The seating plan from the lobby's final roster (placeholder-named AI on empty seats), the
     // shared four-cell spawn table both roles derive identically, and the host's authoritative
@@ -135,8 +141,19 @@ public partial class NetArena3DScene : Node3D
                     _primarySpawn = cliffs.PlayerSpawn;
                     _secondarySpawn = cliffs.EnemySpawns[0];
                     break;
+                case NetMapPick.BuiltIn builtIn when ArenaBuilders.TryGet(builtIn.ArenaId, out var builder):
+                    // A themed code arena (Forest/Volcano/City/…): every member builds the identical layout
+                    // from its id, so host truth and guest rendering agree without map bytes on the wire.
+                    var themed = builder.Build();
+                    _level = themed.Map;
+                    sandbags = themed.Sandbags;
+                    _primarySpawn = themed.PlayerSpawn;
+                    _secondarySpawn = themed.EnemySpawns[0];
+                    break;
                 default:
-                    var seed = ((NetMapPick.Desert)NetMapPick.Resolve(lobby.Map, NetworkSession.ActiveCode)).Seed;
+                    // Desert War (and the safe fallback for any unrecognised pick): a seeded generation.
+                    var seed = (NetMapPick.Resolve(lobby.Map, NetworkSession.ActiveCode) as NetMapPick.Desert)?.Seed
+                        ?? StableHash.Of(NetworkSession.ActiveCode);
                     var dim = Mathf.Max(GameSetup.ArenaWidth, GameSetup.ArenaHeight);
                     var layout = new ArenaGenerator().Generate(
                         new ArenaGenParams(dim, dim, seed, EnemyCount: 0, PickupCount: 0));
@@ -172,6 +189,10 @@ public partial class NetArena3DScene : Node3D
 
         _transport.WelcomeReceived += OnWelcome;
         _transport.SnapshotReceived += OnSnapshot;
+        _transport.LobbyStateReceived += OnLobbyState;
+
+        // If the room handed off during "loading", hold the match until every seated player is in.
+        _awaitingStart = NetworkSession.StartedLobby?.Phase == LobbyPhase.Loading;
 
         // The welcome is a one-shot fired on connect — during the lobby, before this scene existed.
         // The room scene carried our slot across the handoff, so adopt it now rather than waiting for
@@ -180,6 +201,23 @@ public partial class NetArena3DScene : Node3D
         if (NetworkSession.LocalSlot is byte carried)
         {
             OnWelcome(carried);
+        }
+
+        // Our arena is fully built — report loaded so the server can start once everyone else is too.
+        if (_awaitingStart)
+        {
+            _transport.SendLobby(LobbyProtocol.EncodeLoaded());
+        }
+    }
+
+    // The lobby keeps pushing state through the loading phase; the flip to "started" (all seated
+    // players loaded, or the last laggard left — server-side) releases the match to run.
+    private void OnLobbyState(LobbyView view)
+    {
+        if (_awaitingStart && view.Phase == LobbyPhase.Started)
+        {
+            _awaitingStart = false;
+            _status.SetStatus(NetStatusOverlay.ConnectedKey);
         }
     }
 
@@ -231,9 +269,9 @@ public partial class NetArena3DScene : Node3D
     {
         _transport.Poll();
 
-        if (_localSlot is null)
+        if (_localSlot is null || _awaitingStart)
         {
-            return; // not yet welcomed
+            return; // not yet welcomed, or holding on the loading banner until every player is in
         }
 
         _accumulator += delta;
@@ -287,6 +325,10 @@ public partial class NetArena3DScene : Node3D
             NetworkSession.StartedLobby, slot, NetworkSession.ActiveCode, LobbyProtocol.MaxPlayers);
         _spawns = SpawnTable.For(_level.Width, _level.Height, _primarySpawn, _secondarySpawn,
             (x, y) => _arena.IsBlocked(CellCentre(x, y)));
+        // Shuffle spawn assignment with the shared match seed so no slot is nailed to the same cell every
+        // match (issue #4). Every peer derives the same spawn list + seed, so host and guest agree.
+        _matchSeed = NetworkSession.StartedLobby?.Seed ?? 0;
+        _spawns = Shuffled(_spawns, _matchSeed);
         if (slot == HostSlot)
         {
             BecomeHost();
@@ -296,7 +338,7 @@ public partial class NetArena3DScene : Node3D
             BecomeGuest(slot);
         }
 
-        _status.SetStatus(NetStatusOverlay.ConnectedKey);
+        _status.SetStatus(_awaitingStart ? NetStatusOverlay.LoadingKey : NetStatusOverlay.ConnectedKey);
     }
 
     private void BecomeHost()
@@ -318,7 +360,10 @@ public partial class NetArena3DScene : Node3D
             {
                 NetRoster.SeatKind.LocalHuman => _hostInput,
                 NetRoster.SeatKind.RemoteHuman => guestInputs[seat.Slot] = new RelayedInputSource(),
-                _ => ai = new AiInputSource(_world, _arena, grid: _grid, tileSize: TileSize, origin: GridOrigin),
+                // Each bot seeded matchSeed ^ slot: distinct temperaments, yet identical on every host run
+                // of the same match (issue #3). Host-only, so no cross-peer determinism needed.
+                _ => ai = new AiInputSource(_world, _arena, grid: _grid, tileSize: TileSize, origin: GridOrigin,
+                    seed: _matchSeed ^ seat.Slot),
             };
 
             var spawn = _spawns[seat.Slot % _spawns.Count];
@@ -641,4 +686,18 @@ public partial class NetArena3DScene : Node3D
 
     private static NVector2 CellCentre(int x, int y) =>
         new(GridOrigin.X + ((x + 0.5f) * TileSize), GridOrigin.Y + ((y + 0.5f) * TileSize));
+
+    // Deterministic Fisher-Yates: same list + same seed → same order on every peer.
+    private static IReadOnlyList<(int X, int Y)> Shuffled(IReadOnlyList<(int X, int Y)> spawns, int seed)
+    {
+        var shuffled = new List<(int X, int Y)>(spawns);
+        var rng = new System.Random(seed);
+        for (var i = shuffled.Count - 1; i > 0; i--)
+        {
+            var j = rng.Next(i + 1);
+            (shuffled[i], shuffled[j]) = (shuffled[j], shuffled[i]);
+        }
+
+        return shuffled;
+    }
 }

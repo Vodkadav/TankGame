@@ -64,7 +64,8 @@ describe("lobby directory summary", () => {
   });
 
   it("does not list a lobby that has started counting down", () => {
-    const counting = reduce(lobbyWith(2), { type: "start", slot: 0 });
+    const ready = reduce(lobbyWith(2), { type: "setReady", slot: 1, ready: true });
+    const counting = reduce(ready, { type: "start", slot: 0 });
     expect(summarize(counting, "GO0001")).toBeNull();
   });
 });

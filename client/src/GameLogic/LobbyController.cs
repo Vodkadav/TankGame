@@ -42,6 +42,14 @@ public sealed class LobbyController
     /// <summary>Whether the match is counting down to launch.</summary>
     public bool IsCountingDown => State?.Phase == LobbyPhase.Countdown;
 
+    /// <summary>True while the room waits for every seated player's arena to finish building — the UI's
+    /// cue to build its arena and then call <see cref="SendLoaded"/>.</summary>
+    public bool IsLoading => State?.Phase == LobbyPhase.Loading;
+
+    /// <summary>The match seed the server stamped at launch, or null before the first push — feeds the
+    /// spawn shuffle and AI seeding so every client agrees.</summary>
+    public int? Seed => State?.Seed;
+
     /// <summary>True once the server has flipped the lobby to "started" — the UI's cue to hand off to
     /// the networked arena with the final roster + mode.</summary>
     public bool HasStarted => State?.Phase == LobbyPhase.Started;
@@ -57,6 +65,9 @@ public sealed class LobbyController
     public void SetMap(string map) => _transport.SendLobby(LobbyProtocol.EncodeSetMap(map));
 
     public void Start() => _transport.SendLobby(LobbyProtocol.EncodeStart());
+
+    /// <summary>Reports this client's arena is built during the loading phase.</summary>
+    public void SendLoaded() => _transport.SendLobby(LobbyProtocol.EncodeLoaded());
 
     private void OnWelcome(byte slot)
     {

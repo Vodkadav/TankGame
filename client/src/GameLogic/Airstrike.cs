@@ -7,10 +7,11 @@ using TankGame.Domain;
 namespace TankGame.GameLogic;
 
 /// <summary>A carpet-bombing airstrike (called in by a telephone pickup): an ordered run of blast zones
-/// that light up (arm) in an expanding sweep spread across <c>armWindow</c> seconds — zone <c>i</c> lights
-/// at <c>armWindow · i/(count-1)</c> — and each then detonates <c>delay</c> seconds after it lit, so the
-/// blasts sweep outward in the same order the highlights did. Each detonation damages every tank not on
-/// the caller's team within the zone radius, once. Pure C# — the Presentation layer draws the zones.</summary>
+/// that first light up (arm) in an expanding sweep spread across <c>armWindow</c> seconds — zone <c>i</c>
+/// lights at <c>armWindow · i/(count-1)</c>, so the whole blob is telegraphed red by <c>armWindow</c>.
+/// Only then do the zones detonate, in the same growth order: the first boom lands at <c>armWindow + delay</c>
+/// and the rest sweep outward behind it. Each detonation damages every tank not on the caller's team within
+/// the zone radius, once. Pure C# — the Presentation layer draws the zones.</summary>
 public sealed class Airstrike : IAirstrike
 {
     private readonly IWorld _world;
@@ -50,10 +51,11 @@ public sealed class Airstrike : IAirstrike
     public float Radius { get; }
     public bool IsAlive { get; private set; }
 
-    // Highlights are spread evenly across the arm window (a single zone lights immediately); each zone
-    // booms a fixed delay after it lit, so the explosions sweep in the same expanding order.
+    // Highlights are spread evenly across the arm window (a single zone lights immediately), so the whole
+    // blob is telegraphed by armWindow. Nothing detonates until then: the first zone booms at
+    // armWindow + delay and the rest sweep behind it in the same expanding order.
     private float ArmTime(int i) => _centres.Length <= 1 ? 0f : _armWindow * i / (_centres.Length - 1);
-    private float ExplodeTime(int i) => ArmTime(i) + _delay;
+    private float ExplodeTime(int i) => _armWindow + _delay + ArmTime(i);
 
     public void Step(float deltaSeconds)
     {

@@ -26,6 +26,21 @@ public enum ArenaId
 
     /// <summary>The elevated multi-layer map (ADR-0018); not yet built.</summary>
     CliffsAndValleys,
+
+    /// <summary>Dense woodland skirmish arena (built via <see cref="TankGame.GameLogic.ArenaBuilders"/>).</summary>
+    Forest,
+
+    /// <summary>Charred volcanic arena with lava hazards.</summary>
+    Volcano,
+
+    /// <summary>City block arena of building cover.</summary>
+    City,
+
+    /// <summary>Icy arctic wastes arena.</summary>
+    Frozen,
+
+    /// <summary>Rocky canyon-run arena.</summary>
+    Canyon,
 }
 
 /// <summary>Carries match-level state from the title screen into the play scene, which is loaded

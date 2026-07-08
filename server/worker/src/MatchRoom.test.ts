@@ -186,7 +186,7 @@ describe("MatchRoom (lobby)", () => {
     const host = await joinRoom("LOB001", "Ada");
     expect(await welcomeOf(host)).toBe(0);
     let state = await nextLobby(host); // after the host joined
-    expect(state.players).toEqual([{ slot: 0, name: "Ada", team: 0, ready: false }]);
+    expect(state.players).toEqual([{ slot: 0, name: "Ada", team: 0, ready: false, loaded: false }]);
     expect(state.hostSlot).toBe(0);
     expect(state.phase).toBe("waiting");
 
@@ -196,9 +196,10 @@ describe("MatchRoom (lobby)", () => {
     expect(state.players.map((p) => p.slot)).toEqual([0, 1]);
     expect(state.players[1].name).toBe("Bea");
 
-    host.ws.send(encodeLobbyCommand({ type: "setReady", ready: true }));
+    // The guest must ready up before the room can launch (the host's readiness is pressing Start).
+    guest.ws.send(encodeLobbyCommand({ type: "setReady", ready: true }));
     state = await nextLobby(host);
-    expect(state.players[0].ready).toBe(true);
+    expect(state.players[1].ready).toBe(true);
 
     // The command's slot is stamped by the server from the sender, so the guest's start is its own.
     guest.ws.send(encodeLobbyCommand({ type: "start" }));
