@@ -46,6 +46,17 @@ public class SpawnTableTests
     }
 
     [Fact]
+    public void AFullyBlockedField_StillYieldsDistinctSpawns_RatherThanDuplicates()
+    {
+        // Every cell blocked: the ring search finds nothing, so the fallthrough must still hand out
+        // eight DISTINCT cells — two tanks sharing one spawn is worse than a spawn on a blocked tile.
+        var spawns = SpawnTable.For(8, 8, primary: (1, 1), secondary: (6, 6), (_, _) => true);
+
+        Assert.Equal(8, spawns.Count);
+        Assert.Equal(8, new HashSet<(int, int)>(spawns).Count);
+    }
+
+    [Fact]
     public void ACandidateOutsideTheGrid_IsPulledInBounds()
     {
         // A mirrored spawn can land out of bounds on an asymmetric level; the ring search only

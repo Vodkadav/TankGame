@@ -76,6 +76,20 @@ public static class SpawnTable
             }
         }
 
-        return from; // a fully-blocked level: give the candidate back rather than loop forever
+        // Everything within reach was blocked or already taken. Rather than hand back a duplicate (two
+        // tanks materialising on one cell), scan row-major for any distinct in-bounds cell — on a nearly
+        // full map, distinctness matters more than landing on a perfectly open tile.
+        for (var y = 0; y < height; y++)
+        {
+            for (var x = 0; x < width; x++)
+            {
+                if (!taken.Contains((x, y)))
+                {
+                    return (x, y);
+                }
+            }
+        }
+
+        return from; // truly nowhere left (field smaller than the spawn count) — accept the overlap
     }
 }

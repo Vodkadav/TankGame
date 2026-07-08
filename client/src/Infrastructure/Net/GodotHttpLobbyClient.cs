@@ -45,7 +45,7 @@ public sealed partial class GodotHttpLobbyClient : Node, ILobbyClient
     private async Task<(bool Ok, long Status, string Body)> RequestAsync(
         HttpClient.Method method, string path)
     {
-        var request = new HttpRequest();
+        var request = new HttpRequest { Timeout = 10 }; // else a stalled request awaits forever and leaks the node
         AddChild(request);
         try
         {

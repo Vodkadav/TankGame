@@ -120,13 +120,24 @@ public static class MenuStyle
         }
     }
 
+    private const string LiftTweenMeta = "menu_lift_tween";
+
     private static void Lift(Control control, float to)
     {
         control.PivotOffset = control.Size / 2f;
+        // Kill any in-flight lift on this control first, so a fast enter/exit doesn't run competing
+        // scale tweens that fight over the final size.
+        if (control.HasMeta(LiftTweenMeta) && control.GetMeta(LiftTweenMeta).As<Tween>() is { } running
+            && GodotObject.IsInstanceValid(running))
+        {
+            running.Kill();
+        }
+
         var tween = control.CreateTween();
         tween.TweenProperty(control, "scale", new Vector2(to, to), 0.12)
             .SetTrans(Tween.TransitionType.Back)
             .SetEase(Tween.EaseType.Out);
+        control.SetMeta(LiftTweenMeta, tween);
     }
 
     private const string BackdropPath = "res://src/Presentation/Title/ui/title_bg.png";
