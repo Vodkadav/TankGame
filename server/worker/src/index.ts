@@ -2,7 +2,7 @@ import * as Sentry from "@sentry/cloudflare";
 import { withSentry } from "@sentry/cloudflare";
 import { MatchRoom } from "./MatchRoom";
 import { createLobby, joinLobby } from "./lobby";
-import { listOpenLobbies, type LobbyMetaStore } from "./lobbyDirectory";
+import { listOpenLobbies, LobbyDirectory } from "./lobbyDirectory";
 import {
   checkRequestBudget,
   cloudflareAnalytics,
@@ -14,6 +14,7 @@ import {
 interface Env {
   SENTRY_DSN_WORKER: string;
   MATCH_ROOM: DurableObjectNamespace;
+  LOBBY_DIRECTORY: DurableObjectNamespace;
   LOBBY_KV: KVNamespace;
   // Read-only Analytics token + account for the request-budget cron (M3-T11). Optional: absent
   // locally, where the scheduled run is a safe no-op. DO_REQUEST_BUDGET overrides the default cap.
@@ -58,7 +59,8 @@ const handler: ExportedHandler<Env> = {
 
     // Lobby browser (multiplayer milestone): every currently-joinable lobby, for the in-client list.
     if (request.method === "GET" && url.pathname === "/lobbies") {
-      const open = await listOpenLobbies(env.LOBBY_KV as unknown as LobbyMetaStore);
+      const directory = env.LOBBY_DIRECTORY.get(env.LOBBY_DIRECTORY.idFromName("global"));
+      const open = await listOpenLobbies(directory);
       return Response.json(open, { headers: CORS });
     }
     const joinMatch = JOIN_ROUTE.exec(url.pathname);
@@ -98,7 +100,7 @@ const handler: ExportedHandler<Env> = {
   },
 };
 
-export { MatchRoom };
+export { MatchRoom, LobbyDirectory };
 
 export default withSentry(
   (env: Env) => ({

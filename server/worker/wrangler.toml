@@ -22,9 +22,19 @@ crons = ["0 6 * * *"]
 name = "MATCH_ROOM"
 class_name = "MatchRoom"
 
+# One global directory of open lobbies for the browser (strongly consistent, unlike KV list). Every
+# MatchRoom publishes its summary here; the /lobbies route reads it.
+[[durable_objects.bindings]]
+name = "LOBBY_DIRECTORY"
+class_name = "LobbyDirectory"
+
 [[migrations]]
 tag = "v1"
 new_sqlite_classes = ["MatchRoom"]
+
+[[migrations]]
+tag = "v2"
+new_sqlite_classes = ["LobbyDirectory"]
 
 # Maps a shareable lobby code → its MatchRoom (M3-T4). The id is a namespace handle, not a
 # secret — safe to commit. Tests use a local Miniflare KV; this id is for the deployed Worker.
