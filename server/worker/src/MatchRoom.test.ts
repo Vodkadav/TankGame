@@ -186,7 +186,7 @@ describe("MatchRoom (lobby)", () => {
     const host = await joinRoom("LOB001", "Ada");
     expect(await welcomeOf(host)).toBe(0);
     let state = await nextLobby(host); // after the host joined
-    expect(state.players).toEqual([{ slot: 0, name: "Ada", team: 0, ready: false }]);
+    expect(state.players).toEqual([{ slot: 0, name: "Ada", team: 0, ready: false, loaded: false }]);
     expect(state.hostSlot).toBe(0);
     expect(state.phase).toBe("waiting");
 

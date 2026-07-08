@@ -58,8 +58,10 @@ export class MatchRoom implements DurableObject {
     if (request.headers.get("Upgrade") !== "websocket") {
       return new Response("expected a websocket upgrade", { status: 426 });
     }
-    if (this.lobby.phase === "started") {
-      return new Response("match already started", { status: 409 });
+    if (this.lobby.phase !== "waiting") {
+      // Only a waiting room is joinable: once it is counting down, loading, or started, the roster is
+      // locked so no one arrives mid-launch.
+      return new Response("match already launching", { status: 409 });
     }
     if (this.state.getWebSockets().length >= MAX_PLAYERS) {
       return new Response("room full", { status: 503 });

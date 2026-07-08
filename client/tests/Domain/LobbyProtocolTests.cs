@@ -115,4 +115,39 @@ public class LobbyProtocolTests
         using var doc = JsonDocument.Parse(message.AsSpan(1).ToArray());
         Assert.Equal("start", doc.RootElement.GetProperty("type").GetString());
     }
+
+    [Fact]
+    public void EncodeLoaded_IsATaggedLoadedCommand()
+    {
+        var message = LobbyProtocol.EncodeLoaded();
+
+        Assert.Equal(LobbyProtocol.MsgLobbyCmd, message[0]);
+        using var doc = JsonDocument.Parse(message.AsSpan(1).ToArray());
+        Assert.Equal("loaded", doc.RootElement.GetProperty("type").GetString());
+    }
+
+    [Fact]
+    public void ParseState_ReadsTheLoadingPhaseSeedAndPerPlayerLoaded()
+    {
+        var view = LobbyProtocol.ParseState(StateMessage(
+            "{\"mode\":\"ffa\",\"phase\":\"loading\",\"hostSlot\":0,\"countdown\":0,\"seed\":12345," +
+            "\"players\":[{\"slot\":0,\"name\":\"Ada\",\"team\":0,\"ready\":true,\"loaded\":true}," +
+            "{\"slot\":1,\"name\":\"Bea\",\"team\":1,\"ready\":true,\"loaded\":false}]}"));
+
+        Assert.Equal(LobbyPhase.Loading, view.Phase);
+        Assert.Equal(12345, view.Seed);
+        Assert.True(view.Players[0].Loaded);
+        Assert.False(view.Players[1].Loaded);
+    }
+
+    [Fact]
+    public void ParseState_DefaultsSeedAndLoadedWhenAbsent()
+    {
+        var view = LobbyProtocol.ParseState(StateMessage(
+            "{\"mode\":\"ffa\",\"phase\":\"waiting\",\"hostSlot\":0,\"countdown\":0," +
+            "\"players\":[{\"slot\":0,\"name\":\"Ada\",\"team\":0,\"ready\":false}]}"));
+
+        Assert.Equal(0, view.Seed); // older server without the field
+        Assert.False(view.Players[0].Loaded);
+    }
 }

@@ -29,6 +29,7 @@ describe("lobby state reducer", () => {
       hostSlot: 0,
       countdown: 0,
       map: "",
+      seed: 0,
       players: [],
     });
   });
@@ -36,7 +37,7 @@ describe("lobby state reducer", () => {
   it("the first joiner becomes the host", () => {
     const state = run(emptyLobby(), { type: "join", slot: 3, name: "Alice" });
     expect(state.hostSlot).toBe(3);
-    expect(state.players).toEqual([{ slot: 3, name: "Alice", team: 3, ready: false }]);
+    expect(state.players).toEqual([{ slot: 3, name: "Alice", team: 3, ready: false, loaded: false }]);
   });
 
   it("keeps players sorted by slot regardless of join order", () => {
@@ -117,18 +118,58 @@ describe("lobby state reducer", () => {
     expect(reduce(ready, { type: "start", slot: 0 }).phase).toBe("countdown");
   });
 
+  it("stamps a match seed at the waiting→countdown transition", () => {
+    const waiting = run(joinN(2), { type: "setReady", slot: 1, ready: true });
+    expect(waiting.seed).toBe(0);
+    const started = reduce(waiting, { type: "start", slot: 0 });
+    expect(started.seed).not.toBe(0); // random, but ~never 0
+    expect(started.seed).toBeGreaterThanOrEqual(0);
+  });
+
+  it("keeps the seed through countdown, loading and started", () => {
+    let state = reduce(joinN(1), { type: "start", slot: 0 });
+    const { seed } = state;
+    state = reduce(state, { type: "tick" }); // still counting down
+    expect(state.seed).toBe(seed);
+    for (let i = 0; i < COUNTDOWN_SECONDS; i++) state = reduce(state, { type: "tick" });
+    expect(state.phase).toBe("loading");
+    expect(state.seed).toBe(seed);
+    state = reduce(state, { type: "loaded", slot: 0 }); // sole seated player → started
+    expect(state.phase).toBe("started");
+    expect(state.seed).toBe(seed);
+  });
+
   it("refuses a start from someone not seated in the lobby", () => {
     const state = reduce(joinN(1), { type: "start", slot: 3 });
     expect(state.phase).toBe("waiting");
   });
 
-  it("counts down and hands off to started", () => {
+  it("counts down and hands off to loading (NOT started) — the loaded handshake gates started", () => {
     let state = run(joinN(2), { type: "setReady", slot: 1, ready: true }, { type: "start", slot: 0 });
     for (let i = 0; i < COUNTDOWN_SECONDS; i++) {
       state = reduce(state, { type: "tick" });
     }
-    expect(state.phase).toBe("started");
+    expect(state.phase).toBe("loading");
     expect(state.countdown).toBe(0);
+    expect(state.players.every((p) => !p.loaded)).toBe(true);
+  });
+
+  it("starts only once EVERY seated player reports loaded", () => {
+    let state = run(joinN(2), { type: "setReady", slot: 1, ready: true }, { type: "start", slot: 0 });
+    for (let i = 0; i < COUNTDOWN_SECONDS; i++) state = reduce(state, { type: "tick" });
+    expect(state.phase).toBe("loading");
+
+    state = reduce(state, { type: "loaded", slot: 0 });
+    expect(state.phase).toBe("loading"); // slot 1 still loading
+    expect(state.players.find((p) => p.slot === 0)?.loaded).toBe(true);
+
+    state = reduce(state, { type: "loaded", slot: 1 });
+    expect(state.phase).toBe("started"); // all seated players loaded
+  });
+
+  it("ignores a loaded command outside the loading phase", () => {
+    const waiting = reduce(joinN(2), { type: "loaded", slot: 0 });
+    expect(waiting.players[0].loaded).toBe(false);
   });
 
   it("a tick does nothing while waiting", () => {
