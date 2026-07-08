@@ -41,6 +41,9 @@ public partial class LobbyBrowserScene : Control
 
     public override void _Ready()
     {
+        Theme = MenuStyle.Shared;
+        MenuStyle.AddBackdrop(this);
+
         _lobby = NetworkSession.LobbyFactory();
         if (_lobby is Node lobbyNode)
         {
@@ -116,6 +119,7 @@ public partial class LobbyBrowserScene : Control
 
         AddChild(menu);
         BuildCreatePanel();
+        MenuStyle.AttachHoverRecursive(this); // the static buttons + create-panel controls
         _ = RefreshAsync(); // the list is fresh every time the browser opens
     }
 
@@ -220,6 +224,7 @@ public partial class LobbyBrowserScene : Control
 
         var join = Button("Join", "browser.join");
         join.Pressed += () => _ = JoinAsync(lobby.Code);
+        MenuStyle.AttachHover(join); // rows are built on refresh, after the one-time recursive pass
         row.AddChild(join);
         return row;
     }
