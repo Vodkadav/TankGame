@@ -1099,14 +1099,13 @@ public partial class Arena3DScene : Node3D
 
     private void SpawnTanks()
     {
-        // An authored map deals its spawn markers randomly (owner feedback): the player and every AI
-        // draw a distinct cell from the combined marker pool, and each respawn re-rolls from the same
-        // pool. Seeded by the arena so a best-of-N series is reproducible; the built-in arenas keep
-        // their fixed spawns.
+        // Every match deals its spawn markers randomly (issue #4): the player and every AI draw a
+        // distinct cell from the combined marker pool, and each respawn re-rolls from the same pool.
+        // Seeded by the arena so a best-of-N series is reproducible. (Procedural Desert already varies
+        // by seed; shuffling its distinct spawns too is harmless and keeps every map consistent.)
         var playerCell = _playerSpawn;
         var enemyCells = _enemySpawns;
         Func<NVector2>? respawnPoint = null;
-        if (GameSetup.CustomMap is not null)
         {
             var pool = new List<(int X, int Y)> { _playerSpawn };
             pool.AddRange(_enemySpawns);
