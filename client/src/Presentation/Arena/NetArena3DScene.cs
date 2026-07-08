@@ -141,8 +141,19 @@ public partial class NetArena3DScene : Node3D
                     _primarySpawn = cliffs.PlayerSpawn;
                     _secondarySpawn = cliffs.EnemySpawns[0];
                     break;
+                case NetMapPick.BuiltIn builtIn when ArenaBuilders.TryGet(builtIn.ArenaId, out var builder):
+                    // A themed code arena (Forest/Volcano/City/…): every member builds the identical layout
+                    // from its id, so host truth and guest rendering agree without map bytes on the wire.
+                    var themed = builder.Build();
+                    _level = themed.Map;
+                    sandbags = themed.Sandbags;
+                    _primarySpawn = themed.PlayerSpawn;
+                    _secondarySpawn = themed.EnemySpawns[0];
+                    break;
                 default:
-                    var seed = ((NetMapPick.Desert)NetMapPick.Resolve(lobby.Map, NetworkSession.ActiveCode)).Seed;
+                    // Desert War (and the safe fallback for any unrecognised pick): a seeded generation.
+                    var seed = (NetMapPick.Resolve(lobby.Map, NetworkSession.ActiveCode) as NetMapPick.Desert)?.Seed
+                        ?? StableHash.Of(NetworkSession.ActiveCode);
                     var dim = Mathf.Max(GameSetup.ArenaWidth, GameSetup.ArenaHeight);
                     var layout = new ArenaGenerator().Generate(
                         new ArenaGenParams(dim, dim, seed, EnemyCount: 0, PickupCount: 0));

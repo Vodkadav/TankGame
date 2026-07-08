@@ -296,6 +296,33 @@ public class NetArena3DSceneTests : TestClass
         }
     }
 
+    // A themed built-in (Volcano has lava + bridges) picked in a net lobby must build in the net scene,
+    // not crash casting the map choice to Desert. Host builds the authoritative world for the full roster.
+    [Test]
+    public void ThemedMap_BuildsTheNetArena_ForTheFullRoster()
+    {
+        NetworkSession.StartedLobby = new LobbyView(TankGame.Domain.Net.GameMode.Ffa, LobbyPhase.Started, 0, 0,
+            new List<LobbyPlayer> { new(0, "Host", 0, true, true) }, Map: "Volcano");
+        NetworkSession.LocalSlot = 0;
+        var scene = GD.Load<PackedScene>("res://src/Presentation/Arena/NetArena3D.tscn")
+            .Instantiate<NetArena3DScene>();
+        TestScene.AddChild(scene);
+
+        try
+        {
+            // Host fills every empty seat with AI, so a themed net match seats the full room.
+            if (scene.Tanks.Count != LobbyProtocol.MaxPlayers)
+            {
+                throw new Exception(
+                    $"A themed net map must build the authoritative roster; saw {scene.Tanks.Count} tanks.");
+            }
+        }
+        finally
+        {
+            scene.Free();
+        }
+    }
+
     [Test]
     public void GuestSnapshot_DetectsTheDecidedRound_AndNamesTheWinner()
     {

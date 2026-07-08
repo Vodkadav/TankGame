@@ -58,6 +58,10 @@ public static class ArenaBuilders
 
     /// <summary>Whether <paramref name="arenaId"/> names a registered code arena.</summary>
     public static bool Has(string arenaId) => Registry.ContainsKey(arenaId);
+
+    /// <summary>The ids of every registered code arena — the themed built-ins that join Desert and Cliffs
+    /// in the shared random-map pool.</summary>
+    public static IReadOnlyCollection<string> Ids => Registry.Keys.ToArray();
 }
 
 // ── Hand-authored themed arenas ───────────────────────────────────────────────────────────────

@@ -1,3 +1,6 @@
+using System.Collections.Generic;
+using System.Linq;
+
 namespace TankGame.GameLogic;
 
 /// <summary>Resolves a lobby's map id into a level every member can build for itself — the wire
@@ -27,9 +30,26 @@ public static class NetMapPick
         {
             "CliffsAndValleys" => new Cliffs(),
             "DesertWar" => new Desert(seed),
-            "" => (seed & 1) == 0 ? new Desert(seed) : new Cliffs(), // random: a shared coin flip
+            "" => RandomPick(seed), // random: a shared draw over the whole built-in pool
             _ when ArenaBuilders.Has(map) => new BuiltIn(map), // a themed code arena — same on every member
             _ => new Desert(seed),
+        };
+    }
+
+    // The random ("") pick draws from every built-in — Desert, Cliffs, and each themed arena — by a
+    // shared, deterministic index off the lobby seed, so every member lands on the same map. The pool is
+    // ordinally sorted so its order is identical on every member regardless of registry internals.
+    private static Choice RandomPick(int seed)
+    {
+        var pool = new List<string> { "DesertWar", "CliffsAndValleys" };
+        pool.AddRange(ArenaBuilders.Ids);
+        pool.Sort(System.StringComparer.Ordinal);
+        var pick = pool[(int)((uint)seed % (uint)pool.Count)];
+        return pick switch
+        {
+            "DesertWar" => new Desert(seed),
+            "CliffsAndValleys" => new Cliffs(),
+            _ => new BuiltIn(pick),
         };
     }
 }
