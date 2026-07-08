@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Text.Json;
 
 namespace TankGame.Domain.Net;
@@ -55,9 +56,6 @@ public static class LobbyProtocol
     /// <summary>Leading kind byte of a client→server lobby command.</summary>
     public const byte MsgLobbyCmd = 0x11;
 
-    private static readonly JsonSerializerOptions CommandOptions =
-        new() { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
-
     /// <summary>Parses a <see cref="MsgLobbyState"/> message (tag byte then UTF-8 JSON) into a view.</summary>
     public static LobbyView ParseState(ReadOnlySpan<byte> message)
     {
@@ -83,25 +81,55 @@ public static class LobbyProtocol
             root.TryGetProperty("map", out var map) ? map.GetString() ?? "" : "");
     }
 
-    public static byte[] EncodeSetName(string name) => Tag(new { type = "setName", name });
-
-    public static byte[] EncodeSetReady(bool ready) => Tag(new { type = "setReady", ready });
-
-    public static byte[] EncodeSetTeam(int team) => Tag(new { type = "setTeam", team });
-
-    public static byte[] EncodeSetMode(GameMode mode) => Tag(new { type = "setMode", mode = ModeString(mode) });
-
-    public static byte[] EncodeSetMap(string map) => Tag(new { type = "setMap", map });
-
-    public static byte[] EncodeStart() => Tag(new { type = "start" });
-
-    private static byte[] Tag(object command)
+    public static byte[] EncodeSetName(string name) => Tag(w =>
     {
-        var json = JsonSerializer.SerializeToUtf8Bytes(command, CommandOptions);
-        var message = new byte[json.Length + 1];
-        message[0] = MsgLobbyCmd;
-        json.CopyTo(message, 1);
-        return message;
+        w.WriteString("type", "setName");
+        w.WriteString("name", name);
+    });
+
+    public static byte[] EncodeSetReady(bool ready) => Tag(w =>
+    {
+        w.WriteString("type", "setReady");
+        w.WriteBoolean("ready", ready);
+    });
+
+    public static byte[] EncodeSetTeam(int team) => Tag(w =>
+    {
+        w.WriteString("type", "setTeam");
+        w.WriteNumber("team", team);
+    });
+
+    public static byte[] EncodeSetMode(GameMode mode) => Tag(w =>
+    {
+        w.WriteString("type", "setMode");
+        w.WriteString("mode", ModeString(mode));
+    });
+
+    public static byte[] EncodeSetMap(string map) => Tag(w =>
+    {
+        w.WriteString("type", "setMap");
+        w.WriteString("map", map);
+    });
+
+    public static byte[] EncodeStart() => Tag(w => w.WriteString("type", "start"));
+
+    // Hand-write the command JSON with a Utf8JsonWriter (a forward-only writer, no reflection) rather
+    // than JsonSerializer over an anonymous type: the trimmed WebAssembly runtime disables
+    // reflection-based serialization (throws JsonSerializerIsReflectionDisabled), which killed EVERY
+    // lobby command on the web build — SetName, SetMode/Map, and Start — so a web host's room controls
+    // (including "Start") silently did nothing. The reader side (ParseState) already uses JsonDocument.
+    private static byte[] Tag(Action<Utf8JsonWriter> writeBody)
+    {
+        using var stream = new MemoryStream();
+        stream.WriteByte(MsgLobbyCmd);
+        using (var writer = new Utf8JsonWriter(stream))
+        {
+            writer.WriteStartObject();
+            writeBody(writer);
+            writer.WriteEndObject();
+        }
+
+        return stream.ToArray();
     }
 
     private static GameMode ParseMode(string? mode) => mode == "team" ? GameMode.Team : GameMode.Ffa;

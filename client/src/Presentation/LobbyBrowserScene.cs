@@ -46,6 +46,10 @@ public partial class LobbyBrowserScene : Control
         MenuStyle.AddBackdrop(this);
 
         _lobby = NetworkSession.LobbyFactory();
+        if (_lobby is Node lobbyNode)
+        {
+            AddChild(lobbyNode); // the Godot-HttpRequest client only pumps inside the tree
+        }
 
         var menu = new VBoxContainer { Name = "Menu" };
         menu.SetAnchorsAndOffsetsPreset(LayoutPreset.Center);

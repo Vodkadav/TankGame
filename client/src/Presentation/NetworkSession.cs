@@ -1,4 +1,5 @@
 using System;
+using Godot;
 using TankGame.Domain.Net;
 using TankGame.Infrastructure.Net;
 using NetMode = TankGame.Domain.Net.GameMode; // Presentation has its own local-play GameMode enum
@@ -14,9 +15,12 @@ public static class NetworkSession
     private const string WorkerHost = "tankgame-worker.vodkadav.workers.dev";
 
     /// <summary>Builds the lobby directory client. Swap in tests; the default hits the live Worker's
-    /// lobby routes.</summary>
+    /// lobby routes. Web gets the Godot-HttpRequest client — .NET's HttpClient NREs on the
+    /// multi-threaded WASM runtime (see <see cref="GodotHttpLobbyClient"/>).</summary>
     public static Func<ILobbyClient> LobbyFactory { get; set; } =
-        () => new HttpLobbyClient($"https://{WorkerHost}");
+        () => OS.HasFeature("web")
+            ? new GodotHttpLobbyClient { BaseUrl = $"https://{WorkerHost}" }
+            : new HttpLobbyClient($"https://{WorkerHost}");
 
     /// <summary>Builds the transport for a lobby code. Swap in tests to assert the click path without
     /// opening a socket; the default connects a live WebSocket to <c>/room/{code}</c>.</summary>
@@ -42,6 +46,11 @@ public static class NetworkSession
     /// "started" — the networked play scene reads slots/names/teams/mode/map from it.</summary>
     public static LobbyView? StartedLobby { get; set; }
 
+    /// <summary>This client's own slot, learned from the welcome during the lobby and carried across
+    /// the scene change: the welcome is a one-shot on connect, so the play scene — which re-subscribes
+    /// after the handoff — would otherwise never learn its slot and never initialize.</summary>
+    public static byte? LocalSlot { get; set; }
+
     /// <summary>Joins <paramref name="code"/> by building (and, for the live factory, connecting) its
     /// transport, and records it as <see cref="Active"/>.</summary>
     public static IMatchTransport Join(string code)
@@ -59,5 +68,6 @@ public static class NetworkSession
         PendingMode = null;
         PendingMap = null;
         StartedLobby = null;
+        LocalSlot = null;
     }
 }

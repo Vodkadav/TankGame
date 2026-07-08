@@ -174,8 +174,10 @@ public partial class LobbyRoomScene : Control
 
         if (_controller.HasStarted)
         {
-            // Snapshot the final roster (slots, names, teams, mode, map) for the play scene.
+            // Snapshot the final roster (slots, names, teams, mode, map) and our own slot for the play
+            // scene — the welcome that carried the slot is a one-shot that already fired here.
             NetworkSession.StartedLobby = _controller.State;
+            NetworkSession.LocalSlot = _controller.LocalSlot;
             Go(NetArenaScenePath);
             return;
         }

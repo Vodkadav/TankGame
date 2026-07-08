@@ -1,6 +1,5 @@
 using System;
 using System.Net.Http;
-using System.Text.Json;
 using System.Threading.Tasks;
 using TankGame.Domain.Net;
 
@@ -32,11 +31,9 @@ public sealed class HttpLobbyClient : ILobbyClient
                 return null;
             }
 
-            using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
-            return body.RootElement.GetProperty("code").GetString();
+            return LobbyWire.ParseCreatedCode(await response.Content.ReadAsStringAsync());
         }
-        catch (Exception e) when (e is HttpRequestException or TaskCanceledException or JsonException
-            or System.Collections.Generic.KeyNotFoundException)
+        catch (Exception e) when (e is HttpRequestException or TaskCanceledException)
         {
             return null;
         }
@@ -65,21 +62,9 @@ public sealed class HttpLobbyClient : ILobbyClient
                 return null;
             }
 
-            using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
-            var open = new System.Collections.Generic.List<OpenLobbyInfo>();
-            foreach (var lobby in body.RootElement.EnumerateArray())
-            {
-                open.Add(new OpenLobbyInfo(
-                    lobby.GetProperty("code").GetString() ?? "",
-                    lobby.GetProperty("mode").GetString() == "team" ? GameMode.Team : GameMode.Ffa,
-                    lobby.GetProperty("players").GetInt32(),
-                    lobby.TryGetProperty("map", out var map) ? map.GetString() ?? "" : ""));
-            }
-
-            return open;
+            return LobbyWire.ParseOpenLobbies(await response.Content.ReadAsStringAsync());
         }
-        catch (Exception e) when (e is HttpRequestException or TaskCanceledException or JsonException
-            or System.Collections.Generic.KeyNotFoundException or InvalidOperationException)
+        catch (Exception e) when (e is HttpRequestException or TaskCanceledException)
         {
             return null;
         }
