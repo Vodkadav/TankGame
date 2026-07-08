@@ -52,6 +52,7 @@ public partial class NetArena3DScene : Node3D
     private readonly Dictionary<byte, Tank3DView> _tankViews = new();
     private float _accumulator;
     private byte? _localSlot;
+    private int _matchSeed; // the lobby's match seed: drives the spawn shuffle and per-bot AI seeding
 
     // The loading handshake (issue #2): when we enter during the lobby's "loading" phase we report our
     // arena is built and then hold — no ticks, no snapshots — until the server flips to "started"
@@ -313,6 +314,10 @@ public partial class NetArena3DScene : Node3D
             NetworkSession.StartedLobby, slot, NetworkSession.ActiveCode, LobbyProtocol.MaxPlayers);
         _spawns = SpawnTable.For(_level.Width, _level.Height, _primarySpawn, _secondarySpawn,
             (x, y) => _arena.IsBlocked(CellCentre(x, y)));
+        // Shuffle spawn assignment with the shared match seed so no slot is nailed to the same cell every
+        // match (issue #4). Every peer derives the same spawn list + seed, so host and guest agree.
+        _matchSeed = NetworkSession.StartedLobby?.Seed ?? 0;
+        _spawns = Shuffled(_spawns, _matchSeed);
         if (slot == HostSlot)
         {
             BecomeHost();
@@ -344,7 +349,10 @@ public partial class NetArena3DScene : Node3D
             {
                 NetRoster.SeatKind.LocalHuman => _hostInput,
                 NetRoster.SeatKind.RemoteHuman => guestInputs[seat.Slot] = new RelayedInputSource(),
-                _ => ai = new AiInputSource(_world, _arena, grid: _grid, tileSize: TileSize, origin: GridOrigin),
+                // Each bot seeded matchSeed ^ slot: distinct temperaments, yet identical on every host run
+                // of the same match (issue #3). Host-only, so no cross-peer determinism needed.
+                _ => ai = new AiInputSource(_world, _arena, grid: _grid, tileSize: TileSize, origin: GridOrigin,
+                    seed: _matchSeed ^ seat.Slot),
             };
 
             var spawn = _spawns[seat.Slot % _spawns.Count];
@@ -667,4 +675,18 @@ public partial class NetArena3DScene : Node3D
 
     private static NVector2 CellCentre(int x, int y) =>
         new(GridOrigin.X + ((x + 0.5f) * TileSize), GridOrigin.Y + ((y + 0.5f) * TileSize));
+
+    // Deterministic Fisher-Yates: same list + same seed → same order on every peer.
+    private static IReadOnlyList<(int X, int Y)> Shuffled(IReadOnlyList<(int X, int Y)> spawns, int seed)
+    {
+        var shuffled = new List<(int X, int Y)>(spawns);
+        var rng = new System.Random(seed);
+        for (var i = shuffled.Count - 1; i > 0; i--)
+        {
+            var j = rng.Next(i + 1);
+            (shuffled[i], shuffled[j]) = (shuffled[j], shuffled[i]);
+        }
+
+        return shuffled;
+    }
 }

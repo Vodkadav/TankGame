@@ -73,7 +73,7 @@ public sealed class AiInputSource : IInputSource
 
     private ITank? _self;
     private Random _rng = new();
-    private AiPersonality _personality = AiPersonality.Roll(new Random());
+    private AiPersonality _personality; // rolled in Bind; Read() no-ops until _self is set, so default is never used
     private AiState _state = AiState.Wander;
     private int _stateCooldown;
     private ITank? _target;

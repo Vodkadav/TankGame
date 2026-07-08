@@ -1144,8 +1144,11 @@ public partial class Arena3DScene : Node3D
         var enemyIndex = 0;
         foreach (var (ex, ey) in enemyCells)
         {
-            var ambusher = enemyIndex % 2 == 1;
-            var ai = new AiInputSource(_world, _arena, _bushes, ambusher, _grid, TileSize, GridOrigin);
+            // Seed each bot from the per-match arena seed so temperaments (and which bots ambush) differ
+            // every match instead of repeating the same cast — issue #3, less predictable AI.
+            var seed = GameSetup.ArenaSeed ^ ((enemyIndex + 1) * 0x51ED2701);
+            var ambusher = (seed & 4) != 0;
+            var ai = new AiInputSource(_world, _arena, _bushes, ambusher, _grid, TileSize, GridOrigin, seed: seed);
             var enemy = new Tank(ai, _world, _arena, CellCentre(ex, ey),
                 EnemySpeed, FireInterval, ProjectileSpeed, maxHp: TankMaxHp, team: EnemyTeam, lives: StartingLives,
                 terrain: _sandbags, teleporter: _teleporter, displayName: names.Next(), respawnPoint: respawnPoint);
