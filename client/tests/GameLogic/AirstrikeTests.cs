@@ -24,7 +24,7 @@ public class AirstrikeTests
         new(new NoInput(), world, new OpenArena(), pos, speed: 100f, fireInterval: 0.3f,
             projectileSpeed: 600f, maxHp: 3, team: team);
 
-    // One zone: it arms immediately (arm time 0) and detonates after the delay (0.5s).
+    // One zone: it arms immediately (arm time 0) but does not detonate until armWindow + delay = 1.0s.
     [Fact]
     public void Airstrike_DetonatesAZone_DamagingEnemiesInItsBlast()
     {
@@ -35,11 +35,11 @@ public class AirstrikeTests
             armWindow: 0.5f, delay: 0.5f, damage: 2);
         world.Spawn(strike);
 
-        world.Step(0.3f); // still in the highlight delay
+        world.Step(0.3f); // still telegraphing / waiting out the delay
         Assert.Equal(enemy.MaxHp, enemy.Hp);
         Assert.Contains(strike, world.Entities);
 
-        world.Step(0.3f); // 0.6 ≥ 0.5 → detonates
+        world.Step(0.8f); // 1.1 ≥ 1.0 → detonates
         Assert.Equal(enemy.MaxHp - 2, enemy.Hp);
         Assert.DoesNotContain(strike, world.Entities); // all zones spent → reaped
     }
@@ -72,8 +72,8 @@ public class AirstrikeTests
         Assert.Equal(enemy.MaxHp, enemy.Hp);
     }
 
-    // Two zones over a 0.5s arm window with a 0.5s delay: zone0 lights at 0 → booms at 0.5;
-    // zone1 lights at 0.5 (the last of two) → booms at 1.0. The blasts sweep in the same order.
+    // Telegraph-first, then sweep: with a 0.5s arm window and 0.5s delay, zone0 booms at
+    // armWindow + delay = 1.0, and zone1 (last of two, arms at 0.5) booms at 1.5 — same order.
     [Fact]
     public void Airstrike_DetonatesZonesInOrder_Staggered()
     {
@@ -86,11 +86,11 @@ public class AirstrikeTests
         world.Spawn(new Airstrike(world, zones, callerTeam: 1, zoneRadius: 100f,
             armWindow: 0.5f, delay: 0.5f, damage: 2));
 
-        world.Step(0.6f); // zone0 has gone (≥0.5), zone1 not yet (<1.0)
+        world.Step(1.1f); // zone0 has gone (≥1.0), zone1 not yet (<1.5)
         Assert.Equal(first.MaxHp - 2, first.Hp);
         Assert.Equal(second.MaxHp, second.Hp);
 
-        world.Step(0.5f); // zone1 detonates (1.1 ≥ 1.0)
+        world.Step(0.5f); // zone1 detonates (1.6 ≥ 1.5)
         Assert.Equal(second.MaxHp - 2, second.Hp);
     }
 
@@ -120,8 +120,48 @@ public class AirstrikeTests
             .ApplyTo(caller, world);
 
         var strike = Assert.Single(world.Entities.OfType<Airstrike>());
-        // A ~30-cell blob, jittered a little — well short of the old ~55%-of-field carpet (an 8x8 grid is
-        // 64 cells, so ~30 is under half).
-        Assert.InRange(strike.Zones.Count, 25, 35);
+        // A ~6-cell blob (5–7 with jitter) — a small clump, ~20% of the former ~30-cell strike.
+        Assert.InRange(strike.Zones.Count, 5, 7);
+    }
+
+    // Telegraph-first timing: the whole blob lights (arms) before ANYTHING detonates, then the zones
+    // detonate in growth order. With a 0.6s arm window and 0.2s delay, the last zone arms at t=0.6 and
+    // the first boom lands at armWindow + delay = 0.8 (zones then at 0.8, 1.1, 1.4).
+    [Fact]
+    public void Airstrike_TelegraphsEveryZone_BeforeAnyDetonation_ThenSweepsInOrder()
+    {
+        var world = new World();
+        var a = TankAt(world, Vector2.Zero, team: 0);
+        var b = TankAt(world, new Vector2(1000f, 0f), team: 0);
+        var c = TankAt(world, new Vector2(2000f, 0f), team: 0);
+        world.Spawn(a);
+        world.Spawn(b);
+        world.Spawn(c);
+        var zones = new[] { Vector2.Zero, new Vector2(1000f, 0f), new Vector2(2000f, 0f) };
+        var strike = new Airstrike(world, zones, callerTeam: 1, zoneRadius: 100f,
+            armWindow: 0.6f, delay: 0.2f, damage: 1);
+        world.Spawn(strike);
+
+        // (a) just under the arm window: nothing has detonated yet (first boom is at 0.8).
+        world.Step(0.59f);
+        Assert.All(strike.Zones, z => Assert.NotEqual(AirstrikeZonePhase.Detonated, z.Phase));
+        Assert.Equal(a.MaxHp, a.Hp);
+
+        // (b) by t = armWindow every zone has armed (telegraph complete), still none detonated.
+        world.Step(0.02f); // 0.61
+        Assert.All(strike.Zones, z => Assert.Equal(AirstrikeZonePhase.Armed, z.Phase));
+
+        // (c) detonations sweep in growth order: zone0 first (0.8), then zone1 (1.1), then zone2 (1.4).
+        world.Step(0.24f); // 0.85
+        Assert.Equal(a.MaxHp - 1, a.Hp);
+        Assert.Equal(b.MaxHp, b.Hp);
+        world.Step(0.3f); // 1.15
+        Assert.Equal(b.MaxHp - 1, b.Hp);
+        Assert.Equal(c.MaxHp, c.Hp);
+        world.Step(0.3f); // 1.45
+        Assert.Equal(c.MaxHp - 1, c.Hp);
+
+        // (d) all zones spent → the strike is no longer alive.
+        Assert.False(strike.IsAlive);
     }
 }
