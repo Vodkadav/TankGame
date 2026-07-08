@@ -127,6 +127,11 @@ function start(state: LobbyState, slot: number): LobbyState {
   if (!hasSlot(state, slot) || state.phase !== "waiting" || state.players.length < MIN_PLAYERS_TO_START) {
     return state;
   }
+  // Every guest must have readied up first; the host pressing Start is their own readiness, so a lone
+  // host still launches instantly (owner ask). Empty seats are AI-filled at launch and never gate it.
+  if (state.players.some((p) => p.slot !== state.hostSlot && !p.ready)) {
+    return state;
+  }
   return { ...state, phase: "countdown", countdown: COUNTDOWN_SECONDS };
 }
 

@@ -38,6 +38,7 @@ public partial class LobbyBrowserScene : Control
     private OptionButton _modePick = null!;
     private OptionButton _mapPick = null!;
     private readonly List<string> _mapIds = new(); // parallel to _mapPick items; "" = random
+    private bool _refreshing; // guards overlapping refreshes (auto-timer + manual button + join races)
 
     public override void _Ready()
     {
@@ -116,6 +117,13 @@ public partial class LobbyBrowserScene : Control
         AddChild(menu);
         BuildCreatePanel();
         MenuStyle.AttachHoverRecursive(this); // the static buttons + create-panel controls
+
+        // The open-games list goes stale on its own (rooms fill, empty, and close), so re-poll on a
+        // repeating timer instead of relying on the player to hit Refresh.
+        var autoRefresh = new Timer { Name = "AutoRefresh", WaitTime = 5.0, Autostart = true };
+        autoRefresh.Timeout += () => _ = RefreshAsync();
+        AddChild(autoRefresh);
+
         _ = RefreshAsync(); // the list is fresh every time the browser opens
     }
 
@@ -174,25 +182,38 @@ public partial class LobbyBrowserScene : Control
 
     private async Task RefreshAsync()
     {
-        _status.Text = string.Empty;
-        var open = await _lobby.ListOpenLobbiesAsync();
-
-        foreach (var child in _list.GetChildren())
+        if (_refreshing)
         {
-            child.QueueFree();
+            return; // a refresh is already in flight; don't double-build the list
         }
 
-        if (open is null)
+        _refreshing = true;
+        try
         {
-            _empty.Visible = false;
-            _status.Text = "browser.error";
-            return;
-        }
+            _status.Text = string.Empty;
+            var open = await _lobby.ListOpenLobbiesAsync();
 
-        _empty.Visible = open.Count == 0;
-        foreach (var lobby in open)
+            foreach (var child in _list.GetChildren())
+            {
+                child.QueueFree();
+            }
+
+            if (open is null)
+            {
+                _empty.Visible = false;
+                _status.Text = "browser.error";
+                return;
+            }
+
+            _empty.Visible = open.Count == 0;
+            foreach (var lobby in open)
+            {
+                _list.AddChild(BuildRow(lobby));
+            }
+        }
+        finally
         {
-            _list.AddChild(BuildRow(lobby));
+            _refreshing = false;
         }
     }
 

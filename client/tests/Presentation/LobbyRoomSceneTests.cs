@@ -244,6 +244,87 @@ public class LobbyRoomSceneTests : TestClass
         }
     }
 
+    [Test]
+    public void AReadiedGuest_ShowsATick_AndCanToggleTheirReady()
+    {
+        // Local client is the guest in slot 1 (host is slot 0), already readied up.
+        Seat(slot: 1, View(LobbyPhase.Waiting, hostSlot: 0,
+            new LobbyPlayer(0, "Ada", 0, false),
+            new LobbyPlayer(1, "Bea", 1, true)));
+
+        var seat1 = Find("Seat1") as Label ?? throw new Exception("Missing 'Seat1'.");
+        if (!seat1.Text.Contains('✓'))
+        {
+            throw new Exception($"A readied guest's seat must show a tick; showed '{seat1.Text}'.");
+        }
+
+        var ready = Find("Ready") as Button ?? throw new Exception("Missing 'Ready' toggle.");
+        if (!ready.Visible)
+        {
+            throw new Exception("A seated guest must see the Ready toggle.");
+        }
+
+        ready.EmitSignal(BaseButton.SignalName.Toggled, false);
+        if (!ContainsCommand(LobbyProtocol.EncodeSetReady(false)))
+        {
+            throw new Exception("Toggling Ready must send the setReady command.");
+        }
+    }
+
+    [Test]
+    public void TheHost_NeverSeesTheReadyToggle()
+    {
+        // Seated as the host (slot 0) — the host readies by starting, not by a toggle.
+        Seat(slot: 0, View(LobbyPhase.Waiting, hostSlot: 0, new LobbyPlayer(0, "Ada", 0, false)));
+
+        if (Find("Ready") is not Button { Visible: false })
+        {
+            throw new Exception("The host must not see the Ready toggle.");
+        }
+    }
+
+    [Test]
+    public void Start_StaysDisabled_UntilEveryGuestIsReady()
+    {
+        // Host (slot 0) with an un-ready guest → Start is visible but locked.
+        Seat(slot: 0, View(LobbyPhase.Waiting, hostSlot: 0,
+            new LobbyPlayer(0, "Ada", 0, false),
+            new LobbyPlayer(1, "Bea", 1, false)));
+
+        var start = Find("Start") as Button ?? throw new Exception("Missing 'Start'.");
+        if (!start.Visible || !start.Disabled)
+        {
+            throw new Exception("Start must be visible but disabled while a guest is not ready.");
+        }
+
+        _transport.RaiseLobby(View(LobbyPhase.Waiting, hostSlot: 0,
+            new LobbyPlayer(0, "Ada", 0, false),
+            new LobbyPlayer(1, "Bea", 1, true)));
+        if (start.Disabled)
+        {
+            throw new Exception("Start must enable once every guest is ready.");
+        }
+    }
+
+    [Test]
+    public void WhenTheHostLeaves_TheRoomAnnouncesTheNewHost()
+    {
+        // Seated as guest slot 1; host is slot 0 (Ada).
+        Seat(slot: 1, View(LobbyPhase.Waiting, hostSlot: 0,
+            new LobbyPlayer(0, "Ada", 0, false),
+            new LobbyPlayer(1, "Bea", 1, false)));
+
+        // Ada drops → the server migrates the host role to Bea (slot 1).
+        _transport.RaiseLobby(View(LobbyPhase.Waiting, hostSlot: 1,
+            new LobbyPlayer(1, "Bea", 1, false)));
+
+        var notice = Find("HostNotice") as Label ?? throw new Exception("Missing 'HostNotice'.");
+        if (!notice.Text.Contains("Bea"))
+        {
+            throw new Exception($"A host hand-off must name the new host; showed '{notice.Text}'.");
+        }
+    }
+
     private static LobbyView View(LobbyPhase phase, int hostSlot, params LobbyPlayer[] players) =>
         new(NetMode.Ffa, phase, hostSlot, phase == LobbyPhase.Countdown ? 3 : 0, players);
 

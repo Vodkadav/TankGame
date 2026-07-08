@@ -103,10 +103,18 @@ describe("lobby state reducer", () => {
     expect(switched.players.map((p) => p.team)).toEqual([0, 1, 0]);
   });
 
-  it("any player can start once two have joined, opening the countdown", () => {
-    const state = reduce(joinN(2), { type: "start", slot: 1 });
+  it("any player can start once two have joined and the guest is ready", () => {
+    const state = run(joinN(2), { type: "setReady", slot: 1, ready: true }, { type: "start", slot: 1 });
     expect(state.phase).toBe("countdown");
     expect(state.countdown).toBe(COUNTDOWN_SECONDS);
+  });
+
+  it("refuses to start until every guest is ready (the host's start is their readiness)", () => {
+    const two = joinN(2); // host slot 0, guest slot 1 not ready
+    expect(reduce(two, { type: "start", slot: 0 }).phase).toBe("waiting");
+
+    const ready = reduce(two, { type: "setReady", slot: 1, ready: true });
+    expect(reduce(ready, { type: "start", slot: 0 }).phase).toBe("countdown");
   });
 
   it("refuses a start from someone not seated in the lobby", () => {
@@ -115,7 +123,7 @@ describe("lobby state reducer", () => {
   });
 
   it("counts down and hands off to started", () => {
-    let state = reduce(joinN(2), { type: "start", slot: 0 });
+    let state = run(joinN(2), { type: "setReady", slot: 1, ready: true }, { type: "start", slot: 0 });
     for (let i = 0; i < COUNTDOWN_SECONDS; i++) {
       state = reduce(state, { type: "tick" });
     }
@@ -145,7 +153,7 @@ describe("lobby state reducer", () => {
   });
 
   it("keeps counting down when a leave still leaves someone seated", () => {
-    let state = reduce(joinN(2), { type: "start", slot: 0 });
+    let state = run(joinN(2), { type: "setReady", slot: 1, ready: true }, { type: "start", slot: 0 });
     expect(state.phase).toBe("countdown");
     state = reduce(state, { type: "leave", slot: 1 });
     expect(state.phase).toBe("countdown"); // the remaining player still gets their match (AI fill)
@@ -159,7 +167,7 @@ describe("lobby state reducer", () => {
   });
 
   it("rejects joins once the match is counting down", () => {
-    let state = reduce(joinN(2), { type: "start", slot: 0 });
+    let state = run(joinN(2), { type: "setReady", slot: 1, ready: true }, { type: "start", slot: 0 });
     state = reduce(state, { type: "join", slot: 2, name: "late" });
     expect(state.players).toHaveLength(2);
   });
@@ -182,7 +190,7 @@ describe("lobby map", () => {
   });
 
   it("ignores a map pick once the countdown is running", () => {
-    let state = reduce(joinN(2), { type: "start", slot: 0 });
+    let state = run(joinN(2), { type: "setReady", slot: 1, ready: true }, { type: "start", slot: 0 });
     state = reduce(state, { type: "setMap", slot: 0, map: "CliffsAndValleys" });
     expect(state.map).toBe("");
   });
