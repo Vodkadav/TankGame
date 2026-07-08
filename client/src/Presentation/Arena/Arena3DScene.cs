@@ -21,7 +21,7 @@ public partial class Arena3DScene : Node3D
     private const float TankSpeed = 200f;
     private const float EnemySpeed = 140f;
     private const float ProjectileSpeed = 600f;
-    private const float FireInterval = 0.3f;
+    private const float FireInterval = 0.6f; // half the old rate of fire (owner ask 2026-07-08)
     private const float TileSize = 64f;
     private const float CombatHitRadius = 28f;
     private const int PlayerTeam = 0;
@@ -43,10 +43,10 @@ public partial class Arena3DScene : Node3D
     private const int ShieldAmount = 3;
     private const int PowerupCount = 9;
     private const float AirstrikeZoneRadius = 70f;
-    private const float AirstrikeArmWindow = 3f; // all zones light up within 3s, expanding outward
-    private const float AirstrikeDelay = 3f;     // each zone detonates 3s after it lit
+    private const float AirstrikeArmWindow = 5f; // all zones telegraph red within ~5s, expanding outward
+    private const float AirstrikeDelay = 0.5f;   // brief hold once fully telegraphed, then zones detonate in order
     private const int AirstrikeDamage = 3;
-    private const float AirstrikeCooldown = 120f; // the airstrike station refills every 2 minutes
+    private const float AirstrikeCooldown = 50f; // the airstrike station refills every 50s (owner ask 2026-07-08)
 
     private IReadOnlyDictionary<PowerupKind, IPickupEffect> _powerupEffects = null!;
     private IReadOnlyList<(PowerupKind Kind, int X, int Y)> _powerupPlacements = Array.Empty<(PowerupKind, int, int)>();

@@ -25,7 +25,7 @@ public partial class NetArena3DScene : Node3D
     // Match PredictedTank's movement model (200 u/s) so guest prediction replays the host's real
     // Tank faithfully; combat numbers mirror Arena3DScene.
     private const float TankSpeed = 200f;
-    private const float FireInterval = 0.3f;
+    private const float FireInterval = 0.6f; // half the old rate of fire (owner ask 2026-07-08)
     private const float ProjectileSpeed = 600f;
     private const float CombatHitRadius = 28f;
     private const int TankMaxHp = 8;
