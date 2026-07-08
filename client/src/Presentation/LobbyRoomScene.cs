@@ -24,6 +24,7 @@ public partial class LobbyRoomScene : Control
     private IMatchTransport _transport = null!;
     private LobbyController _controller = null!;
     private readonly Label[] _seatNames = new Label[LobbyProtocol.MaxPlayers];
+    private readonly SeatIcon[] _seatIcons = new SeatIcon[LobbyProtocol.MaxPlayers];
     private IReadOnlyList<string> _placeholders = System.Array.Empty<string>();
     private Label _modeLabel = null!;
     private Label _mapLabel = null!;
@@ -39,6 +40,9 @@ public partial class LobbyRoomScene : Control
             return;
         }
 
+        Theme = MenuStyle.Shared;
+        MenuStyle.AddBackdrop(this);
+
         _transport = transport;
         _placeholders = LobbySeats.PlaceholderNames(NetworkSession.ActiveCode, LobbyProtocol.MaxPlayers);
         _controller = new LobbyController(_transport);
@@ -50,21 +54,34 @@ public partial class LobbyRoomScene : Control
         menu.GrowVertical = GrowDirection.Both;
         menu.AddThemeConstantOverride("separation", 12);
 
-        menu.AddChild(new Label
+        var heading = new Label
         {
             Name = "Heading",
             Text = "room.heading",
             HorizontalAlignment = HorizontalAlignment.Center,
-        });
+        };
+        heading.AddThemeFontSizeOverride("font_size", 34);
+        menu.AddChild(heading);
 
+        // Each seat is an icon (human vs AI) + the name, so it's clear at a glance who is a real
+        // player and who is a computer-controlled tank.
         for (var seat = 0; seat < _seatNames.Length; seat++)
         {
+            var row = new HBoxContainer { Name = $"SeatRow{seat}", Alignment = BoxContainer.AlignmentMode.Center };
+            row.AddThemeConstantOverride("separation", 8);
+
+            _seatIcons[seat] = new SeatIcon { Name = $"SeatIcon{seat}" };
+            row.AddChild(_seatIcons[seat]);
+
+            // The name Label keeps the "Seat{seat}" node name so it stays the seat's addressable label.
             _seatNames[seat] = new Label
             {
                 Name = $"Seat{seat}",
                 HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center,
             };
-            menu.AddChild(_seatNames[seat]);
+            row.AddChild(_seatNames[seat]);
+            menu.AddChild(row);
         }
 
         _modeLabel = new Label { Name = "ModeLabel", HorizontalAlignment = HorizontalAlignment.Center };
@@ -90,6 +107,7 @@ public partial class LobbyRoomScene : Control
         menu.AddChild(leave);
 
         AddChild(menu);
+        MenuStyle.AttachHoverRecursive(this);
         Render();
     }
 
@@ -144,11 +162,13 @@ public partial class LobbyRoomScene : Control
             {
                 label.Text = p.Slot == view!.HostSlot ? p.Name + " ★" : p.Name;
                 label.AddThemeColorOverride("font_color", JoinedWhite);
+                _seatIcons[seat].IsHuman = true;
             }
             else
             {
                 label.Text = _placeholders.Count > seat ? _placeholders[seat] : string.Empty;
                 label.AddThemeColorOverride("font_color", PlaceholderGray);
+                _seatIcons[seat].IsHuman = false;
             }
         }
 

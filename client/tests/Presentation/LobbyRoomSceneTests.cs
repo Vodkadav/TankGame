@@ -99,6 +99,27 @@ public class LobbyRoomSceneTests : TestClass
     }
 
     [Test]
+    public void SeatIcons_MarkHumansVsAiSeats()
+    {
+        // Seat 1 is a joined human; the rest are empty (AI-filled once started).
+        Seat(slot: 1, View(LobbyPhase.Waiting, hostSlot: 0,
+            new LobbyPlayer(0, "Ada", 0, false),
+            new LobbyPlayer(1, "Bea", 1, false)));
+
+        var human = Find("SeatIcon1") as SeatIcon ?? throw new Exception("Missing 'SeatIcon1'.");
+        if (!human.IsHuman)
+        {
+            throw new Exception("A joined player's seat icon must mark it as human.");
+        }
+
+        var ai = Find("SeatIcon3") as SeatIcon ?? throw new Exception("Missing 'SeatIcon3'.");
+        if (ai.IsHuman)
+        {
+            throw new Exception("An empty (AI-filled) seat icon must not be marked human.");
+        }
+    }
+
+    [Test]
     public void SeatingIntroduces_TheBattleName_Once()
     {
         Seat(slot: 1, View(LobbyPhase.Waiting, hostSlot: 0, new LobbyPlayer(1, "Player", 1, false)));

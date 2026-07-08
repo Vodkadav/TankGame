@@ -27,12 +27,13 @@ public partial class TitleScene : Control
     {
         LoadRememberedName();
         GameSetup.LoadSettings();
+        Theme = MenuStyle.Shared;
 
         _sfx = new SfxPool { Name = "SfxPool" };
         AddChild(_sfx);
         _sfx.SetVolumeDb(GameSetup.SfxVolumeDb);
 
-        BuildBackdrop(); // behind the menu — added before it so the menu draws on top
+        MenuStyle.AddBackdrop(this); // behind the menu — added before it so the menu draws on top
 
         var menu = new VBoxContainer { Name = "Menu" };
         menu.SetAnchorsAndOffsetsPreset(LayoutPreset.Center);
@@ -40,12 +41,14 @@ public partial class TitleScene : Control
         menu.GrowVertical = GrowDirection.Both;
         menu.AddThemeConstantOverride("separation", 12);
 
-        menu.AddChild(new Label
+        var title = new Label
         {
             Name = "Title",
             Text = "title.heading",
             HorizontalAlignment = HorizontalAlignment.Center,
-        });
+        };
+        title.AddThemeFontSizeOverride("font_size", 44); // the heading looms larger than the buttons
+        menu.AddChild(title);
 
         // Every way into a game asks for the player's battle name first (owner feedback 2026-06-11);
         // the prompt pre-fills the remembered name, so a returning player just confirms.
@@ -76,6 +79,7 @@ public partial class TitleScene : Control
         _settingsOverlay = new SettingsOverlay { Name = "SettingsOverlay" };
         AddChild(_settingsOverlay);
         GameSetup.SettingsChanged += () => _sfx.SetVolumeDb(GameSetup.SfxVolumeDb);
+        MenuStyle.AttachHoverRecursive(this); // every button lifts a little on hover/focus
     }
 
     private void BuildNamePrompt()
@@ -241,53 +245,6 @@ public partial class TitleScene : Control
         {
             GetTree().ChangeSceneToFile(scenePath);
         }
-    }
-
-    private const string BackdropPath = "res://src/Presentation/Title/ui/title_bg.png";
-
-    // A cool cartoon tank-battle backdrop behind the menu (owner ask 2026-06-18). Loaded from the raw
-    // PNG at runtime — like SfxPool's audio — so it works straight after a git pull with no editor
-    // import step; absent art is simply skipped. A faint scrim keeps the menu text legible over it.
-    private void BuildBackdrop()
-    {
-        var tex = LoadPng(BackdropPath);
-        if (tex is null)
-        {
-            return;
-        }
-
-        var backdrop = new TextureRect
-        {
-            Name = "Backdrop",
-            Texture = tex,
-            StretchMode = TextureRect.StretchModeEnum.KeepAspectCovered,
-            MouseFilter = MouseFilterEnum.Ignore,
-        };
-        backdrop.SetAnchorsAndOffsetsPreset(LayoutPreset.FullRect);
-        AddChild(backdrop);
-
-        var scrim = new ColorRect
-        {
-            Name = "BackdropScrim",
-            Color = new Color(0f, 0f, 0f, 0.35f),
-            MouseFilter = MouseFilterEnum.Ignore,
-        };
-        scrim.SetAnchorsAndOffsetsPreset(LayoutPreset.FullRect);
-        AddChild(scrim);
-    }
-
-    private static Texture2D? LoadPng(string resPath)
-    {
-        using var file = FileAccess.Open(resPath, FileAccess.ModeFlags.Read);
-        if (file is null)
-        {
-            return null;
-        }
-
-        var img = new Image();
-        return img.LoadPngFromBuffer(file.GetBuffer((long)file.GetLength())) == Error.Ok
-            ? ImageTexture.CreateFromImage(img)
-            : null;
     }
 
     private static Button Button(string name, string textKey) => new() { Name = name, Text = textKey };
