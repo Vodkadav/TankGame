@@ -1,4 +1,5 @@
 using Godot;
+using TankGame.GameLogic;
 
 namespace TankGame.Presentation;
 
@@ -144,6 +145,18 @@ public partial class SettingsOverlay : Node
         };
         vbox.AddChild(enemyToggle);
 
+        // Bot difficulty: a button that cycles Easy → Normal → Hard on press.
+        vbox.AddChild(RowLabel("settings.difficulty"));
+        var difficultyBtn = new Button { Text = DifficultyKey(GameSetup.BotDifficulty) };
+        difficultyBtn.AddThemeFontSizeOverride("font_size", 16);
+        difficultyBtn.Pressed += () =>
+        {
+            GameSetup.BotDifficulty = (Difficulty)(((int)GameSetup.BotDifficulty + 1) % 3);
+            difficultyBtn.Text = DifficultyKey(GameSetup.BotDifficulty);
+            GameSetup.ApplySettings();
+        };
+        vbox.AddChild(difficultyBtn);
+
         // Bottom separator + close
         vbox.AddChild(new HSeparator());
         var saveBtn = new Button { Text = "settings.close" };
@@ -155,6 +168,13 @@ public partial class SettingsOverlay : Node
         };
         vbox.AddChild(saveBtn);
     }
+
+    private static string DifficultyKey(Difficulty difficulty) => difficulty switch
+    {
+        Difficulty.Easy => "difficulty.easy",
+        Difficulty.Hard => "difficulty.hard",
+        _ => "difficulty.normal",
+    };
 
     private static void UpdateDbLabel(Label label, float db) =>
         label.Text = db <= -29f ? TranslationServer.Translate("settings.mute") : SettingsFormat.Db((int)db);

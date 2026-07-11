@@ -362,13 +362,17 @@ public partial class NetArena3DScene : Node3D
                 NetRoster.SeatKind.RemoteHuman => guestInputs[seat.Slot] = new RelayedInputSource(),
                 // Each bot seeded matchSeed ^ slot: distinct temperaments, yet identical on every host run
                 // of the same match (issue #3). Host-only, so no cross-peer determinism needed.
+                // Host's persisted difficulty governs net bots (guests mirror host snapshots anyway).
                 _ => ai = new AiInputSource(_world, _arena, grid: _grid, tileSize: TileSize, origin: GridOrigin,
-                    seed: _matchSeed ^ seat.Slot),
+                    seed: _matchSeed ^ seat.Slot, difficulty: GameSetup.BotDifficulty),
             };
 
             var spawn = _spawns[seat.Slot % _spawns.Count];
+            var fireInterval = ai is null
+                ? FireInterval
+                : FireInterval * DifficultyPreset.For(GameSetup.BotDifficulty).FireIntervalScale;
             var tank = new Tank(input, _world, _arena, CellCentre(spawn.X, spawn.Y),
-                TankSpeed, FireInterval, ProjectileSpeed, maxHp: TankMaxHp, team: seat.Team,
+                TankSpeed, fireInterval, ProjectileSpeed, maxHp: TankMaxHp, team: seat.Team,
                 displayName: seat.Name);
             ai?.Bind(tank);
             _tanks[seat.Slot] = tank;

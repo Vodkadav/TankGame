@@ -124,6 +124,9 @@ public static class GameSetup
     /// see who you're fighting; the fog still hides out-of-vision enemies (and their tags) entirely.</summary>
     public static bool ShowEnemyNames { get; set; } = true;
 
+    /// <summary>Bot skill level for AI tanks (solo, legacy 2D, and the host's net-bot fill).</summary>
+    public static Difficulty BotDifficulty { get; set; } = Difficulty.Normal;
+
     /// <summary>Raised whenever the user saves new settings; subscribers update live.</summary>
     public static event System.Action? SettingsChanged;
 
@@ -140,6 +143,7 @@ public static class GameSetup
         BrightnessMultiplier = (float) cfg.GetValue("display", "brightness",           1f);
         ShowFriendlyNames    = (bool)  cfg.GetValue("display", "show_friendly_names", true);
         ShowEnemyNames       = (bool)  cfg.GetValue("display", "show_enemy_names",    true);
+        BotDifficulty        = (Difficulty)(int)cfg.GetValue("game", "bot_difficulty", (int)Difficulty.Normal);
     }
 
     /// <summary>Persist all user settings and raise <see cref="SettingsChanged"/>.</summary>
@@ -152,6 +156,7 @@ public static class GameSetup
         cfg.SetValue("display", "brightness",           BrightnessMultiplier);
         cfg.SetValue("display", "show_friendly_names", ShowFriendlyNames);
         cfg.SetValue("display", "show_enemy_names",    ShowEnemyNames);
+        cfg.SetValue("game",    "bot_difficulty",      (int)BotDifficulty);
         cfg.Save(SettingsPath);
         SettingsChanged?.Invoke();
     }

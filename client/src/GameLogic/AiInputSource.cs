@@ -70,6 +70,7 @@ public sealed class AiInputSource : IInputSource
     private readonly Vector2 _origin;
     private readonly AiPersonality? _explicitPersonality;
     private readonly int? _seed;
+    private readonly DifficultyPreset _preset;
 
     private ITank? _self;
     private Random _rng = new();
@@ -91,6 +92,8 @@ public sealed class AiInputSource : IInputSource
     /// <param name="seed">Seeds the per-tank RNG (personality roll, target/pickup choice, wander heading).
     /// The host passes <c>matchSeed ^ slot</c> so each bot differs yet a match is reproducible. Omit to
     /// derive from the tank id, as before.</param>
+    /// <param name="difficulty">Bot skill preset: scales vision and (on Easy) adds a seeded aim error
+    /// when firing. Default Normal is exactly the pre-difficulty behaviour.</param>
     public AiInputSource(
         IWorld world,
         IArena arena,
@@ -100,7 +103,8 @@ public sealed class AiInputSource : IInputSource
         float tileSize = 0f,
         Vector2 origin = default,
         AiPersonality? personality = null,
-        int? seed = null)
+        int? seed = null,
+        Difficulty difficulty = Difficulty.Normal)
     {
         _world = world;
         _arena = arena;
@@ -111,6 +115,7 @@ public sealed class AiInputSource : IInputSource
         _origin = origin;
         _explicitPersonality = personality;
         _seed = seed;
+        _preset = DifficultyPreset.For(difficulty);
     }
 
     /// <summary>Links this controller to the tank it drives and finalises its seeded RNG + temperament.</summary>
@@ -118,7 +123,9 @@ public sealed class AiInputSource : IInputSource
     {
         _self = self;
         _rng = new Random(_seed ?? self.Id.GetHashCode());
-        _personality = _explicitPersonality ?? AiPersonality.Roll(_rng);
+        var rolled = _explicitPersonality ?? AiPersonality.Roll(_rng);
+        // Difficulty scales how far this bot sees, on top of whatever temperament it rolled.
+        _personality = rolled with { Vision = rolled.Vision * _preset.VisionScale };
     }
 
     public TankInput Read()
@@ -144,7 +151,7 @@ public sealed class AiInputSource : IInputSource
             if (distance <= FireRange)
             {
                 var move = distance > _personality.Standoff ? DirectionTo(enemy.Position) : Vector2.Zero;
-                return new TankInput(move, AimAt(enemy.Position), Fire: true);
+                return new TankInput(move, JitteredAim(AimAt(enemy.Position)), Fire: true);
             }
         }
 
@@ -290,6 +297,11 @@ public sealed class AiInputSource : IInputSource
         var aim = AimAt(enemy.Position);
         var fire = Vector2.Distance(enemy.Position, _self!.Position) <= FireRange;
 
+        if (fire)
+        {
+            aim = JitteredAim(aim);
+        }
+
         if (_concealment!.ConcealsAt(_self.Position))
         {
             return new TankInput(Vector2.Zero, aim, fire);
@@ -311,6 +323,14 @@ public sealed class AiInputSource : IInputSource
 
         _wanderCooldown--;
         return new TankInput(_wanderDirection, MathF.Atan2(_wanderDirection.Y, _wanderDirection.X), Fire: false);
+    }
+
+    // Easy bots shoot with a fresh seeded error each shot instead of laser accuracy; Normal/Hard
+    // presets have zero jitter, so this is the identity for them.
+    private float JitteredAim(float aim)
+    {
+        var bound = _preset.AimJitterRadians;
+        return bound <= 0f ? aim : aim + ((float)_rng.NextDouble() * 2f - 1f) * bound;
     }
 
     private float AimAt(Vector2 point)

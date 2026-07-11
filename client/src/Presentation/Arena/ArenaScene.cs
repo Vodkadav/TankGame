@@ -242,9 +242,11 @@ public partial class ArenaScene : Node2D
                 // differ every match instead of repeating the same cast — issue #3, less predictable AI.
                 var seed = GameSetup.ArenaSeed ^ ((enemyIndex + 1) * 0x51ED2701);
                 var ambusher = (seed & 4) != 0;
-                var ai = new AiInputSource(_world, _arena, _bushes, ambusher, _grid, TileSize, GridOrigin, seed: seed);
+                var ai = new AiInputSource(_world, _arena, _bushes, ambusher, _grid, TileSize, GridOrigin, seed: seed,
+                    difficulty: GameSetup.BotDifficulty);
                 var enemy = new Tank(ai, _world, _arena, CellCentre(ex, ey),
-                    EnemySpeed, FireInterval, ProjectileSpeed, maxHp: TankMaxHp, team: EnemyTeam, lives: StartingLives, terrain: _sandbags);
+                    EnemySpeed, FireInterval * DifficultyPreset.For(GameSetup.BotDifficulty).FireIntervalScale,
+                    ProjectileSpeed, maxHp: TankMaxHp, team: EnemyTeam, lives: StartingLives, terrain: _sandbags);
                 ai.Bind(enemy); // resolve the input-source ↔ tank construction cycle
                 SpawnTank(enemy);
                 enemyIndex++;
