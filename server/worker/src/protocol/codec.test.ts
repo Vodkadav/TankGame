@@ -33,12 +33,14 @@ describe("protocol codec", () => {
         { cellX: 12, cellY: 0, material: 0, hp: 0 },
       ],
       projectiles: [],
+
+      powerups: [],
     };
     expect(decodeSnapshot(encodeSnapshot(original))).toEqual(original);
   });
 
   it("round-trips an empty snapshot", () => {
-    const original: SnapshotFrame = { tick: 7, acks: [{ slot: 1, seq: 7 }], tanks: [], wallDeltas: [], projectiles: [] };
+    const original: SnapshotFrame = { tick: 7, acks: [{ slot: 1, seq: 7 }], tanks: [], wallDeltas: [], projectiles: [], powerups: [] };
     expect(decodeSnapshot(encodeSnapshot(original))).toEqual(original);
   });
 
@@ -52,8 +54,38 @@ describe("protocol codec", () => {
         { x: 320, y: 64, rotation: 1.25, style: 0, layer: 0 },
         { x: 96.5, y: 200, rotation: -2.5, style: 1, layer: 2 },
       ],
+      powerups: [],
     };
     expect(decodeSnapshot(encodeSnapshot(original))).toEqual(original);
+  });
+
+  it("round-trips a SnapshotFrame with powerups", () => {
+    const original: SnapshotFrame = {
+      tick: 12,
+      acks: [{ slot: 1, seq: 3 }],
+      tanks: [],
+      wallDeltas: [],
+      projectiles: [],
+      powerups: [
+        { id: 3, kind: 8, cellX: 5, cellY: 9, available: 1 },
+        { id: 4, kind: 0, cellX: 20, cellY: 1, available: 0 },
+      ],
+    };
+    expect(decodeSnapshot(encodeSnapshot(original))).toEqual(original);
+  });
+
+  it("decodes pre-powerup snapshot bytes with empty powerups", () => {
+    // The powerup section is a tolerated trailing extension — the old layout still decodes.
+    const legacy = new Uint8Array([
+      0x07, 0x00, 0x00, 0x00, // tick = 7
+      0x00, // ackCount = 0
+      0x00, // tankCount = 0
+      0x00, 0x00, // wallCount = 0
+      0x00, 0x00, // projectileCount = 0
+    ]);
+    const decoded = decodeSnapshot(legacy);
+    expect(decoded.tick).toBe(7);
+    expect(decoded.powerups).toEqual([]);
   });
 
   // Cross-language parity anchor — these exact bytes are asserted byte-for-byte by the C# codec
@@ -65,7 +97,7 @@ describe("protocol codec", () => {
   });
 
   it("tags a snapshot message with the snapshot kind byte", () => {
-    const frame: SnapshotFrame = { tick: 7, acks: [{ slot: 1, seq: 7 }], tanks: [], wallDeltas: [], projectiles: [] };
+    const frame: SnapshotFrame = { tick: 7, acks: [{ slot: 1, seq: 7 }], tanks: [], wallDeltas: [], projectiles: [], powerups: [] };
     const message = encodeSnapshotMessage(frame);
     expect(message[0]).toBe(MSG_SNAPSHOT);
     expect(decodeSnapshot(message.subarray(1))).toEqual(frame);
@@ -106,6 +138,8 @@ describe("protocol codec", () => {
         tanks: [{ slot: 0, x: 64, y: 128, rotation: 0, turretRotation: 0.5, hp: 3, team: 1, shield: 0, layer: 0 }],
         wallDeltas: [{ cellX: 5, cellY: 6, material: 1, hp: 2 }],
         projectiles: [],
+
+        powerups: [],
       }),
     ];
     expect(bytes).toEqual([
@@ -129,6 +163,34 @@ describe("protocol codec", () => {
       0x01, // material = 1 (brick)
       0x02, // hp = 2
       0x00, 0x00, // projectileCount = 0
+      0x00, // powerupCount = 0
+    ]);
+  });
+
+  // Parity anchor — ProtocolCodecTests.cs asserts the identical bytes for this powerup entry.
+  it("encodes a SnapshotFrame with a powerup to the canonical byte vector", () => {
+    const bytes = [
+      ...encodeSnapshot({
+        tick: 2,
+        acks: [],
+        tanks: [],
+        wallDeltas: [],
+        projectiles: [],
+        powerups: [{ id: 3, kind: 8, cellX: 5, cellY: 9, available: 1 }],
+      }),
+    ];
+    expect(bytes).toEqual([
+      0x02, 0x00, 0x00, 0x00, // tick = 2
+      0x00, // ackCount = 0
+      0x00, // tankCount = 0
+      0x00, 0x00, // wallCount = 0
+      0x00, 0x00, // projectileCount = 0
+      0x01, // powerupCount = 1
+      0x03, 0x00, // id = 3
+      0x08, // kind = 8 (Telephone)
+      0x05, 0x00, // cellX = 5
+      0x09, 0x00, // cellY = 9
+      0x01, // available = 1
     ]);
   });
 });

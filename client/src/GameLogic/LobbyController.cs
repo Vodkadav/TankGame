@@ -69,6 +69,16 @@ public sealed class LobbyController
     /// <summary>Reports this client's arena is built during the loading phase.</summary>
     public void SendLoaded() => _transport.SendLobby(LobbyProtocol.EncodeLoaded());
 
+    /// <summary>Rematch re-entry: the welcome is a one-shot fired on connect, so a room scene rebuilt
+    /// on the same socket after a match adopts the carried slot — and, when given, the waiting view
+    /// the arena captured — instead of waiting for a second welcome that never comes.</summary>
+    public void Adopt(byte slot, LobbyView? state)
+    {
+        LocalSlot = slot;
+        State = state ?? State;
+        Changed?.Invoke();
+    }
+
     private void OnWelcome(byte slot)
     {
         LocalSlot = slot;

@@ -19,6 +19,15 @@ public sealed class HostSession
     private readonly IReadOnlyDictionary<byte, RelayedInputSource> _guestInputs;
     private readonly List<WallDelta> _pendingWallDeltas = new();
 
+    // Small stable wire ids for the live pickups (a Guid is too fat for the snapshot). Entries for
+    // reaped pickups linger — a match drops a few dozen at most, so the map stays tiny.
+    private readonly Dictionary<System.Guid, ushort> _pickupIds = new();
+    private ushort _nextPickupId;
+
+    // Both 3D scenes lay their grid at origin zero with 64-unit tiles; the snapshot's pickup cell is
+    // derived from that shared convention. ponytail: promote to a ctor arg if a scene ever moves it.
+    private const float PickupTileSize = 64f;
+
     /// <param name="transport">The relay link: relayed guest inputs in, snapshots out.</param>
     /// <param name="world">The authoritative world, already populated by the scene with every
     /// tank in <paramref name="tanks"/>.</param>
@@ -101,6 +110,21 @@ public sealed class HostSession
             }
         }
 
+        // Every live pickup rides the snapshot (id/kind/cell/available) so a guest can mirror the
+        // boost director's drops; collection resolves here, in the authoritative world.
+        var pickups = new List<Domain.Net.PowerupState>();
+        foreach (var entity in _world.Entities)
+        {
+            if (entity is IPowerup pickup)
+            {
+                pickups.Add(new Domain.Net.PowerupState(
+                    IdFor(pickup.Id), (byte)pickup.Kind,
+                    (ushort)(pickup.Position.X / PickupTileSize),
+                    (ushort)(pickup.Position.Y / PickupTileSize),
+                    (byte)(pickup.IsAvailable ? 1 : 0)));
+            }
+        }
+
         // One reconciliation anchor per human guest — the snapshot is a broadcast, so every
         // predicting guest must find its own slot's ack in it.
         var acks = new List<InputAck>(_guestInputs.Count);
@@ -109,6 +133,19 @@ public sealed class HostSession
             acks.Add(new InputAck(slot, source.LastAppliedSeq));
         }
 
-        _transport.SendSnapshot(new SnapshotFrame(Tick, acks, states, deltas, projectiles));
+        _transport.SendSnapshot(new SnapshotFrame(Tick, acks, states, deltas, projectiles)
+        {
+            Powerups = pickups,
+        });
+    }
+
+    private ushort IdFor(System.Guid pickupId)
+    {
+        if (!_pickupIds.TryGetValue(pickupId, out var id))
+        {
+            _pickupIds[pickupId] = id = _nextPickupId++;
+        }
+
+        return id;
     }
 }

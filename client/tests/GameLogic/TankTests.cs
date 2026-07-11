@@ -486,11 +486,11 @@ public class TankTests
     {
         var tank = NewTank(new ScriptedInput(new TankInput(Vector2.Zero, Aim: 0f, Fire: false)));
 
-        tank.AddShield(2);
-        tank.AddShield(3);
+        tank.AddShield(1);
+        tank.AddShield(1);
         tank.AddShield(-5); // ignored
 
-        Assert.Equal(5, tank.Shield);
+        Assert.Equal(2, tank.Shield); // stacked below the MaxHp cap
     }
 
     [Fact]
@@ -506,6 +506,47 @@ public class TankTests
         world.Step(0.1f);
 
         Assert.DoesNotContain(tank, world.Entities);
+    }
+
+    [Fact]
+    public void Step_ADamageEffect_ScalesTheFiredShotsDamage()
+    {
+        var world = new World();
+        var tank = new Tank(
+            new ScriptedInput(new TankInput(Vector2.Zero, Aim: 0f, Fire: true)),
+            world, new OpenArena(), Vector2.Zero, Speed, FireInterval, ProjectileSpeed);
+        tank.ApplyEffect(new StatusEffect(StatKind.Damage, Mult: 2f, AddFlat: 0f, Seconds: 5f));
+
+        tank.Step(0.05f);
+
+        var shot = Assert.Single(world.Entities.OfType<Projectile>());
+        Assert.Equal(2, shot.Damage); // base loadout damage 1 * damage stat 2
+    }
+
+    [Fact]
+    public void Step_WithoutADamageEffect_FiresShotsAtDamage1()
+    {
+        var world = new World();
+        var tank = new Tank(
+            new ScriptedInput(new TankInput(Vector2.Zero, Aim: 0f, Fire: true)),
+            world, new OpenArena(), Vector2.Zero, Speed, FireInterval, ProjectileSpeed);
+
+        tank.Step(0.05f);
+
+        Assert.Equal(1, Assert.Single(world.Entities.OfType<Projectile>()).Damage);
+    }
+
+    [Fact]
+    public void AddShield_ClampsTheTotalAtMaxHp()
+    {
+        var input = new ScriptedInput(new TankInput(Vector2.Zero, Aim: 0f, Fire: false));
+        var tank = new Tank(input, new World(), new OpenArena(), Vector2.Zero, Speed, FireInterval,
+            ProjectileSpeed, maxHp: 3);
+
+        tank.AddShield(2);
+        tank.AddShield(5);
+
+        Assert.Equal(3, tank.Shield);
     }
 
     [Fact]

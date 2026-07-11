@@ -206,6 +206,7 @@ public partial class TitleScene : Control
     {
         ArenaId.DesertWar, ArenaId.CliffsAndValleys,
         ArenaId.Forest, ArenaId.Volcano, ArenaId.City, ArenaId.Frozen, ArenaId.Canyon,
+        ArenaId.Donut, ArenaId.Cross, ArenaId.Archipelago,
     };
     private static readonly Random SoloMapRng = new();
 

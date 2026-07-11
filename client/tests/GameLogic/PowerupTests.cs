@@ -246,6 +246,53 @@ public class PowerupTests
         Assert.Equal(spot, station.Position); // …right where it started, not carried off
     }
 
+    [Fact]
+    public void Powerup_Despawns_WhenUncollectedPastItsDespawnTimer()
+    {
+        var world = new World();
+        var timed = new Powerup(world, Vector2.Zero, PowerupKind.Repair, new StatusEffectPickup(SpeedBoost),
+            PickupRadius, despawnAfter: 30f);
+        world.Spawn(timed);
+
+        world.Step(29.9f);
+        Assert.Contains(timed, world.Entities); // still on the field just before the timer
+
+        world.Step(0.2f);
+        Assert.DoesNotContain(timed, world.Entities); // expired uncollected → reaped
+    }
+
+    [Fact]
+    public void Powerup_WithDespawnTimer_IsStillCollectable_BeforeItExpires()
+    {
+        var world = new World();
+        var tank = TankAt(world, Vector2.Zero, new NoInput());
+        var timed = new Powerup(world, Vector2.Zero, PowerupKind.SpeedBoost, new StatusEffectPickup(SpeedBoost),
+            PickupRadius, despawnAfter: 30f);
+        PowerupKind? collected = null;
+        timed.Collected += kind => collected = kind;
+        world.Spawn(tank);
+        world.Spawn(timed);
+
+        world.Step(0.016f);
+
+        Assert.Equal(PowerupKind.SpeedBoost, collected);
+    }
+
+    [Fact]
+    public void Powerup_WithoutDespawnTimer_NeverExpiresUncollected()
+    {
+        var world = new World();
+        var pickup = SpeedPowerupAt(world, new Vector2(1000f, 1000f)); // default: no despawn timer
+        world.Spawn(pickup);
+
+        for (var i = 0; i < 100; i++)
+        {
+            world.Step(1f); // 100 s — far past any director despawn window
+        }
+
+        Assert.Contains(pickup, world.Entities);
+    }
+
     private static float TravelWithPowerup(bool withPowerup)
     {
         var world = new World();

@@ -166,4 +166,59 @@ public class HostSessionTests
 
         Assert.Empty(rig.Transport.Broadcast[1].WallDeltas); // sent once, not re-broadcast forever
     }
+
+    private sealed class NoEffect : IPickupEffect
+    {
+        public void ApplyTo(Tank tank, IWorld world) { }
+    }
+
+    [Fact]
+    public void LivePickups_RideEverySnapshot_WithKindCellAndAvailability()
+    {
+        var rig = new Rig();
+        // Cell (10, 3) at the scene's 64 px tiles — far from both tanks so it is not collected.
+        rig.World.Spawn(new Powerup(rig.World, new Vector2(10.5f * 64f, 3.5f * 64f),
+            PowerupKind.Missile, new NoEffect(), pickupRadius: 20f));
+
+        rig.Session.Step(0.05f);
+
+        var state = Assert.Single(rig.Transport.Broadcast[0].Powerups);
+        Assert.Equal((byte)PowerupKind.Missile, state.Kind);
+        Assert.Equal(10, state.CellX);
+        Assert.Equal(3, state.CellY);
+        Assert.Equal(1, state.Available);
+    }
+
+    [Fact]
+    public void ReapedPickup_LeavesTheSnapshotList()
+    {
+        var rig = new Rig();
+        rig.World.Spawn(new Powerup(rig.World, new Vector2(10.5f * 64f, 3.5f * 64f),
+            PowerupKind.Repair, new NoEffect(), pickupRadius: 20f, despawnAfter: 0.08f));
+
+        rig.Session.Step(0.05f);
+        rig.Session.Step(0.05f); // despawn timer expires during this tick → reaped
+
+        Assert.Single(rig.Transport.Broadcast[0].Powerups);
+        Assert.Empty(rig.Transport.Broadcast[1].Powerups);
+    }
+
+    [Fact]
+    public void TwoPickups_GetDistinctStableIds()
+    {
+        var rig = new Rig();
+        rig.World.Spawn(new Powerup(rig.World, new Vector2(10.5f * 64f, 3.5f * 64f),
+            PowerupKind.Repair, new NoEffect(), pickupRadius: 20f));
+        rig.World.Spawn(new Powerup(rig.World, new Vector2(14.5f * 64f, 6.5f * 64f),
+            PowerupKind.Shield, new NoEffect(), pickupRadius: 20f));
+
+        rig.Session.Step(0.05f);
+        rig.Session.Step(0.05f);
+
+        var first = rig.Transport.Broadcast[0].Powerups;
+        var second = rig.Transport.Broadcast[1].Powerups;
+        Assert.Equal(2, first.Count);
+        Assert.NotEqual(first[0].Id, first[1].Id);
+        Assert.Equal(first.Select(p => p.Id), second.Select(p => p.Id)); // stable while alive
+    }
 }

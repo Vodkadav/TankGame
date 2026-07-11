@@ -88,6 +88,7 @@ public sealed class Tank : ITank
         {
             [StatKind.Speed] = speed,
             [StatKind.FireInterval] = fireInterval,
+            [StatKind.Damage] = 1f,
         });
         _projectileSpeed = projectileSpeed;
     }
@@ -176,12 +177,12 @@ public sealed class Tank : ITank
     }
 
     /// <summary>Adds over-shield points (a shield pickup): a buffer that incoming damage spends
-    /// before hit points. Stacks; not capped by <see cref="MaxHp"/>.</summary>
+    /// before hit points. Stacks, but the total is capped at <see cref="MaxHp"/>.</summary>
     public void AddShield(int amount)
     {
         if (amount > 0)
         {
-            Shield += amount;
+            Shield = Math.Min(Shield + amount, MaxHp);
         }
     }
 
@@ -361,7 +362,8 @@ public sealed class Tank : ITank
 
             // The loadout fires its current shot — the special ammo for as long as it is held (until
             // the tank dies and resets the loadout), else the default straight shot.
-            _ammo.Fire(_world, _arena, Position, direction, _projectileSpeed, Team, Id, Layer);
+            _ammo.Fire(_world, _arena, Position, direction, _projectileSpeed, Team, Id, Layer,
+                damageMult: _stats.Current(StatKind.Damage));
         }
     }
 

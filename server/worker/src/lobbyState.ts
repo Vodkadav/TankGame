@@ -48,6 +48,7 @@ export type LobbyCommand =
   | { type: "setMode"; slot: number; mode: GameMode }
   | { type: "setMap"; slot: number; map: string }
   | { type: "start"; slot: number }
+  | { type: "rematch"; slot: number }
   | { type: "loaded"; slot: number }
   | { type: "tick" };
 
@@ -75,6 +76,8 @@ export function reduce(state: LobbyState, command: LobbyCommand): LobbyState {
       return setMap(state, command.slot, command.map);
     case "start":
       return start(state, command.slot);
+    case "rematch":
+      return rematch(state, command.slot);
     case "loaded":
       return markLoaded(state, command.slot);
     case "tick":
@@ -151,6 +154,22 @@ function start(state: LobbyState, slot: number): LobbyState {
   // Stamp the match seed here so it broadcasts through countdown/loading/started to every client.
   const seed = (Math.random() * 0x80000000) | 0;
   return { ...state, phase: "countdown", countdown: COUNTDOWN_SECONDS, seed };
+}
+
+// Online rematch: the host resets a finished match back to a waiting lobby — same seats, mode and
+// map, ready/loaded flags and seed cleared — so the room runs the normal start flow again. Guests
+// that disconnected mid-match already left the roster via their close-handler's "leave".
+function rematch(state: LobbyState, slot: number): LobbyState {
+  if (state.phase !== "started" || slot !== state.hostSlot) {
+    return state;
+  }
+  return {
+    ...state,
+    phase: "waiting",
+    countdown: 0,
+    seed: 0,
+    players: state.players.map((p) => ({ ...p, ready: false, loaded: false })),
+  };
 }
 
 // The loading handshake: a seated player reports its arena is built. Once EVERY seated player has

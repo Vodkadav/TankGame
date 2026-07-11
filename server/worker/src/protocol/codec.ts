@@ -52,12 +52,25 @@ export interface InputAck {
   seq: number;
 }
 
+// One live pickup's state (the host's boost-director drops): `id` is a small host-assigned handle
+// stable for the pickup's lifetime, `kind` the PowerupKind ordinal, the cell locates it, and
+// `available` is 0 while dormant. Mirrors TankGame.Domain.Net.PowerupState.
+export interface PowerupState {
+  id: number;
+  kind: number;
+  cellX: number;
+  cellY: number;
+  available: number;
+}
+
 export interface SnapshotFrame {
   tick: number;
   acks: InputAck[];
   tanks: TankState[];
   wallDeltas: WallDelta[];
   projectiles: ProjectileState[];
+  // Appended LAST on the wire as a tolerated trailing section — pre-pickup bytes decode to [].
+  powerups: PowerupState[];
 }
 
 // seq(4) + move(4+4) + aim(4) + buttons(1) + slot(1). The slot is deliberately the LAST byte of the
@@ -67,6 +80,8 @@ export const INPUT_ACK_SIZE = 5;
 export const TANK_STATE_SIZE = 21;
 export const WALL_DELTA_SIZE = 6;
 export const PROJECTILE_STATE_SIZE = 14;
+// id(2) + kind(1) + cell(2+2) + available(1).
+export const POWERUP_STATE_SIZE = 8;
 export const FIRE_BIT = 1 << 0;
 
 // Every message is tagged with a leading kind byte: a Welcome (sent once on connect, carrying the
@@ -167,7 +182,9 @@ export function encodeSnapshot(frame: SnapshotFrame): Uint8Array {
     2 +
     frame.wallDeltas.length * WALL_DELTA_SIZE +
     2 +
-    frame.projectiles.length * PROJECTILE_STATE_SIZE;
+    frame.projectiles.length * PROJECTILE_STATE_SIZE +
+    1 +
+    frame.powerups.length * POWERUP_STATE_SIZE;
   const buffer = new Uint8Array(size);
   const view = new DataView(buffer.buffer);
   let offset = 0;
@@ -233,6 +250,23 @@ export function encodeSnapshot(frame: SnapshotFrame): Uint8Array {
     view.setUint8(offset, shot.style);
     offset += 1;
     view.setUint8(offset, shot.layer);
+    offset += 1;
+  }
+
+  // The pickup section is appended LAST (count byte + entries) so a pre-pickup decoder simply never
+  // reads it — the extension does not break the wire format.
+  view.setUint8(offset, frame.powerups.length);
+  offset += 1;
+  for (const pickup of frame.powerups) {
+    view.setUint16(offset, pickup.id, true);
+    offset += 2;
+    view.setUint8(offset, pickup.kind);
+    offset += 1;
+    view.setUint16(offset, pickup.cellX, true);
+    offset += 2;
+    view.setUint16(offset, pickup.cellY, true);
+    offset += 2;
+    view.setUint8(offset, pickup.available);
     offset += 1;
   }
 
@@ -314,5 +348,25 @@ export function decodeSnapshot(data: Uint8Array): SnapshotFrame {
     projectiles.push({ x, y, rotation, style, layer });
   }
 
-  return { tick, acks, tanks, wallDeltas, projectiles };
+  // Tolerated trailing extension: bytes encoded before the pickup section existed end here.
+  const powerups: PowerupState[] = [];
+  if (offset < data.byteLength) {
+    const powerupCount = view.getUint8(offset);
+    offset += 1;
+    for (let i = 0; i < powerupCount; i++) {
+      const id = view.getUint16(offset, true);
+      offset += 2;
+      const kind = view.getUint8(offset);
+      offset += 1;
+      const cellX = view.getUint16(offset, true);
+      offset += 2;
+      const cellY = view.getUint16(offset, true);
+      offset += 2;
+      const available = view.getUint8(offset);
+      offset += 1;
+      powerups.push({ id, kind, cellX, cellY, available });
+    }
+  }
+
+  return { tick, acks, tanks, wallDeltas, projectiles, powerups };
 }

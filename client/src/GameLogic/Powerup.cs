@@ -27,6 +27,8 @@ public sealed class Powerup : IPowerup
     private readonly float _respawnCooldown;
     private Tank? _carrier;
     private float _cooldownRemaining;
+    private readonly bool _despawns;
+    private float _despawnRemaining;
 
     /// <param name="world">The world scanned for a collecting tank.</param>
     /// <param name="position">Where it sits on the field.</param>
@@ -38,8 +40,12 @@ public sealed class Powerup : IPowerup
     /// <param name="respawnCooldown">When greater than zero the pickup is a fixed station: it stays put,
     /// goes dormant on collection, and becomes available again at the same spot after this many seconds.
     /// Mutually exclusive with <paramref name="dropOnCarrierDeath"/>.</param>
+    /// <param name="despawnAfter">When greater than zero the pickup expires (is reaped) after this many
+    /// seconds on the field uncollected — director-dropped crates fade so the field never clutters.
+    /// Zero (default) = stays forever, so every pre-director pickup is unchanged.</param>
     public Powerup(IWorld world, Vector2 position, PowerupKind kind, IPickupEffect effect,
-        float pickupRadius, bool dropOnCarrierDeath = false, float respawnCooldown = 0f)
+        float pickupRadius, bool dropOnCarrierDeath = false, float respawnCooldown = 0f,
+        float despawnAfter = 0f)
     {
         Id = Guid.NewGuid();
         _world = world;
@@ -49,6 +55,8 @@ public sealed class Powerup : IPowerup
         _pickupRadius = pickupRadius;
         _dropOnCarrierDeath = dropOnCarrierDeath;
         _respawnCooldown = respawnCooldown;
+        _despawnRemaining = despawnAfter;
+        _despawns = despawnAfter > 0f;
         IsAlive = true;
         IsAvailable = true;
     }
@@ -91,6 +99,16 @@ public sealed class Powerup : IPowerup
             }
 
             return;
+        }
+
+        if (_despawns)
+        {
+            _despawnRemaining -= deltaSeconds;
+            if (_despawnRemaining <= 0f)
+            {
+                IsAlive = false; // faded uncollected → the world reaps it this step
+                return;
+            }
         }
 
         foreach (var tank in _world.Entities.OfType<Tank>())

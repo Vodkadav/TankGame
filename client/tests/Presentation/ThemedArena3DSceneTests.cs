@@ -12,6 +12,7 @@ public class ThemedArena3DSceneTests : TestClass
     private static readonly ArenaId[] ThemedArenas =
     {
         ArenaId.Forest, ArenaId.Volcano, ArenaId.City, ArenaId.Frozen, ArenaId.Canyon,
+        ArenaId.Donut, ArenaId.Cross, ArenaId.Archipelago,
     };
 
     private ArenaId _previousArena;

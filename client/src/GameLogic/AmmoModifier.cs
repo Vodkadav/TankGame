@@ -42,6 +42,7 @@ public sealed class BouncingAmmo : AmmoModifier
     {
         loadout.BehaviourFactory = () => new BouncingBehaviour(_bounces);
         loadout.Pierce = 0;
+        loadout.Damage = 1;
         loadout.Style = ProjectileStyle.Normal;
     }
 }
@@ -63,6 +64,7 @@ public sealed class PiercingAmmo : AmmoModifier
     {
         loadout.BehaviourFactory = () => new PiercingBehaviour(_tileSize);
         loadout.Pierce = _pierces;
+        loadout.Damage = 2; // a piercing round hits harder than the plain shot
         loadout.Style = ProjectileStyle.Normal;
     }
 }
@@ -86,6 +88,7 @@ public sealed class MissileAmmo : AmmoModifier
         // Leaves the spread axis untouched, so spread + missile fires three missiles (the pickups stack).
         loadout.BehaviourFactory = () => new PiercingBehaviour(_tileSize);
         loadout.Pierce = Pierce;
+        loadout.Damage = 3; // the heavy round: three points per victim in its wake
         loadout.Style = ProjectileStyle.Missile;
     }
 }

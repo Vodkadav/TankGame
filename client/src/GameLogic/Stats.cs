@@ -11,13 +11,20 @@ public enum StatKind
     /// <summary>Minimum seconds between shots (lower is faster — a rapid-fire effect uses
     /// a multiplier below 1).</summary>
     FireInterval,
+
+    /// <summary>Outgoing shot damage multiplier (base 1) — scales the loadout's per-pellet
+    /// damage, rounded, never below 1.</summary>
+    Damage,
 }
 
 /// <summary>A timed modifier to one <see cref="StatKind"/>: the affected stat becomes
 /// <c>(base + AddFlat) × Mult</c> while the effect is live, for <see cref="Seconds"/> seconds.
 /// A pure additive effect uses <c>Mult: 1</c>; a pure multiplicative one uses
-/// <c>AddFlat: 0</c>. Powerups and traps are "apply a <see cref="StatusEffect"/>".</summary>
-public sealed record StatusEffect(StatKind Stat, float Mult, float AddFlat, float Seconds);
+/// <c>AddFlat: 0</c>. Powerups and traps are "apply a <see cref="StatusEffect"/>".
+/// <see cref="Source"/> tags who granted the effect (a pickup kind): re-applying an effect with the
+/// same stat AND source REPLACES the old one (refreshing its clock) instead of stacking; null (the
+/// default) keeps the old append behaviour, so untagged effects (match modifiers) still stack.</summary>
+public sealed record StatusEffect(StatKind Stat, float Mult, float AddFlat, float Seconds, string? Source = null);
 
 /// <summary>A computed stat block: base values composed with a list of expiring
 /// <see cref="StatusEffect"/> modifiers. <see cref="Current"/> folds the live effects over a
@@ -55,8 +62,25 @@ public sealed class Stats
         return (Base(kind) + addFlat) * mult;
     }
 
-    /// <summary>Adds an effect, live for its <see cref="StatusEffect.Seconds"/>.</summary>
-    public void Apply(StatusEffect effect) => _active.Add(new ActiveEffect(effect, effect.Seconds));
+    /// <summary>Adds an effect, live for its <see cref="StatusEffect.Seconds"/>. A tagged effect
+    /// (non-null <see cref="StatusEffect.Source"/>) replaces an existing effect with the same stat
+    /// and source — collecting the same pickup twice refreshes it instead of stacking it.</summary>
+    public void Apply(StatusEffect effect)
+    {
+        if (effect.Source is not null)
+        {
+            for (var i = 0; i < _active.Count; i++)
+            {
+                if (_active[i].Effect.Stat == effect.Stat && _active[i].Effect.Source == effect.Source)
+                {
+                    _active[i] = new ActiveEffect(effect, effect.Seconds);
+                    return;
+                }
+            }
+        }
+
+        _active.Add(new ActiveEffect(effect, effect.Seconds));
+    }
 
     /// <summary>Drops every active effect at once — a tank sheds all its pickup buffs when it dies.</summary>
     public void Clear() => _active.Clear();

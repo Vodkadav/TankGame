@@ -28,6 +28,7 @@ public partial class NetArena3DScene : Node3D
     private const float FireInterval = 0.6f; // half the old rate of fire (owner ask 2026-07-08)
     private const float ProjectileSpeed = 600f;
     private const float CombatHitRadius = 28f;
+    private const float PickupRadius = 28f;
     private const int TankMaxHp = 8;
     private const byte HostSlot = 0;
 
@@ -219,6 +220,28 @@ public partial class NetArena3DScene : Node3D
             _awaitingStart = false;
             _status.SetStatus(NetStatusOverlay.ConnectedKey);
         }
+
+        // The host pressed Rematch: the server reset the room to "waiting". Every client returns to
+        // the lobby room on the SAME socket, carrying the fresh waiting view for the room's controller
+        // (the welcome was a one-shot, so the room re-adopts the carried slot instead).
+        if (view.Phase == LobbyPhase.Waiting)
+        {
+            ReturnToRoom(view);
+        }
+    }
+
+    private void ReturnToRoom(LobbyView view)
+    {
+        // Unhook from the shared transport — it outlives this scene, and a push into a freed node
+        // would explode. LeaveMatch doesn't need this: Reset drops the transport entirely.
+        _transport.WelcomeReceived -= OnWelcome;
+        _transport.SnapshotReceived -= OnSnapshot;
+        _transport.LobbyStateReceived -= OnLobbyState;
+        NetworkSession.StartedLobby = view;
+        if (GetTree().CurrentScene == this)
+        {
+            GetTree().ChangeSceneToFile(LobbyBrowserScene.RoomScenePath);
+        }
     }
 
     // A versus match has no pause (you can't freeze the other player), so the pause-menu route to an
@@ -235,8 +258,23 @@ public partial class NetArena3DScene : Node3D
         leave.CustomMinimumSize = new Vector2(112f, 64f); // a comfortable thumb target
         leave.Pressed += LeaveMatch;
         layer.AddChild(leave);
+
+        // Online rematch: hidden until the round is decided, and only ever shown to the lobby host —
+        // pressing it asks the server to reset the room to "waiting" (the server enforces host-only).
+        _rematch = new Button { Name = "RematchButton", Text = "net.rematch", Visible = false };
+        _rematch.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.TopRight);
+        _rematch.Position += new Vector2(-16f, 96f); // stacked under Leave
+        _rematch.CustomMinimumSize = new Vector2(112f, 64f);
+        _rematch.Pressed += () => _transport.SendLobby(LobbyProtocol.EncodeRematch());
+        layer.AddChild(_rematch);
         AddChild(layer);
     }
+
+    private Button _rematch = null!;
+
+    // Only the lobby host may trigger a rematch (mirrors the server's hostSlot check).
+    private bool IsLobbyHost =>
+        NetworkSession.StartedLobby is { } lobby && _localSlot is byte slot && lobby.HostSlot == slot;
 
     // Escape leaves the match on desktop — the same exit the corner Leave button gives touch players.
     public override void _UnhandledInput(InputEvent @event)
@@ -362,13 +400,17 @@ public partial class NetArena3DScene : Node3D
                 NetRoster.SeatKind.RemoteHuman => guestInputs[seat.Slot] = new RelayedInputSource(),
                 // Each bot seeded matchSeed ^ slot: distinct temperaments, yet identical on every host run
                 // of the same match (issue #3). Host-only, so no cross-peer determinism needed.
+                // Host's persisted difficulty governs net bots (guests mirror host snapshots anyway).
                 _ => ai = new AiInputSource(_world, _arena, grid: _grid, tileSize: TileSize, origin: GridOrigin,
-                    seed: _matchSeed ^ seat.Slot),
+                    seed: _matchSeed ^ seat.Slot, difficulty: GameSetup.BotDifficulty),
             };
 
             var spawn = _spawns[seat.Slot % _spawns.Count];
+            var fireInterval = ai is null
+                ? FireInterval
+                : FireInterval * DifficultyPreset.For(GameSetup.BotDifficulty).FireIntervalScale;
             var tank = new Tank(input, _world, _arena, CellCentre(spawn.X, spawn.Y),
-                TankSpeed, FireInterval, ProjectileSpeed, maxHp: TankMaxHp, team: seat.Team,
+                TankSpeed, fireInterval, ProjectileSpeed, maxHp: TankMaxHp, team: seat.Team,
                 displayName: seat.Name);
             ai?.Bind(tank);
             _tanks[seat.Slot] = tank;
@@ -377,6 +419,37 @@ public partial class NetArena3DScene : Node3D
         }
 
         _session = new HostSession(_transport, _world, _grid, _rosterTanks, guestInputs);
+        SpawnPowerupDirector();
+    }
+
+    // Net matches have no initial pickups — the boost director is their only source, seeded by the
+    // match seed so a re-host of the same match drops the same crates. Only the authoritative world
+    // runs it; guests mirror the drops from the snapshot's powerup states.
+    private void SpawnPowerupDirector()
+    {
+        if (_world is null)
+        {
+            return;
+        }
+
+        var world = _world;
+        var fieldMax = new NVector2(_level.Width * TileSize, _level.Height * TileSize);
+        var effects = PowerupEffects.Catalogue(GridOrigin, fieldMax, TileSize);
+        var floorCells = new List<(int X, int Y)>();
+        for (var x = 1; x < _grid.Width - 1; x++)
+        {
+            for (var y = 1; y < _grid.Height - 1; y++)
+            {
+                if (!_grid.IsBlocked(x, y))
+                {
+                    floorCells.Add((x, y));
+                }
+            }
+        }
+
+        world.Spawn(new PowerupDirector(world, _matchSeed, floorCells, GridOrigin, TileSize,
+            (kind, pos) => new Powerup(world, pos, kind, effects[kind], PickupRadius,
+                despawnAfter: PowerupDirector.DespawnSeconds)));
     }
 
     private void BecomeGuest(byte slot)
@@ -410,6 +483,14 @@ public partial class NetArena3DScene : Node3D
                 view.Bind(projectile);
                 AddChild(view);
                 _projectileViews[projectile] = view;
+                break;
+            case IPowerup pickup:
+                // A director drop in the host's world — same view + collected floater as solo.
+                var pickupView = new Powerup3DView { Name = "Powerup3DView" };
+                pickupView.Bind(pickup);
+                AddChild(pickupView);
+                _projectileViews[pickup] = pickupView; // reaped through the same despawn path
+                pickup.Collected += kind => ShowPickupFloater(pickup.Position, kind);
                 break;
         }
     }
@@ -465,7 +546,96 @@ public partial class NetArena3DScene : Node3D
         }
 
         MirrorProjectiles(snapshot.Projectiles);
+        MirrorPowerups(snapshot);
         DetectRoundOverFromSnapshot(snapshot);
+    }
+
+    // Guest role: the pickups mirrored from the latest snapshot, keyed by the host's stable wire id.
+    private readonly Dictionary<ushort, (NetPowerup Model, Powerup3DView View)> _snapshotPickups = new();
+
+    /// <summary>How many pickups the guest is currently mirroring. Zero on the host. For the tests.</summary>
+    public int MirroredPickupCount => _snapshotPickups.Count;
+
+    // Diff the mirrored pickup set against the snapshot's: new ids appear, known ids update their
+    // availability, absent ids vanish. Collection is not signalled on the wire — a pickup that
+    // vanishes while a tank sits on it was collected (pop the floater), otherwise it just faded.
+    private void MirrorPowerups(SnapshotFrame snapshot)
+    {
+        foreach (var state in snapshot.Powerups)
+        {
+            if (_snapshotPickups.TryGetValue(state.Id, out var known))
+            {
+                known.Model.IsAvailable = state.Available != 0;
+                continue;
+            }
+
+            var model = new NetPowerup
+            {
+                Position = CellCentre(state.CellX, state.CellY),
+                Kind = (PowerupKind)state.Kind,
+                IsAvailable = state.Available != 0,
+            };
+            var view = new Powerup3DView { Name = "NetPowerup3DView" };
+            view.Bind(model);
+            AddChild(view);
+            _snapshotPickups[state.Id] = (model, view);
+        }
+
+        List<ushort>? gone = null;
+        foreach (var (id, mirror) in _snapshotPickups)
+        {
+            var stillLive = false;
+            foreach (var state in snapshot.Powerups)
+            {
+                if (state.Id == id)
+                {
+                    stillLive = true;
+                    break;
+                }
+            }
+
+            if (stillLive)
+            {
+                continue;
+            }
+
+            if (mirror.Model.IsAvailable && TankNear(snapshot, mirror.Model.Position))
+            {
+                ShowPickupFloater(mirror.Model.Position, mirror.Model.Kind); // collected, not faded
+            }
+
+            mirror.View.Free(); // not deferred — a synchronous re-read must see the fresh set
+            (gone ??= new List<ushort>()).Add(id);
+        }
+
+        if (gone is not null)
+        {
+            foreach (var id in gone)
+            {
+                _snapshotPickups.Remove(id);
+            }
+        }
+    }
+
+    // ponytail: "a tank within a tile" approximates "collected it" — good enough for a floater.
+    private static bool TankNear(SnapshotFrame snapshot, NVector2 position)
+    {
+        foreach (var tank in snapshot.Tanks)
+        {
+            if (tank.Hp > 0 && NVector2.Distance(new NVector2(tank.X, tank.Y), position) <= TileSize)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private void ShowPickupFloater(NVector2 position, PowerupKind kind)
+    {
+        var floater = new PickupFloater3D { Name = "PickupFloater" };
+        AddChild(floater);
+        floater.Show(GroundProjection.ToWorld(position, 40f), PickupFloater.LabelKeyFor(kind));
     }
 
     // Rebuild the guest's shot views from the snapshot's live projectile set (ADR-0019 step 4). The
@@ -527,6 +697,7 @@ public partial class NetArena3DScene : Node3D
         {
             RoundResult = result;
             _status.SetStatus(RoundOverText(result.WinningTeam));
+            _rematch.Visible = IsLobbyHost;
         }
     }
 
@@ -551,6 +722,7 @@ public partial class NetArena3DScene : Node3D
         {
             RoundResult = result;
             _status.SetStatus(RoundOverText(result.WinningTeam));
+            _rematch.Visible = IsLobbyHost;
         }
     }
 

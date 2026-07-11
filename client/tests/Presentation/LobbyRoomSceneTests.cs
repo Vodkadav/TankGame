@@ -325,6 +325,32 @@ public class LobbyRoomSceneTests : TestClass
         }
     }
 
+    // Rematch re-entry: the arena returned here on the same socket with the slot + waiting view
+    // carried on NetworkSession — no second welcome ever arrives, so the room must adopt them or the
+    // host would never see Start again.
+    [Test]
+    public void RematchReEntry_AdoptsTheCarriedSlotAndView_SoTheHostSeesStart()
+    {
+        NetworkSession.LocalSlot = 0;
+        NetworkSession.StartedLobby = View(LobbyPhase.Waiting, hostSlot: 0,
+            new LobbyPlayer(0, "Ada", 0, false),
+            new LobbyPlayer(1, "Bea", 1, false));
+        var scene = GD.Load<PackedScene>("res://src/Presentation/LobbyRoom.tscn").Instantiate<Control>();
+        TestScene.AddChild(scene);
+
+        try
+        {
+            if (scene.FindChild("Start", recursive: true, owned: false) is not Button { Visible: true })
+            {
+                throw new Exception("After a rematch the re-entered host must see the Start button again.");
+            }
+        }
+        finally
+        {
+            scene.QueueFree();
+        }
+    }
+
     private static LobbyView View(LobbyPhase phase, int hostSlot, params LobbyPlayer[] players) =>
         new(NetMode.Ffa, phase, hostSlot, phase == LobbyPhase.Countdown ? 3 : 0, players);
 

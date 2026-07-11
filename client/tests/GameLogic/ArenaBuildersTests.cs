@@ -16,6 +16,9 @@ public class ArenaBuildersTests
     [InlineData("City")]
     [InlineData("Frozen")]
     [InlineData("Canyon")]
+    [InlineData("Donut")]
+    [InlineData("Cross")]
+    [InlineData("Archipelago")]
     public void EachRegisteredArena_BuildsAValidPlayableArena(string arenaId)
     {
         Assert.True(ArenaBuilders.TryGet(arenaId, out var builder), $"{arenaId} must have a builder");
@@ -50,6 +53,9 @@ public class ArenaBuildersTests
     [InlineData("City")]
     [InlineData("Frozen")]
     [InlineData("Canyon")]
+    [InlineData("Donut")]
+    [InlineData("Cross")]
+    [InlineData("Archipelago")]
     public void ThemedArena_IsLargeEightSpawn_AndValidates(string arenaId)
     {
         var layout = BuildOrFail(arenaId);
@@ -138,6 +144,55 @@ public class ArenaBuildersTests
         Assert.True(hasRamp, "canyon plateau must be reachable by a ramp");
     }
 
+    // The shaped arenas: the shape mask fills everything outside the playable silhouette with solid
+    // cells, so the fight happens inside a ring, a plus, or an island chain — not the full rectangle.
+    [Fact]
+    public void Donut_HasASolidMountainCore_AndMaskedCorners_ButAnOpenRing()
+    {
+        var layout = BuildOrFail("Donut");
+        var mats = layout.Map.Materials;
+        Assert.Equal(CellMaterial.Mountain, mats[38, 22]); // the core
+        Assert.Equal(CellMaterial.Mountain, mats[4, 4]);   // outside the ring, masked solid
+        Assert.Equal(CellMaterial.Floor, mats[37, 4]);     // the ring itself is open floor
+    }
+
+    [Fact]
+    public void Cross_MasksTheCornersSteel_AndKeepsTheHubOpen()
+    {
+        var layout = BuildOrFail("Cross");
+        var mats = layout.Map.Materials;
+        Assert.Equal(CellMaterial.Steel, mats[5, 5]);    // a masked corner
+        Assert.Equal(CellMaterial.Steel, mats[70, 40]);  // the opposite masked corner
+        Assert.Equal(CellMaterial.Floor, mats[37, 22]);  // the hub where the four arms meet
+    }
+
+    [Fact]
+    public void Archipelago_IsFloorIslands_InAWaterSea_JoinedByBridgeCauseways()
+    {
+        var layout = BuildOrFail("Archipelago");
+        Assert.True(AnyMaterial(layout, CellMaterial.Water), "archipelago must have a water sea");
+
+        // At least one bridge must actually span water (a water cell as a 4-neighbour), else the
+        // causeways are not crossings.
+        var mats = layout.Map.Materials;
+        var bridgeOverWater = false;
+        for (var x = 1; x < layout.Map.Width - 1 && !bridgeOverWater; x++)
+        {
+            for (var y = 1; y < layout.Map.Height - 1; y++)
+            {
+                if (mats[x, y] == CellMaterial.Bridge
+                    && (mats[x - 1, y] == CellMaterial.Water || mats[x + 1, y] == CellMaterial.Water
+                        || mats[x, y - 1] == CellMaterial.Water || mats[x, y + 1] == CellMaterial.Water))
+                {
+                    bridgeOverWater = true;
+                    break;
+                }
+            }
+        }
+
+        Assert.True(bridgeOverWater, "archipelago causeways must bridge over the water sea");
+    }
+
     // Net sync: host and guest build independently, so two builds must be byte-identical terrain.
     [Theory]
     [InlineData("Forest")]
@@ -145,6 +200,9 @@ public class ArenaBuildersTests
     [InlineData("City")]
     [InlineData("Frozen")]
     [InlineData("Canyon")]
+    [InlineData("Donut")]
+    [InlineData("Cross")]
+    [InlineData("Archipelago")]
     public void ThemedArena_IsDeterministic(string arenaId)
     {
         var a = BuildOrFail(arenaId);
