@@ -86,6 +86,55 @@ public class StatsTests
     }
 
     [Fact]
+    public void Apply_SameStatAndSource_Replaces_InsteadOfStacking()
+    {
+        var stats = SpeedStats(100f);
+
+        stats.Apply(new StatusEffect(StatKind.Speed, Mult: 1.6f, AddFlat: 0f, Seconds: 15f, Source: "SpeedBoost"));
+        stats.Apply(new StatusEffect(StatKind.Speed, Mult: 1.6f, AddFlat: 0f, Seconds: 15f, Source: "SpeedBoost"));
+
+        Assert.Equal(160f, stats.Current(StatKind.Speed)); // 1.6x once, not 1.6 * 1.6
+    }
+
+    [Fact]
+    public void Apply_SameSource_RefreshesTheDuration()
+    {
+        var stats = SpeedStats(100f);
+        stats.Apply(new StatusEffect(StatKind.Speed, Mult: 2f, AddFlat: 0f, Seconds: 15f, Source: "SpeedBoost"));
+
+        stats.Step(10f);
+        stats.Apply(new StatusEffect(StatKind.Speed, Mult: 2f, AddFlat: 0f, Seconds: 15f, Source: "SpeedBoost"));
+
+        stats.Step(10f); // 20s after the first apply — only alive because the re-apply reset the clock
+        Assert.Equal(200f, stats.Current(StatKind.Speed));
+
+        stats.Step(6f); // 16s after the refresh — now expired
+        Assert.Equal(100f, stats.Current(StatKind.Speed));
+    }
+
+    [Fact]
+    public void Apply_SameStat_DifferentSources_StillStack()
+    {
+        var stats = SpeedStats(100f);
+
+        stats.Apply(new StatusEffect(StatKind.Speed, Mult: 2f, AddFlat: 0f, Seconds: 15f, Source: "SpeedBoost"));
+        stats.Apply(new StatusEffect(StatKind.Speed, Mult: 1.5f, AddFlat: 0f, Seconds: 15f, Source: "Blitz"));
+
+        Assert.Equal(300f, stats.Current(StatKind.Speed));
+    }
+
+    [Fact]
+    public void Apply_WithoutASource_KeepsTheOldAppendBehaviour()
+    {
+        var stats = SpeedStats(100f);
+
+        stats.Apply(new StatusEffect(StatKind.Speed, Mult: 2f, AddFlat: 0f, Seconds: 5f));
+        stats.Apply(new StatusEffect(StatKind.Speed, Mult: 2f, AddFlat: 0f, Seconds: 5f));
+
+        Assert.Equal(400f, stats.Current(StatKind.Speed)); // sourceless effects still stack
+    }
+
+    [Fact]
     public void AnEffect_ExpiresAfterItsDuration_AndTheStatReturnsToBase()
     {
         var stats = SpeedStats(100f);

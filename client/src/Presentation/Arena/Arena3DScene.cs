@@ -59,13 +59,13 @@ public partial class Arena3DScene : Node3D
         PowerupKind.Repair, PowerupKind.Shield, PowerupKind.PiercingAmmo, PowerupKind.Missile, PowerupKind.Telephone,
     };
 
-    // Field pickups grant their effect for as long as the collector lives (unlimited use), shed on
-    // death — so the stat boosts are permanent (infinite duration), not the old 6-second timer. Built
-    // in _Ready once the field size is known (the airstrike needs the field bounds for its swathe).
+    // Stat boosts run 15 s and REFRESH (not stack) on re-pickup — the source tag makes a second grab
+    // of the same kind replace the live effect, so boosts can't multiply into runaway speed/fire rate.
+    // Built in _Ready once the field size is known (the airstrike needs the field bounds for its swathe).
     private (PowerupKind Kind, IPickupEffect Effect)[] PowerupCatalogue(NVector2 fieldMax) => new[]
     {
-        (PowerupKind.SpeedBoost, (IPickupEffect)new StatusEffectPickup(new StatusEffect(StatKind.Speed, Mult: 1.6f, AddFlat: 0f, Seconds: float.PositiveInfinity))),
-        (PowerupKind.RapidFire, new StatusEffectPickup(new StatusEffect(StatKind.FireInterval, Mult: 0.5f, AddFlat: 0f, Seconds: float.PositiveInfinity))),
+        (PowerupKind.SpeedBoost, (IPickupEffect)new StatusEffectPickup(new StatusEffect(StatKind.Speed, Mult: 1.6f, AddFlat: 0f, Seconds: 15f, Source: nameof(PowerupKind.SpeedBoost)))),
+        (PowerupKind.RapidFire, new StatusEffectPickup(new StatusEffect(StatKind.FireInterval, Mult: 0.5f, AddFlat: 0f, Seconds: 15f, Source: nameof(PowerupKind.RapidFire)))),
         (PowerupKind.BouncingAmmo, new AmmoPickup(new BouncingAmmo(bounces: 3))),
         (PowerupKind.SpreadAmmo, new AmmoPickup(new SpreadAmmo(count: 3, radians: 0.18f))),
         (PowerupKind.Repair, new RepairPickup(RepairAmount)),

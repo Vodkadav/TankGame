@@ -163,6 +163,80 @@ public class AmmoLoadoutTests
     }
 
     [Fact]
+    public void Default_FiresAShotWithDamage1()
+    {
+        Fired(out var world);
+        var shot = Assert.Single(world.Entities.OfType<Projectile>());
+        Assert.Equal(1, shot.Damage);
+    }
+
+    [Fact]
+    public void MissileAmmo_SetsDamage3_StampedOnEachPellet()
+    {
+        var loadout = Fired(out var world, new MissileAmmo(tileSize: 64f));
+
+        Assert.Equal(3, loadout.Damage);
+        var shot = Assert.Single(world.Entities.OfType<Projectile>());
+        Assert.Equal(3, shot.Damage);
+    }
+
+    [Fact]
+    public void PiercingAmmo_SetsDamage2()
+    {
+        var loadout = Fired(out var world, new PiercingAmmo(pierces: 1, tileSize: 64f));
+
+        Assert.Equal(2, loadout.Damage);
+        var shot = Assert.Single(world.Entities.OfType<Projectile>());
+        Assert.Equal(2, shot.Damage);
+    }
+
+    [Fact]
+    public void SpreadAmmo_LeavesDamageAlone()
+    {
+        var loadout = new AmmoLoadout();
+        new MissileAmmo(tileSize: 64f).ApplyTo(loadout);
+        new SpreadAmmo(count: 3, radians: 0.2f).ApplyTo(loadout);
+
+        Assert.Equal(3, loadout.Damage); // spread is the other axis — the missile punch is kept
+    }
+
+    [Fact]
+    public void BouncingAmmo_ReplacingTheBehaviourAxis_ResetsDamageTo1()
+    {
+        var loadout = new AmmoLoadout();
+        new MissileAmmo(tileSize: 64f).ApplyTo(loadout);
+        new BouncingAmmo(bounces: 3).ApplyTo(loadout);
+
+        Assert.Equal(1, loadout.Damage); // bouncing replaced the missile, so its damage goes too
+    }
+
+    [Fact]
+    public void Fire_ScalesDamageByTheMultiplier_RoundedWithAFloorOf1()
+    {
+        var loadout = new AmmoLoadout();
+        new MissileAmmo(tileSize: 64f).ApplyTo(loadout); // damage 3
+
+        var world = new World();
+        loadout.Fire(world, new OpenArena(), Vector2.Zero, new Vector2(1f, 0f), Speed, team: 0, damageMult: 2f);
+        Assert.Equal(6, Assert.Single(world.Entities.OfType<Projectile>()).Damage);
+
+        var weak = new World();
+        loadout.Fire(weak, new OpenArena(), Vector2.Zero, new Vector2(1f, 0f), Speed, team: 0, damageMult: 0.1f);
+        Assert.Equal(1, Assert.Single(weak.Entities.OfType<Projectile>()).Damage); // never below 1
+    }
+
+    [Fact]
+    public void Reset_RestoresDamageTo1()
+    {
+        var loadout = new AmmoLoadout();
+        new MissileAmmo(tileSize: 64f).ApplyTo(loadout);
+
+        loadout.Reset();
+
+        Assert.Equal(1, loadout.Damage);
+    }
+
+    [Fact]
     public void Reset_ReturnsToTheSingleStraightShot()
     {
         var loadout = new AmmoLoadout();
