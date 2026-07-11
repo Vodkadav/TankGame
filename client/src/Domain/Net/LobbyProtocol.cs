@@ -125,6 +125,10 @@ public static class LobbyProtocol
     /// <summary>The loading-phase handshake: this client reports its arena is built and ready.</summary>
     public static byte[] EncodeLoaded() => Tag(w => w.WriteString("type", "loaded"));
 
+    /// <summary>Host-only: reset a finished ("started") match back to a waiting room for a rematch —
+    /// same seats, mode and map; ready/loaded flags and seed cleared server-side.</summary>
+    public static byte[] EncodeRematch() => Tag(w => w.WriteString("type", "rematch"));
+
     // Hand-write the command JSON with a Utf8JsonWriter (a forward-only writer, no reflection) rather
     // than JsonSerializer over an anonymous type: the trimmed WebAssembly runtime disables
     // reflection-based serialization (throws JsonSerializerIsReflectionDisabled), which killed EVERY

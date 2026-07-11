@@ -220,6 +220,28 @@ public partial class NetArena3DScene : Node3D
             _awaitingStart = false;
             _status.SetStatus(NetStatusOverlay.ConnectedKey);
         }
+
+        // The host pressed Rematch: the server reset the room to "waiting". Every client returns to
+        // the lobby room on the SAME socket, carrying the fresh waiting view for the room's controller
+        // (the welcome was a one-shot, so the room re-adopts the carried slot instead).
+        if (view.Phase == LobbyPhase.Waiting)
+        {
+            ReturnToRoom(view);
+        }
+    }
+
+    private void ReturnToRoom(LobbyView view)
+    {
+        // Unhook from the shared transport — it outlives this scene, and a push into a freed node
+        // would explode. LeaveMatch doesn't need this: Reset drops the transport entirely.
+        _transport.WelcomeReceived -= OnWelcome;
+        _transport.SnapshotReceived -= OnSnapshot;
+        _transport.LobbyStateReceived -= OnLobbyState;
+        NetworkSession.StartedLobby = view;
+        if (GetTree().CurrentScene == this)
+        {
+            GetTree().ChangeSceneToFile(LobbyBrowserScene.RoomScenePath);
+        }
     }
 
     // A versus match has no pause (you can't freeze the other player), so the pause-menu route to an
@@ -236,8 +258,23 @@ public partial class NetArena3DScene : Node3D
         leave.CustomMinimumSize = new Vector2(112f, 64f); // a comfortable thumb target
         leave.Pressed += LeaveMatch;
         layer.AddChild(leave);
+
+        // Online rematch: hidden until the round is decided, and only ever shown to the lobby host —
+        // pressing it asks the server to reset the room to "waiting" (the server enforces host-only).
+        _rematch = new Button { Name = "RematchButton", Text = "net.rematch", Visible = false };
+        _rematch.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.TopRight);
+        _rematch.Position += new Vector2(-16f, 96f); // stacked under Leave
+        _rematch.CustomMinimumSize = new Vector2(112f, 64f);
+        _rematch.Pressed += () => _transport.SendLobby(LobbyProtocol.EncodeRematch());
+        layer.AddChild(_rematch);
         AddChild(layer);
     }
+
+    private Button _rematch = null!;
+
+    // Only the lobby host may trigger a rematch (mirrors the server's hostSlot check).
+    private bool IsLobbyHost =>
+        NetworkSession.StartedLobby is { } lobby && _localSlot is byte slot && lobby.HostSlot == slot;
 
     // Escape leaves the match on desktop — the same exit the corner Leave button gives touch players.
     public override void _UnhandledInput(InputEvent @event)
@@ -660,6 +697,7 @@ public partial class NetArena3DScene : Node3D
         {
             RoundResult = result;
             _status.SetStatus(RoundOverText(result.WinningTeam));
+            _rematch.Visible = IsLobbyHost;
         }
     }
 
@@ -684,6 +722,7 @@ public partial class NetArena3DScene : Node3D
         {
             RoundResult = result;
             _status.SetStatus(RoundOverText(result.WinningTeam));
+            _rematch.Visible = IsLobbyHost;
         }
     }
 

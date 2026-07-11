@@ -103,6 +103,39 @@ public class LobbyControllerTests
         Assert.Equal(LobbyProtocol.EncodeStart(), Assert.Single(transport.Sent));
     }
 
+    // Rematch re-entry: the welcome is a one-shot fired on connect, so a room scene rebuilt after a
+    // match must adopt the carried slot (and the waiting view captured at the hand-off) instead.
+    [Fact]
+    public void Adopt_SeedsTheSlotAndState_WithoutAWelcome()
+    {
+        var transport = new FakeTransport();
+        var controller = new LobbyController(transport);
+        var changes = 0;
+        controller.Changed += () => changes++;
+        var view = View(LobbyPhase.Waiting, hostSlot: 1, new LobbyPlayer(1, "Bea", 1, false));
+
+        controller.Adopt(1, view);
+
+        Assert.Equal((byte)1, controller.LocalSlot);
+        Assert.Same(view, controller.State);
+        Assert.True(controller.IsHost);
+        Assert.Equal(1, changes);
+    }
+
+    [Fact]
+    public void Adopt_WithoutAView_KeepsTheExistingState()
+    {
+        var transport = new FakeTransport();
+        var controller = new LobbyController(transport);
+        var pushed = View(LobbyPhase.Waiting, hostSlot: 0, new LobbyPlayer(0, "Ada", 0, false));
+        transport.RaiseLobby(pushed);
+
+        controller.Adopt(0, null);
+
+        Assert.Same(pushed, controller.State);
+        Assert.Equal((byte)0, controller.LocalSlot);
+    }
+
     [Fact]
     public void HasStarted_TracksThePhase()
     {

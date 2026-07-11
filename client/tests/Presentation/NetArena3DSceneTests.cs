@@ -349,6 +349,85 @@ public class NetArena3DSceneTests : TestClass
         }
     }
 
+    // Online rematch: once the round is decided, the LOBBY host (and only the host) gets a Rematch
+    // button beside Leave; pressing it sends the rematch lobby command over the same socket.
+    [Test]
+    public void RoundOver_RevealsRematch_ForTheLobbyHost_AndPressingSendsTheCommand()
+    {
+        NetworkSession.StartedLobby = new LobbyView(TankGame.Domain.Net.GameMode.Ffa, LobbyPhase.Started, 1, 0,
+            new List<LobbyPlayer> { new(0, "Ada", 0, true, true), new(1, "Bea", 1, true, true) });
+        NetworkSession.LocalSlot = 1; // this client is the lobby host (slot 1), playing as a guest
+        var scene = GD.Load<PackedScene>("res://src/Presentation/Arena/NetArena3D.tscn")
+            .Instantiate<NetArena3DScene>();
+        TestScene.AddChild(scene);
+
+        try
+        {
+            var rematch = scene.FindChild("RematchButton", recursive: true, owned: false) as Button
+                ?? throw new Exception("The networked match must have a Rematch button.");
+            if (rematch.Visible)
+            {
+                throw new Exception("Rematch must stay hidden while the round is being fought.");
+            }
+
+            // Bea (slot 1) falls — the round is decided.
+            _transport.DeliverSnapshot(new SnapshotFrame(1, 0,
+                new List<TankState> { new(0, 96f, 160f, 0f, 0f, 8, 0), new(1, 200f, 96f, 0f, 0f, 0, 1) },
+                new List<WallDelta>()));
+
+            if (!rematch.Visible)
+            {
+                throw new Exception("The lobby host must see the Rematch button once the round is decided.");
+            }
+
+            rematch.EmitSignal(BaseButton.SignalName.Pressed);
+            if (_transport.SentLobby.Count == 0
+                || !System.MemoryExtensions.SequenceEqual<byte>(
+                    _transport.SentLobby[^1], LobbyProtocol.EncodeRematch()))
+            {
+                throw new Exception("Pressing Rematch must send the rematch lobby command.");
+            }
+        }
+        finally
+        {
+            scene.Free();
+        }
+    }
+
+    // The server answered the rematch by resetting the room to "waiting": every client returns to the
+    // lobby room on the SAME socket, carrying the fresh waiting view for the room's controller.
+    [Test]
+    public void WaitingPush_ReturnsToTheRoom_KeepingTheTransport()
+    {
+        NetworkSession.StartedLobby = new LobbyView(TankGame.Domain.Net.GameMode.Ffa, LobbyPhase.Started, 0, 0,
+            new List<LobbyPlayer> { new(0, "Ada", 0, true, true), new(1, "Bea", 1, true, true) });
+        NetworkSession.LocalSlot = 1;
+        var scene = GD.Load<PackedScene>("res://src/Presentation/Arena/NetArena3D.tscn")
+            .Instantiate<NetArena3DScene>();
+        TestScene.AddChild(scene);
+
+        try
+        {
+            var waiting = new LobbyView(TankGame.Domain.Net.GameMode.Ffa, LobbyPhase.Waiting, 0, 0,
+                new List<LobbyPlayer> { new(0, "Ada", 0, false), new(1, "Bea", 1, false) });
+            _transport.DeliverLobby(waiting);
+
+            if (!ReferenceEquals(NetworkSession.StartedLobby, waiting))
+            {
+                throw new Exception("Returning to the room must carry the fresh waiting view for its controller.");
+            }
+
+            if (NetworkSession.Active is null)
+            {
+                throw new Exception("A rematch reuses the socket — the transport must NOT be dropped.");
+            }
+        }
+        finally
+        {
+            scene.Free();
+        }
+    }
+
     [Test]
     public void HostTick_DrivesTheGuestTank_FromARelayedInput()
     {

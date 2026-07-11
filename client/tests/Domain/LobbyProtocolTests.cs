@@ -127,6 +127,16 @@ public class LobbyProtocolTests
     }
 
     [Fact]
+    public void EncodeRematch_IsATaggedRematchCommand()
+    {
+        var message = LobbyProtocol.EncodeRematch();
+
+        Assert.Equal(LobbyProtocol.MsgLobbyCmd, message[0]);
+        using var doc = JsonDocument.Parse(message.AsSpan(1).ToArray());
+        Assert.Equal("rematch", doc.RootElement.GetProperty("type").GetString());
+    }
+
+    [Fact]
     public void ParseState_ReadsTheLoadingPhaseSeedAndPerPlayerLoaded()
     {
         var view = LobbyProtocol.ParseState(StateMessage(

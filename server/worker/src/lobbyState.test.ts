@@ -227,6 +227,68 @@ describe("lobby state reducer", () => {
   });
 });
 
+// Online rematch: the host resets a finished ("started") match back to a waiting lobby with the
+// same seats/mode/map, so the room can run the normal start flow again (fresh seed included).
+describe("lobby rematch", () => {
+  // Drive a 2-player room all the way to "started".
+  function startedLobby(): LobbyState {
+    let state = run(
+      joinN(2),
+      { type: "setMap", slot: 0, map: "DesertWar" },
+      { type: "setReady", slot: 1, ready: true },
+      { type: "start", slot: 0 },
+    );
+    for (let i = 0; i < COUNTDOWN_SECONDS; i++) state = reduce(state, { type: "tick" });
+    state = run(state, { type: "loaded", slot: 0 }, { type: "loaded", slot: 1 });
+    expect(state.phase).toBe("started");
+    return state;
+  }
+
+  it("the host's rematch resets a started match to waiting, clearing ready/loaded and the seed", () => {
+    const state = reduce(startedLobby(), { type: "rematch", slot: 0 });
+    expect(state.phase).toBe("waiting");
+    expect(state.countdown).toBe(0);
+    expect(state.seed).toBe(0);
+    expect(state.players.every((p) => !p.ready && !p.loaded)).toBe(true);
+  });
+
+  it("keeps the seats, names, teams, mode and map across a rematch", () => {
+    const before = startedLobby();
+    const state = reduce(before, { type: "rematch", slot: 0 });
+    expect(state.players.map((p) => [p.slot, p.name, p.team])).toEqual(
+      before.players.map((p) => [p.slot, p.name, p.team]),
+    );
+    expect(state.mode).toBe(before.mode);
+    expect(state.map).toBe("DesertWar");
+    expect(state.hostSlot).toBe(before.hostSlot);
+  });
+
+  it("ignores a rematch from a non-host", () => {
+    const state = reduce(startedLobby(), { type: "rematch", slot: 1 });
+    expect(state.phase).toBe("started");
+  });
+
+  it("ignores a rematch outside the started phase", () => {
+    expect(reduce(joinN(2), { type: "rematch", slot: 0 }).phase).toBe("waiting");
+
+    const counting = run(joinN(2), { type: "setReady", slot: 1, ready: true }, { type: "start", slot: 0 });
+    expect(reduce(counting, { type: "rematch", slot: 0 }).phase).toBe("countdown");
+  });
+
+  it("runs the full start flow again after a rematch, stamping a fresh seed", () => {
+    let state = reduce(startedLobby(), { type: "rematch", slot: 0 });
+    state = run(state, { type: "setReady", slot: 1, ready: true }, { type: "start", slot: 0 });
+    expect(state.phase).toBe("countdown");
+    expect(state.seed).not.toBe(0);
+  });
+
+  it("a guest who disconnected mid-match stays removed after the rematch", () => {
+    const state = run(startedLobby(), { type: "leave", slot: 1 }, { type: "rematch", slot: 0 });
+    expect(state.phase).toBe("waiting");
+    expect(state.players.map((p) => p.slot)).toEqual([0]);
+  });
+});
+
 // The room's map (multiplayer plan Phase 1): "" is the random-map sentinel resolved at host launch.
 describe("lobby map", () => {
   it("starts on the random-map sentinel", () => {
