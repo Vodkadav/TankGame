@@ -184,6 +184,79 @@ public class ProtocolCodecTests
             0x01,                   // material = 1 (brick)
             0x02,                   // hp = 2
             0x00, 0x00,             // projectileCount = 0
+            0x00,                   // powerupCount = 0
         }, bytes);
+    }
+
+    [Fact]
+    public void SnapshotFrame_RoundTrips_WithPowerups()
+    {
+        var original = new SnapshotFrame(
+            Tick: 12,
+            Acks: new List<InputAck> { new(1, 3) },
+            Tanks: new List<TankState>(),
+            WallDeltas: new List<WallDelta>(),
+            Projectiles: new List<ProjectileState>())
+        {
+            Powerups = new List<PowerupState>
+            {
+                new(Id: 3, Kind: 8, CellX: 5, CellY: 9, Available: 1),
+                new(Id: 4, Kind: 0, CellX: 20, CellY: 1, Available: 0),
+            },
+        };
+
+        var decoded = ProtocolCodec.DecodeSnapshot(ProtocolCodec.EncodeSnapshot(original));
+
+        Assert.Equal(original.Powerups, decoded.Powerups);
+    }
+
+    [Fact]
+    public void SnapshotWithoutPowerupSection_DecodesWithEmptyPowerups()
+    {
+        // Pre-powerup snapshot bytes (the old layout ends at the projectile section) still decode —
+        // the powerup section is a tolerated trailing extension, so the wire format is not broken.
+        var legacy = new byte[]
+        {
+            0x07, 0x00, 0x00, 0x00, // tick = 7
+            0x00,                   // ackCount = 0
+            0x00,                   // tankCount = 0
+            0x00, 0x00,             // wallCount = 0
+            0x00, 0x00,             // projectileCount = 0
+        };
+
+        var decoded = ProtocolCodec.DecodeSnapshot(legacy);
+
+        Assert.Equal(7u, decoded.Tick);
+        Assert.Empty(decoded.Powerups);
+    }
+
+    // Cross-language parity anchor: the TS codec asserts the identical bytes for this powerup entry.
+    [Fact]
+    public void SnapshotWithAPowerup_EncodesToTheCanonicalByteVector()
+    {
+        var frame = new SnapshotFrame(
+            Tick: 2,
+            Acks: new List<InputAck>(),
+            Tanks: new List<TankState>(),
+            WallDeltas: new List<WallDelta>(),
+            Projectiles: new List<ProjectileState>())
+        {
+            Powerups = new List<PowerupState> { new(Id: 3, Kind: 8, CellX: 5, CellY: 9, Available: 1) },
+        };
+
+        Assert.Equal(new byte[]
+        {
+            0x02, 0x00, 0x00, 0x00, // tick = 2
+            0x00,                   // ackCount = 0
+            0x00,                   // tankCount = 0
+            0x00, 0x00,             // wallCount = 0
+            0x00, 0x00,             // projectileCount = 0
+            0x01,                   // powerupCount = 1
+            0x03, 0x00,             // id = 3
+            0x08,                   // kind = 8 (Telephone)
+            0x05, 0x00,             // cellX = 5
+            0x09, 0x00,             // cellY = 9
+            0x01,                   // available = 1
+        }, ProtocolCodec.EncodeSnapshot(frame));
     }
 }

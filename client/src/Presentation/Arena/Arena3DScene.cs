@@ -39,40 +39,18 @@ public partial class Arena3DScene : Node3D
 
     private const float TeleportPadRadius = 40f; // a tank centred within this of a pad warps to its partner
     private const float PickupRadius = 28f;
-    private const int RepairAmount = 2;
-    private const int ShieldAmount = 3;
     private const int PowerupCount = 9;
-    private const float AirstrikeZoneRadius = 70f;
-    private const float AirstrikeArmWindow = 5f; // all zones telegraph red within ~5s, expanding outward
-    private const float AirstrikeDelay = 0.5f;   // brief hold once fully telegraphed, then zones detonate in order
-    private const int AirstrikeDamage = 3;
     private const float AirstrikeCooldown = 50f; // the airstrike station refills every 50s (owner ask 2026-07-08)
 
     private IReadOnlyDictionary<PowerupKind, IPickupEffect> _powerupEffects = null!;
     private IReadOnlyList<(PowerupKind Kind, int X, int Y)> _powerupPlacements = Array.Empty<(PowerupKind, int, int)>();
 
-    // The catalogue's kind order — the generator's PickupCells line up with it one-for-one. Keep in sync
-    // with PowerupCatalogue below.
+    // The generator's PickupCells line up with this kind order one-for-one (the effects themselves
+    // come from the shared PowerupEffects catalogue).
     private static readonly PowerupKind[] PowerupOrder =
     {
         PowerupKind.SpeedBoost, PowerupKind.RapidFire, PowerupKind.BouncingAmmo, PowerupKind.SpreadAmmo,
         PowerupKind.Repair, PowerupKind.Shield, PowerupKind.PiercingAmmo, PowerupKind.Missile, PowerupKind.Telephone,
-    };
-
-    // Stat boosts run 15 s and REFRESH (not stack) on re-pickup — the source tag makes a second grab
-    // of the same kind replace the live effect, so boosts can't multiply into runaway speed/fire rate.
-    // Built in _Ready once the field size is known (the airstrike needs the field bounds for its swathe).
-    private (PowerupKind Kind, IPickupEffect Effect)[] PowerupCatalogue(NVector2 fieldMax) => new[]
-    {
-        (PowerupKind.SpeedBoost, (IPickupEffect)new StatusEffectPickup(new StatusEffect(StatKind.Speed, Mult: 1.6f, AddFlat: 0f, Seconds: 15f, Source: nameof(PowerupKind.SpeedBoost)))),
-        (PowerupKind.RapidFire, new StatusEffectPickup(new StatusEffect(StatKind.FireInterval, Mult: 0.5f, AddFlat: 0f, Seconds: 15f, Source: nameof(PowerupKind.RapidFire)))),
-        (PowerupKind.BouncingAmmo, new AmmoPickup(new BouncingAmmo(bounces: 3))),
-        (PowerupKind.SpreadAmmo, new AmmoPickup(new SpreadAmmo(count: 3, radians: 0.18f))),
-        (PowerupKind.Repair, new RepairPickup(RepairAmount)),
-        (PowerupKind.Shield, new ShieldPickup(ShieldAmount)),
-        (PowerupKind.PiercingAmmo, new AmmoPickup(new PiercingAmmo(pierces: 1, TileSize))),
-        (PowerupKind.Missile, new AmmoPickup(new MissileAmmo(TileSize))),
-        (PowerupKind.Telephone, new AirstrikePickup(GridOrigin, fieldMax, AirstrikeZoneRadius, AirstrikeArmWindow, AirstrikeDelay, AirstrikeDamage)),
     };
 
     // Orthographic ¾ camera. Eyeball-gated on playtest.
@@ -635,7 +613,7 @@ public partial class Arena3DScene : Node3D
         }
 
         var fieldMax = new NVector2(level.Width * TileSize, level.Height * TileSize);
-        _powerupEffects = PowerupCatalogue(fieldMax).ToDictionary(p => p.Kind, p => p.Effect);
+        _powerupEffects = PowerupEffects.Catalogue(GridOrigin, fieldMax, TileSize);
 
         var grid = level.BuildGrid();
         _grid = grid;
@@ -673,6 +651,7 @@ public partial class Arena3DScene : Node3D
 
         BuildTeleporter(level.Width, level.Height); // before SpawnTanks — the tanks consult it
         SpawnPowerups();
+        SpawnPowerupDirector();
         SpawnTanks();
         BuildPreviewHud();
         BuildPauseMenu();
@@ -1291,6 +1270,30 @@ public partial class Arena3DScene : Node3D
                 : new Powerup(_world, CellCentre(x, y), kind, effect, PickupRadius, dropOnCarrierDeath: true);
             _world.Spawn(powerup);
         }
+    }
+
+    // The boost director drops extra pickups over the match (on top of the initial placement):
+    // seeded by the arena seed so the same setup drops the same crates. Candidates are the passable
+    // interior cells — in generated arenas every passable cell is reachable by construction (the
+    // generator walls off cut-off floor). ponytail: a hand-authored map pocket cell would just fade
+    // uncollected after 30 s.
+    private void SpawnPowerupDirector()
+    {
+        var floorCells = new List<(int X, int Y)>();
+        for (var x = 1; x < _grid.Width - 1; x++)
+        {
+            for (var y = 1; y < _grid.Height - 1; y++)
+            {
+                if (!_grid.IsBlocked(x, y))
+                {
+                    floorCells.Add((x, y));
+                }
+            }
+        }
+
+        _world.Spawn(new PowerupDirector(_world, GameSetup.ArenaSeed, floorCells, GridOrigin, TileSize,
+            (kind, pos) => new Powerup(_world, pos, kind, _powerupEffects[kind], PickupRadius,
+                despawnAfter: PowerupDirector.DespawnSeconds)));
     }
 
     private void OnEntitySpawned(IEntity entity)

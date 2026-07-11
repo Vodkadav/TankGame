@@ -29,6 +29,9 @@ public static class ProtocolCodec
     /// <summary>Encoded size of one <see cref="ProjectileState"/>: 3 floats(12) + style(1) + layer(1).</summary>
     public const int ProjectileStateSize = 14;
 
+    /// <summary>Encoded size of one <see cref="PowerupState"/>: id(2) + kind(1) + cell(2+2) + available(1).</summary>
+    public const int PowerupStateSize = 8;
+
     /// <summary>Leading kind byte of a server→client welcome message (slot assignment).</summary>
     public const byte MsgWelcome = 1;
 
@@ -99,7 +102,8 @@ public static class ProtocolCodec
     public static byte[] EncodeSnapshot(SnapshotFrame frame)
     {
         var size = 4 + 1 + (frame.Acks.Count * InputAckSize) + 1 + (frame.Tanks.Count * TankStateSize)
-            + 2 + (frame.WallDeltas.Count * WallDeltaSize) + 2 + (frame.Projectiles.Count * ProjectileStateSize);
+            + 2 + (frame.WallDeltas.Count * WallDeltaSize) + 2 + (frame.Projectiles.Count * ProjectileStateSize)
+            + 1 + (frame.Powerups.Count * PowerupStateSize);
         var buffer = new byte[size];
         var span = buffer.AsSpan();
         var offset = 0;
@@ -159,6 +163,21 @@ public static class ProtocolCodec
             offset += 4;
             span[offset++] = shot.Style;
             span[offset++] = shot.Layer;
+        }
+
+        // The pickup section is appended LAST (count byte + entries) so a pre-pickup decoder simply
+        // never reads it — the extension does not break the wire format.
+        span[offset++] = (byte)frame.Powerups.Count;
+        foreach (var pickup in frame.Powerups)
+        {
+            BinaryPrimitives.WriteUInt16LittleEndian(span[offset..], pickup.Id);
+            offset += 2;
+            span[offset++] = pickup.Kind;
+            BinaryPrimitives.WriteUInt16LittleEndian(span[offset..], pickup.CellX);
+            offset += 2;
+            BinaryPrimitives.WriteUInt16LittleEndian(span[offset..], pickup.CellY);
+            offset += 2;
+            span[offset++] = pickup.Available;
         }
 
         return buffer;
@@ -229,6 +248,25 @@ public static class ProtocolCodec
             projectiles.Add(new ProjectileState(x, y, rotation, style, layer));
         }
 
-        return new SnapshotFrame(tick, acks, tanks, walls, projectiles);
+        // Tolerated trailing extension: bytes encoded before the pickup section existed end here.
+        var powerups = new List<PowerupState>();
+        if (offset < data.Length)
+        {
+            var powerupCount = data[offset++];
+            for (var i = 0; i < powerupCount; i++)
+            {
+                var id = BinaryPrimitives.ReadUInt16LittleEndian(data[offset..]);
+                offset += 2;
+                var kind = data[offset++];
+                var cellX = BinaryPrimitives.ReadUInt16LittleEndian(data[offset..]);
+                offset += 2;
+                var cellY = BinaryPrimitives.ReadUInt16LittleEndian(data[offset..]);
+                offset += 2;
+                var available = data[offset++];
+                powerups.Add(new PowerupState(id, kind, cellX, cellY, available));
+            }
+        }
+
+        return new SnapshotFrame(tick, acks, tanks, walls, projectiles) { Powerups = powerups };
     }
 }

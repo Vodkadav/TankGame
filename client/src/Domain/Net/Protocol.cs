@@ -51,6 +51,13 @@ public readonly record struct ProjectileState(float X, float Y, float Rotation, 
 /// snapshot is a broadcast, so every predicting guest finds its own reconciliation anchor here.</summary>
 public readonly record struct InputAck(byte Slot, uint Seq);
 
+/// <summary>One live pickup's authoritative state in a snapshot, so a guest sees the crates the
+/// host's boost director drops. <see cref="Id"/> is a small host-assigned handle stable for the
+/// pickup's lifetime (a guest keys its mirror views on it); <see cref="Kind"/> is the
+/// <c>PowerupKind</c> ordinal; the cell locates it (director drops sit on cell centres and never
+/// move); <see cref="Available"/> is 0 while dormant (a carried or cooling-down pickup).</summary>
+public readonly record struct PowerupState(ushort Id, byte Kind, ushort CellX, ushort CellY, byte Available);
+
 /// <summary>One server→client world snapshot at <see cref="Tick"/>. <see cref="Acks"/> carries a
 /// per-guest-slot reconciliation anchor (the snapshot is broadcast to all guests, so each finds its
 /// own — see <see cref="AckFor"/>). Carries the full tank set, the live projectiles, plus any wall
@@ -59,6 +66,11 @@ public sealed record SnapshotFrame(
     uint Tick, IReadOnlyList<InputAck> Acks, IReadOnlyList<TankState> Tanks,
     IReadOnlyList<WallDelta> WallDeltas, IReadOnlyList<ProjectileState> Projectiles)
 {
+    /// <summary>The live pickups on the host's field (boost-director drops). An init property with an
+    /// empty default — not a positional parameter — so every pre-pickup call site and byte layout
+    /// stays valid; the codec appends it as a tolerated trailing section.</summary>
+    public IReadOnlyList<PowerupState> Powerups { get; init; } = System.Array.Empty<PowerupState>();
+
     /// <summary>A snapshot acking the single 2-player-era guest — kept so the many call sites and
     /// tests that predate 4-player rooms stay terse. The one ack is anchored on both low slots,
     /// because in the 2-player era "the guest" is whichever of them the receiver happens to be.</summary>

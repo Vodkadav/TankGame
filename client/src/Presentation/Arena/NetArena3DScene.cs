@@ -28,6 +28,7 @@ public partial class NetArena3DScene : Node3D
     private const float FireInterval = 0.6f; // half the old rate of fire (owner ask 2026-07-08)
     private const float ProjectileSpeed = 600f;
     private const float CombatHitRadius = 28f;
+    private const float PickupRadius = 28f;
     private const int TankMaxHp = 8;
     private const byte HostSlot = 0;
 
@@ -381,6 +382,37 @@ public partial class NetArena3DScene : Node3D
         }
 
         _session = new HostSession(_transport, _world, _grid, _rosterTanks, guestInputs);
+        SpawnPowerupDirector();
+    }
+
+    // Net matches have no initial pickups — the boost director is their only source, seeded by the
+    // match seed so a re-host of the same match drops the same crates. Only the authoritative world
+    // runs it; guests mirror the drops from the snapshot's powerup states.
+    private void SpawnPowerupDirector()
+    {
+        if (_world is null)
+        {
+            return;
+        }
+
+        var world = _world;
+        var fieldMax = new NVector2(_level.Width * TileSize, _level.Height * TileSize);
+        var effects = PowerupEffects.Catalogue(GridOrigin, fieldMax, TileSize);
+        var floorCells = new List<(int X, int Y)>();
+        for (var x = 1; x < _grid.Width - 1; x++)
+        {
+            for (var y = 1; y < _grid.Height - 1; y++)
+            {
+                if (!_grid.IsBlocked(x, y))
+                {
+                    floorCells.Add((x, y));
+                }
+            }
+        }
+
+        world.Spawn(new PowerupDirector(world, _matchSeed, floorCells, GridOrigin, TileSize,
+            (kind, pos) => new Powerup(world, pos, kind, effects[kind], PickupRadius,
+                despawnAfter: PowerupDirector.DespawnSeconds)));
     }
 
     private void BecomeGuest(byte slot)
@@ -414,6 +446,14 @@ public partial class NetArena3DScene : Node3D
                 view.Bind(projectile);
                 AddChild(view);
                 _projectileViews[projectile] = view;
+                break;
+            case IPowerup pickup:
+                // A director drop in the host's world — same view + collected floater as solo.
+                var pickupView = new Powerup3DView { Name = "Powerup3DView" };
+                pickupView.Bind(pickup);
+                AddChild(pickupView);
+                _projectileViews[pickup] = pickupView; // reaped through the same despawn path
+                pickup.Collected += kind => ShowPickupFloater(pickup.Position, kind);
                 break;
         }
     }
@@ -469,7 +509,96 @@ public partial class NetArena3DScene : Node3D
         }
 
         MirrorProjectiles(snapshot.Projectiles);
+        MirrorPowerups(snapshot);
         DetectRoundOverFromSnapshot(snapshot);
+    }
+
+    // Guest role: the pickups mirrored from the latest snapshot, keyed by the host's stable wire id.
+    private readonly Dictionary<ushort, (NetPowerup Model, Powerup3DView View)> _snapshotPickups = new();
+
+    /// <summary>How many pickups the guest is currently mirroring. Zero on the host. For the tests.</summary>
+    public int MirroredPickupCount => _snapshotPickups.Count;
+
+    // Diff the mirrored pickup set against the snapshot's: new ids appear, known ids update their
+    // availability, absent ids vanish. Collection is not signalled on the wire — a pickup that
+    // vanishes while a tank sits on it was collected (pop the floater), otherwise it just faded.
+    private void MirrorPowerups(SnapshotFrame snapshot)
+    {
+        foreach (var state in snapshot.Powerups)
+        {
+            if (_snapshotPickups.TryGetValue(state.Id, out var known))
+            {
+                known.Model.IsAvailable = state.Available != 0;
+                continue;
+            }
+
+            var model = new NetPowerup
+            {
+                Position = CellCentre(state.CellX, state.CellY),
+                Kind = (PowerupKind)state.Kind,
+                IsAvailable = state.Available != 0,
+            };
+            var view = new Powerup3DView { Name = "NetPowerup3DView" };
+            view.Bind(model);
+            AddChild(view);
+            _snapshotPickups[state.Id] = (model, view);
+        }
+
+        List<ushort>? gone = null;
+        foreach (var (id, mirror) in _snapshotPickups)
+        {
+            var stillLive = false;
+            foreach (var state in snapshot.Powerups)
+            {
+                if (state.Id == id)
+                {
+                    stillLive = true;
+                    break;
+                }
+            }
+
+            if (stillLive)
+            {
+                continue;
+            }
+
+            if (mirror.Model.IsAvailable && TankNear(snapshot, mirror.Model.Position))
+            {
+                ShowPickupFloater(mirror.Model.Position, mirror.Model.Kind); // collected, not faded
+            }
+
+            mirror.View.Free(); // not deferred — a synchronous re-read must see the fresh set
+            (gone ??= new List<ushort>()).Add(id);
+        }
+
+        if (gone is not null)
+        {
+            foreach (var id in gone)
+            {
+                _snapshotPickups.Remove(id);
+            }
+        }
+    }
+
+    // ponytail: "a tank within a tile" approximates "collected it" — good enough for a floater.
+    private static bool TankNear(SnapshotFrame snapshot, NVector2 position)
+    {
+        foreach (var tank in snapshot.Tanks)
+        {
+            if (tank.Hp > 0 && NVector2.Distance(new NVector2(tank.X, tank.Y), position) <= TileSize)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private void ShowPickupFloater(NVector2 position, PowerupKind kind)
+    {
+        var floater = new PickupFloater3D { Name = "PickupFloater" };
+        AddChild(floater);
+        floater.Show(GroundProjection.ToWorld(position, 40f), PickupFloater.LabelKeyFor(kind));
     }
 
     // Rebuild the guest's shot views from the snapshot's live projectile set (ADR-0019 step 4). The
