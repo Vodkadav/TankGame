@@ -41,6 +41,15 @@ public enum ArenaId
 
     /// <summary>Rocky canyon-run arena.</summary>
     Canyon,
+
+    /// <summary>Ring arena around a solid mountain core — fights orbit the donut.</summary>
+    Donut,
+
+    /// <summary>Plus-shaped arena: four arms meeting at an open central hub.</summary>
+    Cross,
+
+    /// <summary>Floor islands in a water sea, joined by bridge causeways.</summary>
+    Archipelago,
 }
 
 /// <summary>Carries match-level state from the title screen into the play scene, which is loaded

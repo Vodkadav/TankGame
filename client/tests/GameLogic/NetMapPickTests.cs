@@ -55,6 +55,9 @@ public class NetMapPickTests
     [InlineData("City")]
     [InlineData("Frozen")]
     [InlineData("Canyon")]
+    [InlineData("Donut")]
+    [InlineData("Cross")]
+    [InlineData("Archipelago")]
     public void ARegisteredCodeArena_ResolvesToBuiltIn_SoEveryMemberBuildsIt(string arenaId)
     {
         var choice = Assert.IsType<NetMapPick.BuiltIn>(NetMapPick.Resolve(arenaId, "ABC123"));

@@ -30,6 +30,7 @@ public partial class LobbyBrowserScene : Control
     {
         ArenaId.DesertWar, ArenaId.CliffsAndValleys,
         ArenaId.Forest, ArenaId.Volcano, ArenaId.City, ArenaId.Frozen, ArenaId.Canyon,
+        ArenaId.Donut, ArenaId.Cross, ArenaId.Archipelago,
     };
 
     private ILobbyClient _lobby = null!;
@@ -300,6 +301,9 @@ public partial class LobbyBrowserScene : Control
         "City" => "map.city",
         "Frozen" => "map.frozen",
         "Canyon" => "map.canyon",
+        "Donut" => "map.donut",
+        "Cross" => "map.cross",
+        "Archipelago" => "map.archipelago",
         _ when mapId.StartsWith(CustomMapPrefix, System.StringComparison.Ordinal) =>
             mapId[CustomMapPrefix.Length..],
         _ => mapId,

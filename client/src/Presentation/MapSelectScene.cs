@@ -28,6 +28,9 @@ public partial class MapSelectScene : Control
         new(ArenaId.City, "City", "map.city", PreviewDir + "City.png", true),
         new(ArenaId.Frozen, "Frozen", "map.frozen", PreviewDir + "Frozen.png", true),
         new(ArenaId.Canyon, "Canyon", "map.canyon", PreviewDir + "Canyon.png", true),
+        new(ArenaId.Donut, "Donut", "map.donut", PreviewDir + "Donut.png", true),
+        new(ArenaId.Cross, "Cross", "map.cross", PreviewDir + "Cross.png", true),
+        new(ArenaId.Archipelago, "Archipelago", "map.archipelago", PreviewDir + "Archipelago.png", true),
     };
 
     private TextureRect _preview = null!;

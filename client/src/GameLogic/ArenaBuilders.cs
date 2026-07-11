@@ -40,6 +40,9 @@ public static class ArenaBuilders
             ["City"] = new CityArena(),
             ["Frozen"] = new FrozenArena(),
             ["Canyon"] = new CanyonArena(),
+            ["Donut"] = new DonutArena(),
+            ["Cross"] = new CrossArena(),
+            ["Archipelago"] = new ArchipelagoArena(),
         };
 
     /// <summary>The builder registered under <paramref name="arenaId"/>, or false when none is (a
@@ -292,6 +295,138 @@ public sealed class CanyonArena : IArenaBuilder
     }
 }
 
+// ── Shaped arenas ─────────────────────────────────────────────────────────────────────────────
+// These three use ArenaAuthor.Mask: a shape predicate keeps only the playable silhouette open inside
+// the standard 76x46 rectangle; everything outside it is filled with ordinary solid cells, so no
+// grid/renderer/net change is needed — a masked cell is just a wall.
+
+/// <summary>Donut Ring: an elliptical ring of open floor around a solid Mountain core, corners masked
+/// solid too — every fight orbits the ring, with brick outcrops as the only cover.</summary>
+public sealed class DonutArena : IArenaBuilder
+{
+    public ArenaLayout Build()
+    {
+        var (materials, bushes) = ArenaAuthor.Field();
+
+        // The ring: an elliptical annulus around the field centre. Outside it (the corners and the
+        // core) is masked solid Mountain.
+        static double R2(int x, int y)
+        {
+            var dx = (x - 37.5) / 36.0;
+            var dy = (y - 22.5) / 21.0;
+            return (dx * dx) + (dy * dy);
+        }
+
+        ArenaAuthor.Mask(materials, (x, y) => R2(x, y) is >= 0.16 and <= 1.0, CellMaterial.Mountain);
+
+        // Brick outcrops on the ring diagonals — destructible cover on an otherwise open orbit.
+        foreach (var (cx, cy) in new[] { (16, 9), (59, 9), (16, 36), (59, 36) })
+        {
+            ArenaAuthor.Diamond(materials, cx, cy, 1, CellMaterial.Brick);
+        }
+
+        var powerups = new[]
+        {
+            (PowerupKind.Repair, 37, 6),
+            (PowerupKind.Shield, 38, 39),
+            (PowerupKind.SpeedBoost, 9, 22),
+            (PowerupKind.RapidFire, 66, 22),
+            (PowerupKind.Missile, 23, 10),
+        };
+
+        return ArenaAuthor.Assemble(materials, bushes, powerups, GroundTheme.Mars, (37, 3), (6, 22));
+    }
+}
+
+/// <summary>Crossfire: a plus-shaped arena — four arms meeting at an open central hub (the
+/// chokepoint) — with the corners outside the plus masked solid Steel.</summary>
+public sealed class CrossArena : IArenaBuilder
+{
+    public ArenaLayout Build()
+    {
+        var (materials, bushes) = ArenaAuthor.Field();
+
+        // The plus: a vertical arm (x 26–49) and a horizontal arm (y 15–30); the four corner blocks
+        // outside both arms are masked solid Steel.
+        ArenaAuthor.Mask(materials, (x, y) => x is >= 26 and <= 49 || y is >= 15 and <= 30, CellMaterial.Steel);
+
+        // Steel pillars framing the hub so it fights as a chokepoint, not an open square.
+        foreach (var (cx, cy) in new[] { (30, 18), (45, 18), (30, 27), (45, 27) })
+        {
+            ArenaAuthor.Diamond(materials, cx, cy, 1, CellMaterial.Steel);
+        }
+
+        // Brick cover midway down each arm.
+        foreach (var (cx, cy) in new[] { (37, 9), (38, 36), (12, 22), (63, 23) })
+        {
+            ArenaAuthor.Diamond(materials, cx, cy, 1, CellMaterial.Brick);
+        }
+
+        var powerups = new[]
+        {
+            (PowerupKind.Repair, 37, 22), // the hub — worth fighting through the chokepoint for
+            (PowerupKind.Missile, 37, 12),
+            (PowerupKind.Shield, 37, 33),
+            (PowerupKind.SpeedBoost, 10, 22),
+            (PowerupKind.RapidFire, 65, 22),
+        };
+
+        return ArenaAuthor.Assemble(materials, bushes, powerups, GroundTheme.ParkingLot, (37, 3), (4, 22));
+    }
+}
+
+/// <summary>Archipelago: five floor islands in a Water sea (water blocks tanks but not shots), joined
+/// by single-cell Bridge causeways — hold an island or duel across the open water.</summary>
+public sealed class ArchipelagoArena : IArenaBuilder
+{
+    public ArenaLayout Build()
+    {
+        var (materials, bushes) = ArenaAuthor.Field();
+
+        // The sea: everything inside the border starts as Water; the islands are stamped back in as
+        // open floor.
+        ArenaAuthor.Mask(materials, (_, _) => false, CellMaterial.Water);
+
+        foreach (var (cx, cy, radius) in new[] { (13, 10, 7), (62, 10, 7), (13, 35, 7), (62, 35, 7), (37, 22, 8) })
+        {
+            ArenaAuthor.Diamond(materials, cx, cy, radius, CellMaterial.Floor);
+        }
+
+        // Causeways: a ring joining the four corner islands plus a central spine through the middle
+        // island. Only sea cells become Bridge — island floor along the line stays floor.
+        static void Causeway(CellMaterial[,] mats, int x0, int y0, int x1, int y1)
+        {
+            for (var x = x0; x <= x1; x++)
+            {
+                for (var y = y0; y <= y1; y++)
+                {
+                    if (mats[x, y] == CellMaterial.Water)
+                    {
+                        mats[x, y] = CellMaterial.Bridge;
+                    }
+                }
+            }
+        }
+
+        Causeway(materials, 13, 10, 62, 10);
+        Causeway(materials, 13, 35, 62, 35);
+        Causeway(materials, 13, 10, 13, 35);
+        Causeway(materials, 62, 10, 62, 35);
+        Causeway(materials, 37, 10, 37, 35);
+
+        var powerups = new[]
+        {
+            (PowerupKind.Repair, 37, 22), // the central island
+            (PowerupKind.Shield, 13, 14),
+            (PowerupKind.Missile, 62, 14),
+            (PowerupKind.SpeedBoost, 13, 31),
+            (PowerupKind.RapidFire, 62, 31),
+        };
+
+        return ArenaAuthor.Assemble(materials, bushes, powerups, GroundTheme.Sand, (13, 10), (62, 10));
+    }
+}
+
 /// <summary>Shared authoring helpers for the built-in themed arenas: a steel-ringed floor field of the
 /// common size, primitive terrain stampers, and the assembler that turns authored terrain into an
 /// <see cref="ArenaLayout"/> with eight <see cref="SpawnTable"/> spawns. Deterministic — loops and
@@ -315,6 +450,23 @@ internal static class ArenaAuthor
         }
 
         return (materials, bushes);
+    }
+
+    /// <summary>Fills every interior cell OUTSIDE the shape (<paramref name="inside"/> false) with
+    /// <paramref name="fill"/>, shaping the playable silhouette inside the standard rectangle. The
+    /// steel border ring is left untouched; masked cells are ordinary solid cells to the grid.</summary>
+    public static void Mask(CellMaterial[,] materials, System.Func<int, int, bool> inside, CellMaterial fill)
+    {
+        for (var x = 1; x < Width - 1; x++)
+        {
+            for (var y = 1; y < Height - 1; y++)
+            {
+                if (!inside(x, y))
+                {
+                    materials[x, y] = fill;
+                }
+            }
+        }
     }
 
     /// <summary>Stamps a solid diamond (L1 radius) of <paramref name="material"/> centred at
