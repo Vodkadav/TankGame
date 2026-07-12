@@ -121,6 +121,9 @@ public partial class NetArena3DScene : Node3D
     /// step 4). Zero on the host, which renders its own shots from the world. For the tests.</summary>
     public int MirroredProjectileCount => _snapshotProjectiles.Count;
 
+    /// <summary>The authoritative world when hosting (null as a guest). For the tests.</summary>
+    internal World? HostWorld => _world;
+
     public override void _Ready()
     {
         _transport = NetworkSession.Active
@@ -491,6 +494,15 @@ public partial class NetArena3DScene : Node3D
                 AddChild(pickupView);
                 _projectileViews[pickup] = pickupView; // reaped through the same despawn path
                 pickup.Collected += kind => ShowPickupFloater(pickup.Position, kind);
+                break;
+            case IAirstrike strike:
+                // The director drops the airstrike telephone online too — the host must see the
+                // telegraphed zones, same as solo, not take invisible damage. (Guests still can't:
+                // the snapshot carries no airstrike section yet.)
+                var strikeView = new Airstrike3DView { Name = "Airstrike3DView" };
+                strikeView.Bind(strike);
+                AddChild(strikeView);
+                _projectileViews[strike] = strikeView; // reaped through the same despawn path
                 break;
         }
     }

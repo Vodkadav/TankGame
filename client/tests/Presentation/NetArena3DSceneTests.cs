@@ -349,6 +349,26 @@ public class NetArena3DSceneTests : TestClass
         }
     }
 
+    // The boost director drops the airstrike telephone online too: when the host's world spawns an
+    // airstrike, the host scene must telegraph its zones (an Airstrike3DView) — never deal invisible
+    // damage from a strike no one can see.
+    [Test]
+    public void HostAirstrike_ShowsItsTelegraphedZones()
+    {
+        _transport.DeliverWelcome(0);
+        var world = _scene.HostWorld
+            ?? throw new Exception("The welcomed host must run the authoritative world.");
+
+        world.Spawn(new TankGame.GameLogic.Airstrike(world,
+            new List<System.Numerics.Vector2> { new(96f, 96f) }, callerTeam: 0,
+            zoneRadius: 70f, armWindow: 5f, delay: 0.5f, damage: 3));
+
+        if (_scene.FindChild("Airstrike3DView", recursive: true, owned: false) is null)
+        {
+            throw new Exception("An airstrike in the host world must show its telegraphed zone view.");
+        }
+    }
+
     // Online rematch: once the round is decided, the LOBBY host (and only the host) gets a Rematch
     // button beside Leave; pressing it sends the rematch lobby command over the same socket.
     [Test]
