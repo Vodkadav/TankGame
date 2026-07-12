@@ -1,9 +1,10 @@
 # Web (WASM) export + Lundrea Arcade deploy + multiplayer plan
 
-Status as of 2026-06-27. This branch (`feat/web-export`) holds the **experimental Godot .NET
-WebAssembly build** of TankGame and everything needed to rebuild and redeploy it. It is **not merged
-to `main`** (it carries web-only changes guarded by `#if GODOT_WEB`). Single-player is **live and
-playable** at <https://lundrea-arcade.web.app/tank/index.html> (arcade home: <https://lundrea-arcade.web.app>).
+Status as of 2026-07-12. This branch (`web-reconcile-256`, successor to `feat/web-export`)
+reconciles the **experimental Godot .NET WebAssembly build** of TankGame onto `main` and holds
+everything needed to rebuild and redeploy it (web-only changes guarded by `#if GODOT_WEB`).
+Single-player is **live and playable** at <https://lundrea-arcade.web.app/tank/index.html>
+(arcade home: <https://lundrea-arcade.web.app>).
 
 ---
 
