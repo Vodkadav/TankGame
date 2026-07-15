@@ -9,13 +9,16 @@ Write-Host "=== TankGame play test ===" -ForegroundColor Cyan
 Write-Host "Repo: $repo`n"
 
 # 1. Fetch the latest committed version (fast-forward only; never clobbers local work).
+# Run git where stderr is NOT a terminating error: a blocked or diverged pull writes to
+# stderr, and under $ErrorActionPreference='Stop' that throws and aborts the launcher
+# before the "play current working tree" fallback below can run.
 Write-Host "Updating to latest version..." -ForegroundColor Yellow
-git -C $repo pull --ff-only 2>&1 | Write-Host
+& { $ErrorActionPreference = 'Continue'; git -C $repo pull --ff-only 2>&1 | Write-Host }
 if ($LASTEXITCODE -ne 0) {
     Write-Host "Could not fast-forward (offline, or local changes present) - playing current working tree." -ForegroundColor DarkYellow
 }
 
-# 2. Resolve Godot 4.6 (.NET) — PATH shim first, then the known winget install.
+# 2. Resolve Godot 4.6 (.NET) - PATH shim first, then the known winget install.
 $godot = (Get-Command godot -ErrorAction SilentlyContinue).Source
 if (-not $godot) {
     $godot = Join-Path $env:LOCALAPPDATA 'Microsoft\WinGet\Packages\GodotEngine.GodotEngine.Mono_Microsoft.Winget.Source_8wekyb3d8bbwe\Godot_v4.6.2-stable_mono_win64\Godot_v4.6.2-stable_mono_win64.exe'
