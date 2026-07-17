@@ -11,7 +11,7 @@ namespace TankGame.GameLogic;
 /// by diffing snapshot ids, not by reaping).</summary>
 public sealed class NetPowerup : IPowerup
 {
-    public Guid Id { get; } = Guid.NewGuid();
+    public Guid Id { get; } = EntityId.Next();
     public Vector2 Position { get; set; }
     public PowerupKind Kind { get; set; }
     public bool IsAvailable { get; set; } = true;

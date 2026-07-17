@@ -74,7 +74,7 @@ public sealed class PowerupDirector : IEntity
         _untilNextSpawn = NextInterval();
     }
 
-    public Guid Id { get; } = Guid.NewGuid();
+    public Guid Id { get; } = EntityId.Next();
     public Vector2 Position => Vector2.Zero; // bookkeeping entity — nowhere on the field
     public bool IsAlive => true;
 

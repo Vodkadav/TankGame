@@ -1,10 +1,12 @@
-# Web (WASM) export + Lundrea Arcade deploy + multiplayer plan
+# Web (WASM) export + Lundrea Arcade deploy
 
-Status as of 2026-07-12. This branch (`web-reconcile-256`, successor to `feat/web-export`)
-reconciles the **experimental Godot .NET WebAssembly build** of TankGame onto `main` and holds
-everything needed to rebuild and redeploy it (web-only changes guarded by `#if GODOT_WEB`).
-Single-player is **live and playable** at <https://lundrea-arcade.web.app/tank/index.html>
-(arcade home: <https://lundrea-arcade.web.app>).
+Status as of 2026-07-17: the web layer is **reconciled into `main`** — the WASM export builds
+from `main` alone, no side branch. All web-only code is `#if GODOT_WEB`-guarded or additive, so
+desktop/Android/test builds are unaffected. The live single-player build is at
+<https://lundrea-arcade.web.app/tank/index.html> (arcade home: <https://lundrea-arcade.web.app>).
+
+The old branches `feat/web-export`, `web-export-deploy`, `web-reconcile`, and `web-reconcile-256`
+are fully reconciled (ported or superseded) and can be deleted.
 
 ---
 
@@ -30,33 +32,35 @@ EDITOR="C:/godot-web-export/.../Godot_v4.6.2-stable_mono_web_export_win64.exe"
 "$EDITOR" --headless --path client --export-release "Web" "$(pwd)/build/web/index.html"
 ```
 
-Serve locally with COOP/COEP to test (the build needs cross-origin isolation). A minimal server is
-in the session scratchpad (`serve_coi.py`); any server sending
+Serve locally with COOP/COEP to test (the build needs cross-origin isolation): any server sending
 `Cross-Origin-Opener-Policy: same-origin` + `Cross-Origin-Embedder-Policy: require-corp` works.
 
-## 3. Web-only code changes (all `#if GODOT_WEB`-guarded; desktop/Android untouched)
+## 3. The web layer on `main` (what makes the WASM build work)
 
 | File | Change | Why |
 |---|---|---|
-| `client/TankGame.csproj` | `OutputType=Exe` + `Program.cs`, `WasmEnableThreads`, `GODOT_WEB` define, Sentry+GoDotTest excluded, `TrimmerRootAssembly` for `System.Private.CoreLib`, `System.Runtime`, **`TankGame`, `GodotSharp`** | wasm needs an entry point; trimmer would otherwise prune the whole game (the engine calls `GodotPlugins.Game.Main` natively, so it's invisible to the trimmer) |
-| `client/Program.cs`, `client/TankGame.sln` | new (`{}` entry + hand-written solution) | the static-mono runtime needs a top-level entry + a solution to publish |
-| `client/src/GameLogic/EntityId.cs` | crypto-free counter-based entity ids on web | **`Guid.NewGuid()` returns the SAME value every call on this runtime** (no crypto RNG) → all tanks shared one id → `tank.Id == shot.Owner` / `== self.Id` always true → no damage + AI never fires. This was *the* combat bug. |
-| `Tank/Projectile/Airstrike/Powerup/NetTank/NetProjectile.cs`, `GameMode.cs` | use `EntityId.Next()` | (same) |
-| `Arena3DScene.cs` | fixed-timestep accumulator (`_world.Step(1/120)` N×/frame) | low web FPS → large `delta` → projectiles tunnel past tanks; fixed step prevents it |
-| `Arena3DScene.cs` | `ExitGame()` → `JavaScriptBridge.Eval("window.top.location.href='/'")` on web | `GetTree().Quit()` is a no-op in a browser; Exit returns to the arcade |
-| `SfxPool.cs` | `AttenuationModel = Disabled` on the 3D pool + `GD.Load` fallback in `LoadOgg` | camera is ~2500u back → default attenuation silenced all SFX; exports ship only the *imported* `.ogg`, so raw `FileAccess` returns null |
-| `TranslationLoader.cs`, `TitleScene.cs` | `GD.Load` fallback when raw `FileAccess` fails | exports drop raw source files (csv/png); load the imported resource instead |
-| `GameMode.cs` | `ShowEnemyNames` default **true**; `KillStreakTracker` no longer time-windowed | owner asks: see enemy names; streak = kills since last death |
-| `TitleScene.cs` | map editor + Exit gated out on web | web is play-only |
-| `client/audio/sfx/fire.ogg` | short cartoon "pew", ~25% volume | replaced a harsh continuous tone (asset, ffmpeg-synthesized; local Stable Audio model was down) |
-| `export_presets.cfg` | `[preset.1]` Web preset | — |
+| `client/TankGame.csproj` | web `PropertyGroup`: `OutputType=Exe` + `Program.cs`, `WasmEnableThreads`, `GODOT_WEB` define, Sentry+GoDotTest excluded, `TrimmerRootAssembly` for `System.Private.CoreLib`, `System.Runtime`, **`TankGame`, `GodotSharp`** | wasm needs an entry point; the trimmer would otherwise prune the whole game (the engine calls `GodotPlugins.Game.Main` natively, so it's invisible to the trimmer) |
+| `client/Program.cs`, `client/TankGame.sln` | `{}` entry point + hand-written solution | the static-mono runtime needs a top-level entry + a solution to publish |
+| `client/src/GameLogic/EntityId.cs` | crypto-free counter-based entity ids on web (`#if GODOT_WEB`; desktop keeps `Guid.NewGuid`) | **`Guid.NewGuid()` returns the SAME value every call on this runtime** (no crypto RNG) → all tanks shared one id → `tank.Id == shot.Owner` / `== self.Id` always true → no damage + AI never fires. This was *the* combat bug. Every entity id call site (`Tank`, `Projectile`, `Airstrike`, `Powerup`, `NetTank`, `NetProjectile`, `NetPowerup`, `PowerupDirector`) goes through `EntityId.Next()`. |
+| `client/src/Presentation/GameMode.cs` | `ArenaSeed` from `HashCode.Combine(EntityId.Next(), DateTime.UtcNow.Ticks)` | `Guid.NewGuid` is constant on WASM, and EntityId's web counter restarts at 0 every page load — either alone rolls the identical "random" arena every web session |
+| `client/src/Infrastructure/TranslationLoader.cs`, `SfxPool.LoadOgg` | `GD.Load` fallback when raw `FileAccess` fails | exports ship only the *imported* resources, not raw source files (csv/ogg) |
+| `client/src/Presentation/Bootstrap.cs` | Sentry + test-runner skipped on web | neither works on the WASM runtime |
+| `client/src/Infrastructure/PlatformExit.cs` | Exit → `JavaScriptBridge.Eval` back to the arcade on web | `GetTree().Quit()` is a no-op in a browser (button reads "Back to Arcade") |
+| `client/src/Infrastructure/Net/GodotHttpLobbyClient.cs` | web lobby HTTP over Godot `HttpRequest` nodes | .NET `HttpClient` dies with an NRE in `BrowserHttpInterop` on the threaded WASM runtime; desktop keeps `HttpLobbyClient`, both parse via the shared `LobbyWire` |
+| `client/export_presets.cfg` | `[preset.1]` Web preset, `canvas_resize_policy=2` (adaptive) | policy 1 locked the canvas to base resolution — rendered in a corner of the iframe |
+| `client/audio/sfx/fire.ogg` | short cartoon "pew" (4.4 KB) | replaced a harsh 40 KB continuous tone; also shrinks the web bundle. `SfxPool.FireOffsetDb` re-levelled −20 → −6 dB for the quieter clip (final level owner-ear-gated) |
 
 ### The 5 web-only bugs that had to be fixed (in order discovered)
 1. `wasm-tools` not actually installed → managed C# never compiled → black screen.
 2. Trimmer pruned the game (rooted `TankGame`/`GodotSharp`).
-3. Exports drop raw `FileAccess` resources → untranslated menu, no SFX, no backdrop (GD.Load fallbacks).
+3. Exports drop raw `FileAccess` resources → untranslated menu, no SFX (GD.Load fallbacks).
 4. `Guid.NewGuid()` collision → no combat damage, AI never fires (counter-based `EntityId`).
 5. GitHub LFS bandwidth quota broke the CI deploy → store the bundle as **plain git blobs** (both files < 100 MB).
+
+Superseded-along-the-way (never ported; `main`'s versions won): the old branch's inline
+fixed-timestep loop (main has swept-collision fixed-step combat, #243), its time-less
+`KillStreakTracker`, its TitleScene web gating (main's slim menu + `PlatformExit`, #248),
+and its .NET-HttpClient-era lobby plumbing (host-authoritative redesign, ADR-0019/0021, #245+).
 
 ## 4. Deploy to Lundrea Arcade (ProjectX repo)
 
@@ -74,54 +78,20 @@ ProjectX integration (already in place on `main`): `public/tank/` bundle as **pl
 suites skip `external` games; tile `public/tiles/tank.webp`.
 
 **Caveats:** Spark free tier ≈ 15–20 cold loads/day (≈58 MB bundle; repeat visits cached/free).
-One harmless web-audio `sample_set_pause` console warning. Map editor is gated out of web.
+One harmless web-audio `sample_set_pause` console warning. Map editor is desktop-only.
 
----
+## 5. Multiplayer status
 
-## 5. NEXT MILESTONE — Multiplayer (the spec + plan)
-
-**Owner spec (2026-06-27):**
-- Title menu becomes: **Solo · Multiplayer · Settings · Back to Arcade** (Back-to-Arcade web-only).
-- **Multiplayer** → choose **Team vs Team** or **FFA**.
-- Either choice opens a **lobby** with **up to 8 slots** for players to join.
-- Multiplayer also shows a **list of available lobbies to join** (a lobby browser).
-- Any player can press **Start game** → **3 · 2 · 1 · Start** countdown → launches the arena.
-- Both **FFA** and **Team vs Team** must work in the arena.
-
-**Backend:** Firebase Spark can't host realtime (no Cloud Functions/WebSockets). There is already a
-Cloudflare Worker **`tankgame-worker.vodkadav.workers.dev`** (ADR-0019 relay) — extend it with a
-**Durable Object** for lobby state + the N-player relay. The Cloudflare MCP is available in-session
-for deploys.
-
-**Current netcode:** 2-player host/join (ADR-0019 steps 1–4: relay DO, Host/Join codes, HostSession
-+ NetArena3DScene, protocol fidelity). Needs extending to **up to 8 players + FFA/Team + a lobby
-browser + a synced countdown.**
-
-**Proposed phases:**
-1. **Client menu/lobby UX** — restructure the title to Solo/Multiplayer/Settings/Back-to-Arcade;
-   Multiplayer → FFA/Team picker → lobby screen (8 slots, ready/start, countdown) + a lobby-browser
-   list. Dev against a local stub first.
-2. **Backend (tankgame-worker)** — a `Lobby` Durable Object: create / list / join / leave / start;
-   broadcast slot changes + the start countdown; then relay game packets for N players.
-3. **Netcode to N players** — extend HostSession/NetArena3DScene/snapshot codec from 2 → up to 8
-   tanks; FFA (every tank its own team) vs Team (2 teams) win logic.
-4. **Wire client ↔ worker** — lobby browser + join + countdown sync + launch into NetArena3DScene
-   with the right roster/mode.
-5. **Playtest** across 2+ devices/browsers.
-
-**Known step-4 remnant (ADR-0019):** the guest's OWN shield/elevation isn't predicted
-(`PredictedTank`/`Reconcile` doesn't track Shield/Layer).
-
----
+The 2026-06-27 multiplayer spec is **delivered on `main`**: slim title menu
+(Solo · Multiplayer · Settings · Back-to-Arcade), lobby browser + lobby room for up to 8 players
+(`LobbyProtocol.MaxPlayers`), countdown start, host-authoritative relay netcode over the
+`tankgame-worker` Cloudflare Durable Objects (ADR-0019 relay, ADR-0021 lobby directory), net
+pickups, victory screen + online rematch (#259/#262). See those ADRs for design; this doc only
+covers the web build/deploy.
 
 ## 6. Resume checklist (fresh machine)
 
-1. Pull TankGame, `git checkout feat/web-export`; pull ProjectX `main`.
+1. Pull TankGame `main`; pull ProjectX `main`.
 2. Install the ComplexRobot Godot web-export editor + `dotnet workload install wasm-tools` (verify with `dotnet workload list`).
 3. `--import` once, then `--export-release "Web"` (section 2).
 4. To deploy: copy `build/web/*` → `ProjectX/public/tank/`, then PR→main in ProjectX (section 4).
-5. For multiplayer, start at section 5 phase 1.
-
-**Also pending (desktop/main parity):** the SFX-attenuation fix is ProjectX-independent and lives in
-TankGame PR #229 (`fix/sfx-attenuation`); the pew asset, `ShowEnemyNames` default, and the
-no-window `KillStreakTracker` still need porting to TankGame `main` for the desktop build.

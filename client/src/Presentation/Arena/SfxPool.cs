@@ -18,10 +18,11 @@ public partial class SfxPool : Node
     // louder but still subdued.
     private const float HoverOffsetDb = -16f;
     private const float UiClickOffsetDb = -6f;
-    // Cannon shots fire constantly during a fight; at full volume they drown everything else out
-    // (owner feedback 2026-06-30: too loud). −20 dB ≈ 10% of the previous amplitude, the level asked
-    // for. Applied per-shot to the Fire kind only, so explosions/pickups/voice keep their volume.
-    private const float FireOffsetDb = -20f;
+    // Cannon shots fire constantly during a fight, so Fire sits below the other gameplay SFX.
+    // The old loud clip needed −20 dB (owner feedback 2026-06-30); the current cartoon pew is
+    // intrinsically much quieter, so it only gets a small trim. Provisional pending owner's ear —
+    // adjust this constant alone to re-level. Applied per-shot to the Fire kind only.
+    private const float FireOffsetDb = -6f;
 
     private static readonly Dictionary<SfxKind, string> SfxFiles = new()
     {
