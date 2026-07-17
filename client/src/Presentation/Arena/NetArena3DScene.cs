@@ -70,6 +70,12 @@ public partial class NetArena3DScene : Node3D
     private readonly List<(byte Slot, ITank Tank)> _rosterTanks = new();
     private readonly List<(int Team, bool Alive)> _roundStatus = new();
 
+    // The net match's stat book (no stats on the wire): the host feeds it from its authoritative
+    // world each tick, a guest from every snapshot — both derive the identical leaderboard.
+    private readonly NetMatchStats _netStats = new();
+    private VictoryScreen? _victory;
+    private CanvasLayer _leaveLayer = null!;
+
     /// <summary>The decided round (FFA: last tank standing; Team: last team standing). The host
     /// evaluates it each authoritative tick; a guest derives the same verdict from the snapshot's
     /// tank states, so both roles show the winner banner. Null while the round is being fought.</summary>
@@ -252,6 +258,7 @@ public partial class NetArena3DScene : Node3D
     private void BuildLeaveButton()
     {
         var layer = new CanvasLayer { Name = "LeaveLayer", Layer = 3 };
+        _leaveLayer = layer;
         var leave = new Button { Name = "LeaveButton", Text = "net.leave" };
         leave.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.TopRight);
         leave.Position += new Vector2(-16f, 16f);
@@ -367,6 +374,11 @@ public partial class NetArena3DScene : Node3D
         // match (issue #4). Every peer derives the same spawn list + seed, so host and guest agree.
         _matchSeed = NetworkSession.StartedLobby?.Seed ?? 0;
         _spawns = Shuffled(_spawns, _matchSeed);
+        foreach (var seat in _roster)
+        {
+            _netStats.Register(seat.Slot, seat.Name, seat.Team); // both roles book the same rows
+        }
+
         if (slot == HostSlot)
         {
             BecomeHost();
@@ -687,8 +699,9 @@ public partial class NetArena3DScene : Node3D
     private void EvaluateRound()
     {
         _roundStatus.Clear();
-        foreach (var (_, tank) in _rosterTanks)
+        foreach (var (slot, tank) in _rosterTanks)
         {
+            _netStats.Observe(slot, tank.Hp); // the host's side of the shared stat book
             _roundStatus.Add((tank.Team, tank.IsAlive));
         }
 
@@ -698,6 +711,7 @@ public partial class NetArena3DScene : Node3D
             RoundResult = result;
             _status.SetStatus(RoundOverText(result.WinningTeam));
             _rematch.Visible = IsLobbyHost;
+            ShowVictoryScreen(result.WinningTeam);
         }
     }
 
@@ -714,6 +728,7 @@ public partial class NetArena3DScene : Node3D
         _roundStatus.Clear();
         foreach (var state in snapshot.Tanks)
         {
+            _netStats.Observe(state.Slot, state.Hp); // the guest's side of the shared stat book
             _roundStatus.Add((state.Team, state.Hp > 0));
         }
 
@@ -723,7 +738,87 @@ public partial class NetArena3DScene : Node3D
             RoundResult = result;
             _status.SetStatus(RoundOverText(result.WinningTeam));
             _rematch.Visible = IsLobbyHost;
+            ShowVictoryScreen(result.WinningTeam);
         }
+    }
+
+    /// <summary>The real end of a networked match (multiplayer plan: "net victory screen"): the same
+    /// <see cref="VictoryScreen"/> the solo arena shows, on BOTH roles, ranked from the shared stat
+    /// book — final standing, damage taken, and repairs, all derived from the hp streams each peer
+    /// already observes, so nothing new travels on the wire. The card carries the online affordances
+    /// (host: Rematch + Leave; guest: Leave) and the corner copies hide beneath it.</summary>
+    private void ShowVictoryScreen(int winningTeam)
+    {
+        if (_victory is not null)
+        {
+            return;
+        }
+
+        var standings = _netStats.Standings();
+        var standingRows = new List<VictoryScreen.Row>(standings.Count);
+        foreach (var tally in standings)
+        {
+            // The value column shows the hit points the tank went out with — the winner's margin.
+            standingRows.Add(new VictoryScreen.Row(tally.Name, tally.Hp.ToString(CultureInfo.InvariantCulture)));
+        }
+
+        var sheets = new List<VictoryScreen.Sheet>
+        {
+            new("stats.standing", standingRows),
+            RankedSheet("stats.taken", t => t.DamageTaken, lowerIsBetter: true),
+            RankedSheet("stats.repairs", t => t.Repairs, lowerIsBetter: false),
+        };
+
+        var buttons = new List<VictoryScreen.ButtonSpec>();
+        if (IsLobbyHost)
+        {
+            buttons.Add(new VictoryScreen.ButtonSpec("VictoryRematch", "net.rematch",
+                () => _transport.SendLobby(LobbyProtocol.EncodeRematch())));
+        }
+
+        buttons.Add(new VictoryScreen.ButtonSpec("VictoryLeave", "net.leave", LeaveMatch));
+
+        _victory = VictoryScreen.Build(
+            GetViewport().GetVisibleRect().Size, ChampionName(winningTeam), sheets, buttons);
+        AddChild(_victory);
+        _leaveLayer.Visible = false; // the screen's buttons take over — no doubled corner controls
+    }
+
+    private VictoryScreen.Sheet RankedSheet(
+        string titleKey, System.Func<NetMatchStats.SlotTally, int> value, bool lowerIsBetter)
+    {
+        var rows = new List<VictoryScreen.Row>();
+        foreach (var tally in LeaderboardOrder.Rank(_netStats.Tallies, value, lowerIsBetter))
+        {
+            rows.Add(new VictoryScreen.Row(tally.Name, value(tally).ToString(CultureInfo.InvariantCulture)));
+        }
+
+        return new VictoryScreen.Sheet(titleKey, rows);
+    }
+
+    // The ribbon's headliner: the winner's name when the winning team is a single tank (always, in
+    // FFA), "Team N" for a squad, and null (= the ribbon says draw) when nobody survived.
+    private string? ChampionName(int winningTeam)
+    {
+        if (winningTeam == LastStanding.NoWinner)
+        {
+            return null;
+        }
+
+        string? sole = null;
+        var teamSize = 0;
+        foreach (var seat in _roster)
+        {
+            if (seat.Team == winningTeam)
+            {
+                sole = seat.Name;
+                teamSize++;
+            }
+        }
+
+        return teamSize == 1 && sole is not null
+            ? sole
+            : string.Format(CultureInfo.InvariantCulture, Tr("net.team_label"), winningTeam + 1);
     }
 
     // "{name} wins!" when one tank owns the winning team (always true in FFA), "Team N wins!"

@@ -428,6 +428,134 @@ public class NetArena3DSceneTests : TestClass
         }
     }
 
+    // The real end of a networked match (net victory screen): a GUEST whose deciding snapshot
+    // arrives must show the full victory screen v2 — the winner's ribbon, the standing sheet ranked
+    // from the hp stream it observed, and a Leave button on the card — with the corner buttons
+    // hidden beneath it (the card's buttons take over).
+    [Test]
+    public void GuestRoundDecided_ShowsTheVictoryScreen_RankedFromObservedHp()
+    {
+        _transport.DeliverWelcome(1);
+        _transport.DeliverSnapshot(new SnapshotFrame(1, 0,
+            new List<TankState> { new(0, 96f, 160f, 0f, 0f, 8, 0), new(1, 200f, 96f, 0f, 0f, 8, 1) },
+            new List<WallDelta>()));
+        _transport.DeliverSnapshot(new SnapshotFrame(2, 0,
+            new List<TankState> { new(0, 96f, 160f, 0f, 0f, 8, 0), new(1, 200f, 96f, 0f, 0f, 0, 1) },
+            new List<WallDelta>()));
+
+        if (_scene.FindChild("VictoryCard", recursive: true, owned: false) is null)
+        {
+            throw new Exception("A decided round must show the victory screen on the guest.");
+        }
+
+        var winner = _scene.FindChild("WinnerName", recursive: true, owned: false) as Label
+            ?? throw new Exception("The victory screen must carry the winner's ribbon.");
+        if (winner.Text != _scene.Tanks[0].DisplayName || winner.Text.Length == 0)
+        {
+            throw new Exception($"The ribbon must name the surviving tank; got '{winner.Text}'.");
+        }
+
+        var title = _scene.FindChild("ViewTitle", recursive: true, owned: false) as Label
+            ?? throw new Exception("The victory screen must name its ranking sheet.");
+        if (title.Text != "stats.standing")
+        {
+            throw new Exception($"The net board opens on the final standing; got '{title.Text}'.");
+        }
+
+        var rows = _scene.FindChild("LeaderboardRows", recursive: true, owned: false) as Control
+            ?? throw new Exception("The victory screen must show the ranked rows.");
+        if (rows.GetChildCount() != 2)
+        {
+            throw new Exception($"Both tanks must rank on the sheet; saw {rows.GetChildCount()} rows.");
+        }
+
+        if (_scene.FindChild("VictoryLeave", recursive: true, owned: false) is not Button)
+        {
+            throw new Exception("A guest must keep a Leave affordance on the victory screen.");
+        }
+
+        if (_scene.FindChild("VictoryRematch", recursive: true, owned: false) is not null)
+        {
+            throw new Exception("A non-host must not be offered Rematch.");
+        }
+
+        var corner = _scene.FindChild("LeaveLayer", recursive: true, owned: false) as CanvasLayer
+            ?? throw new Exception("The corner button layer must still exist.");
+        if (corner.Visible)
+        {
+            throw new Exception("The corner buttons must hide once the victory screen carries them.");
+        }
+    }
+
+    // The HOST reaches the same screen from its authoritative world: when its last opponent falls,
+    // the next tick decides the round and raises the victory screen there too.
+    [Test]
+    public void HostRoundDecided_ShowsTheVictoryScreen()
+    {
+        _transport.DeliverWelcome(0);
+
+        _scene.Tanks[1].TakeDamage(8); // the guest tank falls (net tanks have a single life)
+        _scene.Tick(0.05f);            // the deciding authoritative tick
+
+        if (_scene.RoundResult is not { Decided: true })
+        {
+            throw new Exception("Downing the only opponent must decide the round on the host.");
+        }
+
+        if (_scene.FindChild("VictoryCard", recursive: true, owned: false) is null)
+        {
+            throw new Exception("A decided round must show the victory screen on the host.");
+        }
+
+        if (_scene.FindChild("VictoryLeave", recursive: true, owned: false) is not Button)
+        {
+            throw new Exception("The host must keep a Leave affordance on the victory screen.");
+        }
+    }
+
+    // Requirement: the online rematch keeps working from the new screen — the LOBBY host's victory
+    // card carries a Rematch button whose press sends the same lobby command as the old corner one.
+    [Test]
+    public void VictoryScreenRematch_SendsTheRematchCommand_ForTheLobbyHost()
+    {
+        NetworkSession.StartedLobby = new LobbyView(TankGame.Domain.Net.GameMode.Ffa, LobbyPhase.Started, 1, 0,
+            new List<LobbyPlayer> { new(0, "Ada", 0, true, true), new(1, "Bea", 1, true, true) });
+        NetworkSession.LocalSlot = 1; // this client is the lobby host (slot 1), playing as a guest
+        var scene = GD.Load<PackedScene>("res://src/Presentation/Arena/NetArena3D.tscn")
+            .Instantiate<NetArena3DScene>();
+        TestScene.AddChild(scene);
+
+        try
+        {
+            // Bea (slot 1) falls — the round is decided.
+            _transport.DeliverSnapshot(new SnapshotFrame(1, 0,
+                new List<TankState> { new(0, 96f, 160f, 0f, 0f, 8, 0), new(1, 200f, 96f, 0f, 0f, 0, 1) },
+                new List<WallDelta>()));
+
+            var winner = scene.FindChild("WinnerName", recursive: true, owned: false) as Label
+                ?? throw new Exception("The victory screen must show on the lobby host.");
+            if (winner.Text != "Ada")
+            {
+                throw new Exception($"The ribbon must carry the roster name of the survivor; got '{winner.Text}'.");
+            }
+
+            var rematch = scene.FindChild("VictoryRematch", recursive: true, owned: false) as Button
+                ?? throw new Exception("The lobby host's victory screen must offer Rematch.");
+            rematch.EmitSignal(BaseButton.SignalName.Pressed);
+
+            if (_transport.SentLobby.Count == 0
+                || !System.MemoryExtensions.SequenceEqual<byte>(
+                    _transport.SentLobby[^1], LobbyProtocol.EncodeRematch()))
+            {
+                throw new Exception("Pressing the card's Rematch must send the rematch lobby command.");
+            }
+        }
+        finally
+        {
+            scene.Free();
+        }
+    }
+
     [Test]
     public void HostTick_DrivesTheGuestTank_FromARelayedInput()
     {
