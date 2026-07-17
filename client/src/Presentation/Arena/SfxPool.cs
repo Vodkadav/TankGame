@@ -26,14 +26,21 @@ public partial class SfxPool : Node
     private static readonly Dictionary<SfxKind, string> SfxFiles = new()
     {
         [SfxKind.Fire]      = "fire.ogg",
-        // placeholder: barrier-break SFX removed pending a better fit
-        [SfxKind.WallBreak] = "",
+        [SfxKind.Explosion] = "explosion.ogg",
+        [SfxKind.WallBreak] = "wall_break.ogg",
+        [SfxKind.Pickup]    = "pickup.ogg",
         [SfxKind.Victory]   = "victory.ogg",
         [SfxKind.UiClick]   = "ui_click.ogg",
         [SfxKind.UiHover]   = "ui_hover.ogg",
-        // Tank-death (Explosion) and powerup-pickup (Pickup + every PowerupX) are intentionally
-        // silent placeholders: no entry here means the play methods no-op. Restore these mappings
-        // once the owner supplies the real audio assets.
+        [SfxKind.PowerupSpeed]     = "powerup_speed.ogg",
+        [SfxKind.PowerupRapidFire] = "powerup_rapid.ogg",
+        [SfxKind.PowerupBouncing]  = "powerup_bounce.ogg",
+        [SfxKind.PowerupSpread]    = "powerup_spread.ogg",
+        [SfxKind.PowerupPiercing]  = "powerup_pierce.ogg",
+        [SfxKind.PowerupRepair]    = "powerup_repair.ogg",
+        [SfxKind.PowerupShield]    = "powerup_shield.ogg",
+        [SfxKind.PowerupMissile]   = "powerup_missile.ogg",
+        [SfxKind.PowerupAirstrike] = "powerup_airstrike.ogg",
         [SfxKind.KillEnemy]        = "kill_enemy.ogg",
         [SfxKind.StreakDouble]     = "streak_double.ogg",
         [SfxKind.StreakTriple]     = "streak_triple.ogg",
@@ -77,9 +84,12 @@ public partial class SfxPool : Node
         AddChild(_voicePlayer);
 
         foreach (var (kind, file) in SfxFiles)
-            // An empty path is a deliberate silent placeholder: leave the stream null so PlayAt no-ops.
-            _streams[kind] = string.IsNullOrEmpty(file) ? null : LoadOgg(SfxDir + file);
+            _streams[kind] = LoadOgg(SfxDir + file);
     }
+
+    /// <summary>Whether the kind resolved a loaded audio stream
+    /// (false = unmapped, or its file is missing / failed to decode).</summary>
+    public bool HasStream(SfxKind kind) => _streams.TryGetValue(kind, out var s) && s is not null;
 
     // Load an OGG file via FileAccess + LoadFromBuffer — bypasses the Godot import/resource
     // system entirely, so the file works immediately after a git pull without an editor import.
