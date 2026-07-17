@@ -1,3 +1,4 @@
+using System;
 using Godot;
 using Chickensoft.GoDotTest;
 using TankGame.Presentation;
@@ -20,11 +21,27 @@ public class SfxPoolTests : TestClass
     [Cleanup]
     public void Cleanup() => _pool.QueueFree();
 
-    // WallBreak is mapped to "" (barrier-break SFX removed): playing it must be a silent no-op —
-    // no stream, no crash. The test passes iff PlayAt returns without throwing.
+    // Every kind maps to a real OGG: a null stream here means a missing or undecodable file
+    // (e.g. a WAV smuggled in under an .ogg name — LoadFromBuffer would return null).
     [Test]
-    public void PlayAt_WithASilentPlaceholderKind_DoesNotThrow()
+    public void EveryKind_ResolvesALoadedStream()
     {
-        _pool.PlayAt(SfxKind.WallBreak, Vector3.Zero);
+        foreach (var kind in Enum.GetValues<SfxKind>())
+            if (!_pool.HasStream(kind))
+                throw new Exception($"SfxKind.{kind} must resolve a loaded audio stream.");
+    }
+
+    [Test]
+    public void PlayAt_WithEveryKind_DoesNotThrow()
+    {
+        foreach (var kind in Enum.GetValues<SfxKind>())
+            _pool.PlayAt(kind, Vector3.Zero);
+    }
+
+    // The pool must stay robust to a kind with no mapping: PlayAt no-ops instead of throwing.
+    [Test]
+    public void PlayAt_WithAnUnmappedKind_DoesNotThrow()
+    {
+        _pool.PlayAt((SfxKind)999, Vector3.Zero);
     }
 }

@@ -29,21 +29,21 @@ update the affected row (Kenney license ≈ CC0, no attribution required).
 | Asset | Model / Tool | License | Prompt |
 |-------|-------------|---------|--------|
 | `client/audio/sfx/fire.ogg` (3.0 s) | **Stable Audio Open 1.0** via the `assetfactory` MCP `generate_sound`; auto-QC'd (CLAP-ranked best of 3, trimmed, peak-normalised); FLAC→OGG via ffmpeg | **Royalty-free / commercial use permitted** — Stable Audio Open's licence does **not** restrict the generated audio; free for any use including commercial | "a cartoonish tank cannon firing a shell, a punchy boomy pop with a quick airy whoosh, playful arcade style" (regenerated 2026-06-18, cartoonier per owner ask) |
-| `client/audio/sfx/explosion.ogg` (2.0 s) | Same pipeline | Same | "a big punchy cartoon explosion, deep booming blast with a bright crack and scattering debris, impactful arcade style" (regenerated 2026-06-18) |
-| `client/audio/sfx/wall_break.ogg` (2.0 s) | Same pipeline | Same | "brick wall crumbling and breaking apart, heavy rubble crashing to ground, destruction impact" |
-| `client/audio/sfx/pickup.ogg` (2.0 s) | Same pipeline | Same | "item pickup collected, short positive electronic beep, power-up sound, retro arcade" |
+| `client/audio/sfx/explosion.ogg` (1.5 s) | Same pipeline; post: trim + fade-out + 25 Hz highpass + peak-matched to `fire.ogg` (ffmpeg) | Same | "a big punchy cartoon explosion, a deep booming blast with a bright crack, playful arcade style" (regenerated 2026-07-17, SFX overhaul — all 12 non-voice clips below share this date + post chain) |
+| `client/audio/sfx/wall_break.ogg` (1.5 s) | Same pipeline + post | Same | "a brick wall and wooden crate crumbling apart, rubble chunks tumbling to the ground, short destruction impact" |
+| `client/audio/sfx/pickup.ogg` (1.0 s) | Same pipeline + post | Same | "a quick cheerful marimba plink, a soft rounded two-note pickup pop, warm and playful" |
 | `client/audio/sfx/victory.ogg` (3.6 s) | Same pipeline | Same | "triumphant victory fanfare, short brass sting, military bugle call, winner announcement" |
 | `client/audio/sfx/ui_click.ogg` (0.2 s) | Same pipeline | Same | "soft menu button click, brief UI tap, interface interaction sound, subtle click" |
 | `client/audio/sfx/ui_hover.ogg` (0.2 s) | Derived from `ui_click.ogg` via ffmpeg (`-filter:a volume=-10dB`) — a quieter click used for mouse-hover feedback | Same | (derived) |
-| `client/audio/sfx/powerup_speed.ogg` (2.0 s) | Same pipeline | Same | "a revving car engine accelerating, a quick turbo boost rev-up whoosh, energetic arcade style" (Speed Boost) |
-| `client/audio/sfx/powerup_rapid.ogg` (2.0 s) | Same pipeline | Same | "a fast machine gun rattle, rapid mechanical clatter of gunfire, arcade style" (Rapid Fire) |
-| `client/audio/sfx/powerup_bounce.ogg` (2.0 s) | Same pipeline | Same | "a metallic ricochet ping, a bouncing bullet zing ricocheting off steel, cartoon style" (Bouncing Ammo) |
-| `client/audio/sfx/powerup_spread.ogg` (1.5 s) | Same pipeline | Same | "a deep punchy shotgun blast, a low booming buckshot shot with a pump, arcade style" (Spread Shot) |
-| `client/audio/sfx/powerup_pierce.ogg` (2.0 s) | Same pipeline | Same | "a sharp armor-piercing zing, a high-velocity metallic whistle punching through steel plate, cartoon style" (Piercing Ammo) |
-| `client/audio/sfx/powerup_repair.ogg` (2.0 s) | Same pipeline | Same | "a heavy wrench ratcheting and a solid metal clunk, tank armor being repaired, warm low mechanical clanks" (Repair) |
-| `client/audio/sfx/powerup_shield.ogg` (3.0 s) | Same pipeline | Same | "an energy shield powering up, a humming force field activation tone, sci-fi protective bubble" (Shield) |
-| `client/audio/sfx/powerup_missile.ogg` (2.0 s) | Same pipeline | Same | "a rocket missile launching with a powerful whoosh and ignition roar, arcade style" (Missile) |
-| `client/audio/sfx/powerup_airstrike.ogg` (3.5 s) | Same pipeline | Same | "a fighter jet roaring overhead with a fast whoosh followed by an air-raid warning siren, incoming airstrike" (Airstrike / Telephone) |
+| `client/audio/sfx/powerup_speed.ogg` (1.5 s) | Same pipeline + post | Same | "a cartoon car engine revving up fast, a quick turbo boost rev, energetic and playful" (Speed Boost) |
+| `client/audio/sfx/powerup_rapid.ogg` (1.5 s) | Same pipeline + post | Same | "a fast machine gun rattle, a short burst of rapid mechanical gunfire clatter, arcade style" (Rapid Fire) |
+| `client/audio/sfx/powerup_bounce.ogg` (1.2 s) | Same pipeline + post (extra: −4 dB treble shelf @ 8 kHz) | Same | "a metallic ricochet ping, a bullet zinging off a steel plate, cartoon style" (Bouncing Ammo) |
+| `client/audio/sfx/powerup_spread.ogg` (1.5 s) | Same pipeline + post | Same | "a single loud shotgun blast, a deep booming gunshot" (Spread Shot) |
+| `client/audio/sfx/powerup_pierce.ogg` (1.4 s) | Same pipeline + post | Same | "a sharp armor piercing zing, a fast metallic whoosh punching through a steel plate, cartoon style" (Piercing Ammo) |
+| `client/audio/sfx/powerup_repair.ogg` (1.5 s) | Same pipeline + post | Same | "a warm restorative glockenspiel ding with a quick wrench ratchet click, gentle and positive repair sound" (Repair) |
+| `client/audio/sfx/powerup_shield.ogg` (1.5 s) | Same pipeline + post | Same | "an energy shield powering on, a rising electric hum swelling into a steady force field tone, sci-fi bubble" (Shield) |
+| `client/audio/sfx/powerup_missile.ogg` (1.5 s) | Same pipeline + post | Same | "a rocket missile launching with a fast whoosh and ignition burst, arcade style" (Missile) |
+| `client/audio/sfx/powerup_airstrike.ogg` (2.0 s) | Same pipeline + post | Same | "an air raid siren wailing as a military jet plane flies past overhead with a loud roaring whoosh" (Airstrike / Telephone) |
 | `client/audio/sfx/kill_enemy.ogg` (~1 s) | **Kokoro TTS** voice `bm_george` (British male) via Reader `scripts/synth.py`; WAV→OGG via ffmpeg | **Kokoro-82M is Apache-2.0**; the synthesized speech is free for any use including commercial | spoken: "Enemy destroyed!" — the local player's kill announcer |
 | `client/audio/sfx/streak_double.ogg` (~1 s) | Same (Kokoro `bm_george`) | Same | spoken: "Double kill!" |
 | `client/audio/sfx/streak_triple.ogg` (~1 s) | Same (Kokoro `bm_george`) | Same | spoken: "Triple kill!" |
