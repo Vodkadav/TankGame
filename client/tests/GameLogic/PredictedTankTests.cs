@@ -166,6 +166,31 @@ public class PredictedTankTests
     }
 
     [Fact]
+    public void Reconcile_TeleportSizedJump_SnapsCleanly_AndReplaysFromTheDestination()
+    {
+        // Net teleport pads: the host warps the guest's tank across the map (and up a layer) inside
+        // its authoritative world. The guest does NOT predict the warp — the next snapshot carries
+        // the teleport-sized jump, reconcile snaps to it outright (no smoothing to fight), and the
+        // still-unacknowledged inputs replay from the DESTINATION, so prediction never rubber-bands
+        // back through the pad.
+        var tank = new PredictedTank(1, new OpenArena(), new Vector2(160f, 160f));
+        tank.Predict(Move(1, 1f, 0f));
+        tank.Predict(Move(2, 1f, 0f));
+        tank.Predict(Move(3, 1f, 0f)); // still in flight when the warp lands host-side
+
+        // The host acked seq 2 and teleported the tank to the far pad, one layer up.
+        tank.Reconcile(SnapshotWith(ackSeq: 2, slot: 1, x: 1440f, y: 1184f, layer: 1));
+
+        Assert.Equal(1440f + StepDistance, tank.Position.X, precision: 3); // seq 3 replays from the pad
+        Assert.Equal(1184f, tank.Position.Y, precision: 3);
+        Assert.Equal(1, tank.Layer);
+
+        // The next predicted tick continues from the destination — no pull back toward the source pad.
+        tank.Predict(Move(4, 1f, 0f));
+        Assert.Equal(1440f + (StepDistance * 2f), tank.Position.X, precision: 3);
+    }
+
+    [Fact]
     public void Predict_StopsAtAWall_LikeTheServer()
     {
         // Wall at x = 24: the leading edge (centre + 24) hits it once the centre would reach 0.

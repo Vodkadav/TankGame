@@ -428,6 +428,134 @@ public class NetArena3DSceneTests : TestClass
         }
     }
 
+    // The real end of a networked match (net victory screen): a GUEST whose deciding snapshot
+    // arrives must show the full victory screen v2 — the winner's ribbon, the standing sheet ranked
+    // from the hp stream it observed, and a Leave button on the card — with the corner buttons
+    // hidden beneath it (the card's buttons take over).
+    [Test]
+    public void GuestRoundDecided_ShowsTheVictoryScreen_RankedFromObservedHp()
+    {
+        _transport.DeliverWelcome(1);
+        _transport.DeliverSnapshot(new SnapshotFrame(1, 0,
+            new List<TankState> { new(0, 96f, 160f, 0f, 0f, 8, 0), new(1, 200f, 96f, 0f, 0f, 8, 1) },
+            new List<WallDelta>()));
+        _transport.DeliverSnapshot(new SnapshotFrame(2, 0,
+            new List<TankState> { new(0, 96f, 160f, 0f, 0f, 8, 0), new(1, 200f, 96f, 0f, 0f, 0, 1) },
+            new List<WallDelta>()));
+
+        if (_scene.FindChild("VictoryCard", recursive: true, owned: false) is null)
+        {
+            throw new Exception("A decided round must show the victory screen on the guest.");
+        }
+
+        var winner = _scene.FindChild("WinnerName", recursive: true, owned: false) as Label
+            ?? throw new Exception("The victory screen must carry the winner's ribbon.");
+        if (winner.Text != _scene.Tanks[0].DisplayName || winner.Text.Length == 0)
+        {
+            throw new Exception($"The ribbon must name the surviving tank; got '{winner.Text}'.");
+        }
+
+        var title = _scene.FindChild("ViewTitle", recursive: true, owned: false) as Label
+            ?? throw new Exception("The victory screen must name its ranking sheet.");
+        if (title.Text != "stats.standing")
+        {
+            throw new Exception($"The net board opens on the final standing; got '{title.Text}'.");
+        }
+
+        var rows = _scene.FindChild("LeaderboardRows", recursive: true, owned: false) as Control
+            ?? throw new Exception("The victory screen must show the ranked rows.");
+        if (rows.GetChildCount() != 2)
+        {
+            throw new Exception($"Both tanks must rank on the sheet; saw {rows.GetChildCount()} rows.");
+        }
+
+        if (_scene.FindChild("VictoryLeave", recursive: true, owned: false) is not Button)
+        {
+            throw new Exception("A guest must keep a Leave affordance on the victory screen.");
+        }
+
+        if (_scene.FindChild("VictoryRematch", recursive: true, owned: false) is not null)
+        {
+            throw new Exception("A non-host must not be offered Rematch.");
+        }
+
+        var corner = _scene.FindChild("LeaveLayer", recursive: true, owned: false) as CanvasLayer
+            ?? throw new Exception("The corner button layer must still exist.");
+        if (corner.Visible)
+        {
+            throw new Exception("The corner buttons must hide once the victory screen carries them.");
+        }
+    }
+
+    // The HOST reaches the same screen from its authoritative world: when its last opponent falls,
+    // the next tick decides the round and raises the victory screen there too.
+    [Test]
+    public void HostRoundDecided_ShowsTheVictoryScreen()
+    {
+        _transport.DeliverWelcome(0);
+
+        _scene.Tanks[1].TakeDamage(8); // the guest tank falls (net tanks have a single life)
+        _scene.Tick(0.05f);            // the deciding authoritative tick
+
+        if (_scene.RoundResult is not { Decided: true })
+        {
+            throw new Exception("Downing the only opponent must decide the round on the host.");
+        }
+
+        if (_scene.FindChild("VictoryCard", recursive: true, owned: false) is null)
+        {
+            throw new Exception("A decided round must show the victory screen on the host.");
+        }
+
+        if (_scene.FindChild("VictoryLeave", recursive: true, owned: false) is not Button)
+        {
+            throw new Exception("The host must keep a Leave affordance on the victory screen.");
+        }
+    }
+
+    // Requirement: the online rematch keeps working from the new screen — the LOBBY host's victory
+    // card carries a Rematch button whose press sends the same lobby command as the old corner one.
+    [Test]
+    public void VictoryScreenRematch_SendsTheRematchCommand_ForTheLobbyHost()
+    {
+        NetworkSession.StartedLobby = new LobbyView(TankGame.Domain.Net.GameMode.Ffa, LobbyPhase.Started, 1, 0,
+            new List<LobbyPlayer> { new(0, "Ada", 0, true, true), new(1, "Bea", 1, true, true) });
+        NetworkSession.LocalSlot = 1; // this client is the lobby host (slot 1), playing as a guest
+        var scene = GD.Load<PackedScene>("res://src/Presentation/Arena/NetArena3D.tscn")
+            .Instantiate<NetArena3DScene>();
+        TestScene.AddChild(scene);
+
+        try
+        {
+            // Bea (slot 1) falls — the round is decided.
+            _transport.DeliverSnapshot(new SnapshotFrame(1, 0,
+                new List<TankState> { new(0, 96f, 160f, 0f, 0f, 8, 0), new(1, 200f, 96f, 0f, 0f, 0, 1) },
+                new List<WallDelta>()));
+
+            var winner = scene.FindChild("WinnerName", recursive: true, owned: false) as Label
+                ?? throw new Exception("The victory screen must show on the lobby host.");
+            if (winner.Text != "Ada")
+            {
+                throw new Exception($"The ribbon must carry the roster name of the survivor; got '{winner.Text}'.");
+            }
+
+            var rematch = scene.FindChild("VictoryRematch", recursive: true, owned: false) as Button
+                ?? throw new Exception("The lobby host's victory screen must offer Rematch.");
+            rematch.EmitSignal(BaseButton.SignalName.Pressed);
+
+            if (_transport.SentLobby.Count == 0
+                || !System.MemoryExtensions.SequenceEqual<byte>(
+                    _transport.SentLobby[^1], LobbyProtocol.EncodeRematch()))
+            {
+                throw new Exception("Pressing the card's Rematch must send the rematch lobby command.");
+            }
+        }
+        finally
+        {
+            scene.Free();
+        }
+    }
+
     [Test]
     public void HostTick_DrivesTheGuestTank_FromARelayedInput()
     {
@@ -450,6 +578,170 @@ public class NetArena3DSceneTests : TestClass
         if (last.AckSeq != 1)
         {
             throw new Exception($"The broadcast snapshot must ack the applied guest input; got {last.AckSeq}.");
+        }
+    }
+
+    // ── Teleport pads in the net world (multiplayer plan: "Cliffs teleport pads") ──
+    // Pads are static map features every member derives from the same map resolution, so nothing
+    // about them travels on the wire: the host's authoritative tanks warp inside World.Step and the
+    // new position/layer rides the normal snapshot; every peer renders the same rings.
+
+    private const float NetTile = 64f;
+
+    private static System.Numerics.Vector2 NetCellCentre(int x, int y) =>
+        new((x + 0.5f) * NetTile, (y + 0.5f) * NetTile);
+
+    private static LobbyView CliffsLobby(int seed)
+    {
+        // Eight humans fill every seat — no AI, so the host world only moves tanks we drive.
+        var players = new List<LobbyPlayer>();
+        for (var slot = 0; slot < LobbyProtocol.MaxPlayers; slot++)
+        {
+            players.Add(new LobbyPlayer(slot, $"P{slot}", slot, true, true));
+        }
+
+        return new LobbyView(TankGame.Domain.Net.GameMode.Ffa, LobbyPhase.Started, 0, 0, players,
+            Map: "CliffsAndValleys", Seed: seed);
+    }
+
+    // Cliffs authors a cross-layer pad pair: the net scene must derive the same two rings the solo
+    // arena shows — one down on the valley floor, one up at plateau height — on every role, with
+    // nothing on the wire (a guest builds them straight from the shared map resolution too).
+    [Test]
+    public void CliffsNetMatch_BuildsTheCrossLayerPadRings()
+    {
+        NetworkSession.StartedLobby = CliffsLobby(seed: 1);
+        NetworkSession.LocalSlot = 1; // a guest — the role with no world must still show the rings
+        var scene = GD.Load<PackedScene>("res://src/Presentation/Arena/NetArena3D.tscn")
+            .Instantiate<NetArena3DScene>();
+        TestScene.AddChild(scene);
+
+        try
+        {
+            var ground = 0;
+            var raised = 0;
+            foreach (var child in scene.GetChildren())
+            {
+                if (child is TeleportPad3DView view)
+                {
+                    if (view.Position.Y >= GroundProjection.LayerHeight - 0.5f)
+                    {
+                        raised++;
+                    }
+                    else
+                    {
+                        ground++;
+                    }
+                }
+            }
+
+            if (ground != 1 || raised != 1)
+            {
+                throw new Exception(
+                    $"A Cliffs net match must place the cross-layer pad pair (one valley ring, one plateau ring); saw {ground} ground + {raised} raised.");
+            }
+        }
+        finally
+        {
+            scene.Free();
+        }
+    }
+
+    // End-to-end host-side warp: a guest tank relayed onto the valley pad (cell 2,2) must come out
+    // on the plateau pad (cell 22,18) — across the map AND one layer up — through the authoritative
+    // world alone. Deterministic: every seat is human, so no AI moves or shoots.
+    [Test]
+    public void CliffsNetHost_WarpsARelayedTank_AcrossTheMapAndUpALayer()
+    {
+        NetworkSession.StartedLobby = CliffsLobby(seed: 1);
+        NetworkSession.LocalSlot = 0; // this client hosts the authoritative world
+        var scene = GD.Load<PackedScene>("res://src/Presentation/Arena/NetArena3D.tscn")
+            .Instantiate<NetArena3DScene>();
+        TestScene.AddChild(scene);
+
+        try
+        {
+            // The spawn shuffle is seeded by the lobby seed, so WHICH slot starts at the pad-adjacent
+            // primary spawn (1,1) is fixed but opaque — find it. It must be a guest (relayed input);
+            // if a shuffle change ever hands it to slot 0, pick a different seed above.
+            byte? padSlot = null;
+            foreach (var (slot, seated) in scene.Tanks)
+            {
+                if (seated.Position == NetCellCentre(1, 1))
+                {
+                    padSlot = slot;
+                }
+            }
+
+            if (padSlot is not byte driven)
+            {
+                throw new Exception("Expected a tank on the Cliffs primary spawn (1,1).");
+            }
+
+            if (driven == 0)
+            {
+                throw new Exception("Seed 1 put the HOST on the pad-adjacent spawn — choose another seed.");
+            }
+
+            // Drive diagonally from (1,1) toward the valley pad at (2,2); ~6 ticks reach its trigger
+            // radius, the warp fires inside World.Step, and the remaining ticks roll on the plateau.
+            _transport.DeliverInput(new InputFrame(Seq: 1, MoveX: 0.707f, MoveY: 0.707f, Aim: 0f,
+                Buttons: 0, Slot: driven));
+            for (var i = 0; i < 12; i++)
+            {
+                scene.Tick(0.05f);
+            }
+
+            var tank = scene.Tanks[driven];
+            var padB = NetCellCentre(22, 18);
+            var distance = System.Numerics.Vector2.Distance(tank.Position, padB);
+            if (distance > 200f)
+            {
+                throw new Exception(
+                    $"The relayed tank must warp to the plateau pad {padB}; ended {distance:0} away at {tank.Position}.");
+            }
+
+            if (tank.Layer != 1)
+            {
+                throw new Exception($"The warp must lift the tank to the plateau layer; got layer {tank.Layer}.");
+            }
+
+            // The warped position rides the normal snapshot — no new wire section for teleports.
+            var last = _transport.Broadcast[^1];
+            foreach (var state in last.Tanks)
+            {
+                if (state.Slot == driven && state.Layer != 1)
+                {
+                    throw new Exception("The broadcast snapshot must carry the warped tank's new layer.");
+                }
+            }
+        }
+        finally
+        {
+            scene.Free();
+        }
+    }
+
+    // The guest's own tank teleports host-side; the snapshot brings the jump back. Reconcile snaps
+    // the prediction to the pad, and the local view-model must follow — including the LAYER, or a
+    // cross-layer warp would leave the guest's own tank rendered down in the valley.
+    [Test]
+    public void GuestSnapshot_LiftsItsOwnTank_ToTheTeleportedLayer()
+    {
+        _transport.DeliverWelcome(1);
+        _transport.DeliverSnapshot(new SnapshotFrame(1, 0,
+            new List<TankState> { new(1, 1440f, 1184f, 0f, 0f, 8, 1, Shield: 0, Layer: 1) },
+            new List<WallDelta>()));
+
+        var own = _scene.Tanks[1];
+        if (Math.Abs(own.Position.X - 1440f) > 0.01f || Math.Abs(own.Position.Y - 1184f) > 0.01f)
+        {
+            throw new Exception($"The guest's own tank must snap to the authoritative warp; got {own.Position}.");
+        }
+
+        if (own.Layer != 1)
+        {
+            throw new Exception($"The guest's own tank must follow the warp's layer; got {own.Layer}.");
         }
     }
 }
