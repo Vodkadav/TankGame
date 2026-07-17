@@ -41,7 +41,7 @@ dashboard reads — keep it in sync with the detailed sections below.
   GoDotTest 187 — all green. Remaining: merge (owner squash-merge after CI), live two-device rematch/pickup
   check, 60 fps profile with the director on the largest map (perf rule), web re-export for the arcade.
 - [~] Multiplayer-menu restructure 2026-07-05 (`docs/tasks/multiplayer-menu-restructure.md`, #247 prep) — title slimmed to **Solo | Multiplayer | Settings | Exit** (last label platform-aware: "Back to Arcade" on web via `title.back_to_arcade`, behaviour unchanged — `PlatformExit`); map picking moved **into the lobby browser** (new Maps button → MapSelect; desktop-only Editor button — the editor needs the local asset library the WASM build doesn't bundle); MapSelect Back stays → Title. New i18n key `browser.maps` (EN/ES/DA). GoDotTest 172✓ (red-first). Remaining: web-branch reconcile + WASM re-export + arcade redeploy.
-- [~] Parallel batch 2026-07-17 (orchestrated; PRs #261 + #262 open — owner gates below):
+- [~] Parallel batch 2026-07-17 (orchestrated; #261/#262/#263 merged — owner gates below):
   **SFX overhaul** (#261, `feat/sfx-overhaul` @ d55195b) — the 12 silenced placeholder sounds (tank-death
   explosion, wall break, generic pickup, all 9 per-powerup cues) regenerated via local Stable Audio
   (assetfactory), loudness-matched to fire.ogg; every `SfxKind` now mapped in `SfxPool`; new
@@ -60,6 +60,25 @@ dashboard reads — keep it in sync with the detailed sections below.
   budget, so the perf-rule question moves to on-device rendering, not the sim. Finding: ~9.7 KB/step
   allocated by AI list/A* churn (not the director; `World.Step` itself stays zero-alloc) — optional
   future pooling slice if WASM GC hitches appear on device.
+- [~] Arcade-parity fix batch 2026-07-17 (orchestrated; #264/#265/#266 merged — owner gates below):
+  **Randomized min-distance spawns** (#264) — `SpawnTable` rewritten: the mirrored 8-candidate scheme
+  (which collapsed centre spawns and nudged duplicates to ADJACENT cells → tanks stuck inside each
+  other) replaced by seeded random placement over open non-lethal cells, pairwise Chebyshev separation
+  target 10 relaxing to floor 3, farthest-point best-effort below; deterministic per seed
+  (`GameSetup.ArenaSeed` / lobby seed); solo + generator + net host rewired; respawns keep their cell.
+  **Volcano lava + bridges** (#265) — lava is now an animated 2-layer value-noise ShaderMaterial
+  (dark crust, glowing pulsing cracks, world-space, unshaded/no texture fetches — Compatibility/WASM
+  safe) replacing the flat yellow emissive plane; every lava crossing widened to 3 cells (test-asserted).
+  **Web parity reconcile** (#266) — the 4 June web branches audited commit-by-commit (4 ported, 5
+  already-in-main/superseded): main now exports Web directly (csproj/Program.cs/sln + Bootstrap
+  `GODOT_WEB` guards; smoke-built 53.7 MB wasm), crypto-free `EntityId` on web (Guid.NewGuid is
+  constant under WASM — silently disabled all combat), SfxPool/TranslationLoader `GD.Load` fallbacks,
+  deterministic web arena seed, quiet cartoon-pew `fire.ogg` restored with `FireOffsetDb` −20→−6 dB;
+  `docs/web-export.md` rewritten; `client/audio/sfx/README.md` audition guide added (all clips
+  preview-able + replace-by-name). All batches verified: xUnit 14/69/583/54 + GoDotTest 195 green on
+  the final merged tree. Remaining (owner-gated): lava look eyeball, fire-loudness ear-check at −6 dB,
+  arcade WASM re-export + ProjectX/Firebase redeploy (confirm before live push), two-device net spawn
+  sanity.
 
 ## Current status: **M1 + S1 + M2 + local-first combat arc complete; local polish arc in progress** (2026-06-03)
 
