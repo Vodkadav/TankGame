@@ -649,7 +649,8 @@ public class NetArena3DSceneTests : TestClass
 
     // End-to-end host-side warp: a guest tank relayed onto the valley pad (cell 2,2) must come out
     // on the plateau pad (cell 22,18) — across the map AND one layer up — through the authoritative
-    // world alone. Deterministic: every seat is human, so no AI moves or shoots.
+    // world alone. Deterministic: every seat is human, so no AI moves or shoots, and the seeded
+    // spawn placement is fixed per lobby seed.
     [Test]
     public void CliffsNetHost_WarpsARelayedTank_AcrossTheMapAndUpALayer()
     {
@@ -661,34 +662,37 @@ public class NetArena3DSceneTests : TestClass
 
         try
         {
-            // The spawn shuffle is seeded by the lobby seed, so WHICH slot starts at the pad-adjacent
-            // primary spawn (1,1) is fixed but opaque — find it. It must be a guest (relayed input);
-            // if a shuffle change ever hands it to slot 0, pick a different seed above.
+            // Spawns are seeded-random, so WHICH guest starts nearest the valley pad is fixed per
+            // seed but opaque — find it and drive it. The host (slot 0) has no relayed input, so it
+            // is excluded; if a placement change ever strands every guest behind a wall on the way
+            // to the pad, pick a different seed above.
+            var padA = NetCellCentre(2, 2);
             byte? padSlot = null;
+            var best = float.MaxValue;
             foreach (var (slot, seated) in scene.Tanks)
             {
-                if (seated.Position == NetCellCentre(1, 1))
+                var d = System.Numerics.Vector2.Distance(seated.Position, padA);
+                if (slot != 0 && d < best)
                 {
+                    best = d;
                     padSlot = slot;
                 }
             }
 
             if (padSlot is not byte driven)
             {
-                throw new Exception("Expected a tank on the Cliffs primary spawn (1,1).");
+                throw new Exception("Expected at least one guest tank to drive onto the pad.");
             }
 
-            if (driven == 0)
+            // Home toward the valley pad, re-aiming each tick; the warp fires inside World.Step the
+            // moment the tank enters the pad's trigger radius, lifting it to the plateau layer.
+            uint seq = 0;
+            for (var i = 0; i < 400 && scene.Tanks[driven].Layer != 1; i++)
             {
-                throw new Exception("Seed 1 put the HOST on the pad-adjacent spawn — choose another seed.");
-            }
-
-            // Drive diagonally from (1,1) toward the valley pad at (2,2); ~6 ticks reach its trigger
-            // radius, the warp fires inside World.Step, and the remaining ticks roll on the plateau.
-            _transport.DeliverInput(new InputFrame(Seq: 1, MoveX: 0.707f, MoveY: 0.707f, Aim: 0f,
-                Buttons: 0, Slot: driven));
-            for (var i = 0; i < 12; i++)
-            {
+                var pos = scene.Tanks[driven].Position;
+                var dir = System.Numerics.Vector2.Normalize(padA - pos);
+                _transport.DeliverInput(new InputFrame(Seq: ++seq, MoveX: dir.X, MoveY: dir.Y,
+                    Aim: 0f, Buttons: 0, Slot: driven));
                 scene.Tick(0.05f);
             }
 
