@@ -109,6 +109,45 @@ public class ArenaBuildersTests
         Assert.True(bridgeOverLava, "volcano must have at least one Bridge crossing lava");
     }
 
+    // Owner feedback: single-cell crossings made it too easy to clip lava — every crossing must be a
+    // run of at least three Bridge cells along its river, so a tank has room to drive across.
+    [Fact]
+    public void Volcano_EveryLavaCrossing_IsAtLeastThreeCellsWide()
+    {
+        var layout = BuildOrFail("Volcano");
+        var mats = layout.Map.Materials;
+        for (var x = 0; x < layout.Map.Width; x++)
+        {
+            for (var y = 0; y < layout.Map.Height; y++)
+            {
+                if (mats[x, y] != CellMaterial.Bridge)
+                {
+                    continue;
+                }
+
+                var run = System.Math.Max(RunLength(mats, x, y, 1, 0), RunLength(mats, x, y, 0, 1));
+                Assert.True(run >= 3, $"bridge at ({x},{y}) is only {run} cell(s) wide");
+            }
+        }
+    }
+
+    // The length of the contiguous straight run of Bridge cells through (x, y) along (dx, dy).
+    private static int RunLength(CellMaterial[,] mats, int x, int y, int dx, int dy)
+    {
+        var run = 1;
+        for (var i = 1; mats[x + (i * dx), y + (i * dy)] == CellMaterial.Bridge; i++)
+        {
+            run++;
+        }
+
+        for (var i = 1; mats[x - (i * dx), y - (i * dy)] == CellMaterial.Bridge; i++)
+        {
+            run++;
+        }
+
+        return run;
+    }
+
     [Fact]
     public void City_IsAGridOfBuildingBlocks()
     {

@@ -177,23 +177,67 @@ public partial class Terrain3DView : Node3D
             MaterialOverride = new StandardMaterial3D { AlbedoColor = new Color(0.20f, 0.42f, 0.66f), Roughness = 0.3f },
         });
 
-    // A molten lava pool: a glowing red plane sitting near the ground, emissive so it reads as hot even
-    // in shadow. Flush enough that a bridge tile (drawn just above) sits over it.
+    // Molten lava: dark crust broken by glowing, slowly-flowing cracks. Two layers of procedural value
+    // noise scroll in different directions (so the surface churns rather than sliding as one sticker),
+    // and the crack glow pulses. Sampled in WORLD space so the flow runs seamlessly across neighbouring
+    // cells. Unshaded with zero texture fetches — cheap enough for the Compatibility renderer
+    // (WASM/mobile); unshaded also keeps it reading as hot even in shadow.
+    private const string LavaShaderCode = @"
+shader_type spatial;
+render_mode unshaded;
+uniform float cell_size = 64.0;
+varying vec2 wpos;
+void vertex() {
+    wpos = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xz;
+}
+float vhash(vec2 p) {
+    return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
+}
+float vnoise(vec2 p) {
+    vec2 i = floor(p);
+    vec2 f = fract(p);
+    vec2 u = f * f * (3.0 - 2.0 * f);
+    return mix(mix(vhash(i), vhash(i + vec2(1.0, 0.0)), u.x),
+               mix(vhash(i + vec2(0.0, 1.0)), vhash(i + vec2(1.0, 1.0)), u.x), u.y);
+}
+void fragment() {
+    vec2 p = wpos / cell_size;
+    float a = vnoise((p * 2.2) + (TIME * vec2(0.14, 0.05)));
+    float b = vnoise((p * 5.1) - (TIME * vec2(0.06, 0.11)));
+    float n = (a * 0.65) + (b * 0.35);
+    float molten = smoothstep(0.42, 0.72, n);
+    float pulse = 0.8 + (0.2 * sin((TIME * 1.6) + (n * 12.0)));
+    vec3 crust = vec3(0.10, 0.03, 0.02);
+    vec3 hot = mix(vec3(0.95, 0.28, 0.02), vec3(1.0, 0.85, 0.30), smoothstep(0.75, 0.95, n));
+    ALBEDO = mix(crust, hot * pulse, molten);
+}";
+
+    private static Shader _lavaShader = null!;
+    private ShaderMaterial? _lavaMaterial;
+
+    // One material shared by every lava cell in the arena — world-space sampling makes them one
+    // continuous surface, and sharing lets the renderer batch them.
+    private ShaderMaterial LavaMaterial()
+    {
+        if (_lavaMaterial is null)
+        {
+            _lavaShader ??= new Shader { Code = LavaShaderCode };
+            _lavaMaterial = new ShaderMaterial { Shader = _lavaShader };
+            _lavaMaterial.SetShaderParameter("cell_size", _tileSize);
+        }
+
+        return _lavaMaterial;
+    }
+
+    // A molten lava pool sitting near the ground, flush enough that a bridge tile (drawn just above)
+    // sits over it.
     private void AddLava(NVector2 centre, string name) =>
         AddChild(new MeshInstance3D
         {
             Name = name,
             Mesh = new PlaneMesh { Size = new Vector2(_tileSize, _tileSize) },
             Position = new Vector3(centre.X, 0.6f, centre.Y),
-            MaterialOverride = new StandardMaterial3D
-            {
-                AlbedoColor = new Color(0.85f, 0.18f, 0.05f),
-                EmissionEnabled = true,
-                Emission = new Color(0.95f, 0.30f, 0.05f),
-                EmissionEnergyMultiplier = 2.5f,
-                Roughness = 0.6f,
-                SpecularMode = BaseMaterial3D.SpecularModeEnum.Disabled,
-            },
+            MaterialOverride = LavaMaterial(),
         });
 
     // A flat road tile flush with the ground (the bridge crossing over water).
