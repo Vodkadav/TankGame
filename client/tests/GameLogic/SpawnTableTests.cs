@@ -1,4 +1,6 @@
+using System;
 using System.Collections.Generic;
+using System.Linq;
 using TankGame.GameLogic;
 using Xunit;
 
@@ -6,64 +8,114 @@ namespace TankGame.Tests.GameLogic;
 
 public class SpawnTableTests
 {
-    [Fact]
-    public void AnOpenField_YieldsEightDistinctSpawns_LedByTheDeclaredCells()
-    {
-        var spawns = SpawnTable.For(30, 16, primary: (2, 7), secondary: (25, 7), (_, _) => false);
+    private static int Chebyshev((int X, int Y) a, (int X, int Y) b) =>
+        Math.Max(Math.Abs(a.X - b.X), Math.Abs(a.Y - b.Y));
 
-        // The two declared cells lead; the rest are their reflections across the centre and both axes.
-        Assert.Equal(new List<(int X, int Y)>
+    private static int MinPairwise(IReadOnlyList<(int X, int Y)> spawns)
+    {
+        var min = int.MaxValue;
+        for (var i = 0; i < spawns.Count; i++)
         {
-            (2, 7), (25, 7), (27, 8), (4, 8), (2, 8), (27, 7), (25, 8), (4, 7),
-        }, spawns);
+            for (var j = i + 1; j < spawns.Count; j++)
+            {
+                min = Math.Min(min, Chebyshev(spawns[i], spawns[j]));
+            }
+        }
+
+        return min;
     }
 
     [Fact]
-    public void EightPlayers_AllGetADistinctOpenCell_EvenWhenCandidatesCollide()
+    public void AnOpenField_MeetsTheTargetSeparation()
     {
-        // A tight field where several reflections land on the same cell: the taken-set still nudges
-        // each to its own open cell, so eight tanks never share a spawn.
-        var spawns = SpawnTable.For(8, 8, primary: (1, 1), secondary: (6, 6), (_, _) => false);
+        for (var seed = 0; seed < 10; seed++)
+        {
+            var spawns = SpawnTable.For(76, 46, SpawnTable.MaxSpawns, seed, (_, _) => false);
+
+            Assert.Equal(8, spawns.Count);
+            Assert.Equal(8, new HashSet<(int, int)>(spawns).Count);
+            Assert.All(spawns, s => Assert.True(s.X is >= 0 and < 76 && s.Y is >= 0 and < 46));
+            Assert.True(MinPairwise(spawns) >= SpawnTable.TargetSeparation,
+                $"seed {seed}: pairwise separation {MinPairwise(spawns)} is under the target");
+        }
+    }
+
+    [Fact]
+    public void ACrampedField_RelaxesGradually_ButNeverUnderTheFloor()
+    {
+        // 12x12 cannot seat eight tanks ten apart; the placement must relax — yet never under three.
+        for (var seed = 0; seed < 10; seed++)
+        {
+            var spawns = SpawnTable.For(12, 12, 8, seed, (_, _) => false);
+
+            Assert.Equal(8, spawns.Count);
+            Assert.Equal(8, new HashSet<(int, int)>(spawns).Count);
+            Assert.True(MinPairwise(spawns) >= SpawnTable.FloorSeparation,
+                $"seed {seed}: pairwise separation {MinPairwise(spawns)} is under the floor");
+        }
+    }
+
+    [Fact]
+    public void ATinyField_BestEffort_StillKeepsEverySpawnOnItsOwnCell()
+    {
+        // 3x3 can never give separation three, but its nine cells still seat eight tanks distinctly.
+        var spawns = SpawnTable.For(3, 3, 8, seed: 5, (_, _) => false);
 
         Assert.Equal(8, spawns.Count);
-        Assert.Equal(8, new HashSet<(int, int)>(spawns).Count); // all distinct
+        Assert.Equal(8, new HashSet<(int, int)>(spawns).Count);
+        Assert.All(spawns, s => Assert.True(s.X is >= 0 and < 3 && s.Y is >= 0 and < 3));
+    }
+
+    [Fact]
+    public void AFieldSmallerThanTheSpawnCount_IsTheOnlyTimeCellsAreShared()
+    {
+        var spawns = SpawnTable.For(2, 2, 8, seed: 5, (_, _) => false);
+
+        Assert.Equal(8, spawns.Count);
+        Assert.Equal(4, new HashSet<(int, int)>(spawns).Count); // all four cells used, then reused
+        Assert.All(spawns, s => Assert.True(s.X is >= 0 and < 2 && s.Y is >= 0 and < 2));
+    }
+
+    [Fact]
+    public void BlockedCells_AreNeverChosen_WhileOpenOnesRemain()
+    {
+        // The caller's predicate covers walls AND deadly terrain (lava/water); with the whole left
+        // half blocked, every spawn must sit in the open right half.
+        for (var seed = 0; seed < 10; seed++)
+        {
+            var spawns = SpawnTable.For(40, 40, 8, seed, (x, _) => x < 20);
+
+            Assert.Equal(8, spawns.Count);
+            Assert.All(spawns, s => Assert.True(s.X >= 20, $"seed {seed}: spawn {s} sits on a blocked cell"));
+        }
+    }
+
+    [Fact]
+    public void AFullyBlockedField_StillYieldsDistinctInBoundsSpawns()
+    {
+        // Nowhere is open: distinctness still beats openness — two tanks must never share a cell.
+        var spawns = SpawnTable.For(8, 8, 8, seed: 3, (_, _) => true);
+
+        Assert.Equal(8, spawns.Count);
+        Assert.Equal(8, new HashSet<(int, int)>(spawns).Count);
         Assert.All(spawns, s => Assert.True(s.X is >= 0 and < 8 && s.Y is >= 0 and < 8));
     }
 
     [Fact]
-    public void ABlockedCandidate_NudgesToTheNearestOpenCell()
+    public void TheSameSeed_YieldsTheSameSpawns()
     {
-        var blocked = new HashSet<(int, int)> { (2, 7) };
+        var a = SpawnTable.For(76, 46, 8, seed: 42, (_, _) => false);
+        var b = SpawnTable.For(76, 46, 8, seed: 42, (_, _) => false);
 
-        var spawns = SpawnTable.For(30, 16, primary: (2, 7), secondary: (25, 7),
-            (x, y) => blocked.Contains((x, y)));
-
-        Assert.NotEqual((2, 7), spawns[0]);
-        var (dx, dy) = (spawns[0].X - 2, spawns[0].Y - 7);
-        Assert.True(System.Math.Max(System.Math.Abs(dx), System.Math.Abs(dy)) == 1,
-            $"the nudge must land on an adjacent cell; landed {spawns[0]}");
-        Assert.Equal((25, 7), spawns[1]); // the open candidates never move
+        Assert.Equal(a, b);
     }
 
     [Fact]
-    public void AFullyBlockedField_StillYieldsDistinctSpawns_RatherThanDuplicates()
+    public void DifferentSeeds_YieldDifferentSpawns()
     {
-        // Every cell blocked: the ring search finds nothing, so the fallthrough must still hand out
-        // eight DISTINCT cells — two tanks sharing one spawn is worse than a spawn on a blocked tile.
-        var spawns = SpawnTable.For(8, 8, primary: (1, 1), secondary: (6, 6), (_, _) => true);
+        var a = SpawnTable.For(76, 46, 8, seed: 1, (_, _) => false);
+        var b = SpawnTable.For(76, 46, 8, seed: 2, (_, _) => false);
 
-        Assert.Equal(8, spawns.Count);
-        Assert.Equal(8, new HashSet<(int, int)>(spawns).Count);
-    }
-
-    [Fact]
-    public void ACandidateOutsideTheGrid_IsPulledInBounds()
-    {
-        // A mirrored spawn can land out of bounds on an asymmetric level; the ring search only
-        // accepts in-bounds cells.
-        var spawns = SpawnTable.For(10, 10, primary: (0, 0), secondary: (12, 5), (_, _) => false);
-
-        Assert.All(spawns, s => Assert.True(
-            s.X is >= 0 and < 10 && s.Y is >= 0 and < 10, $"spawn {s} must be in bounds"));
+        Assert.NotEqual(a.ToList(), b.ToList());
     }
 }

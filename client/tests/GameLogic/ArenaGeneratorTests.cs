@@ -353,6 +353,30 @@ public class ArenaGeneratorTests
         Assert.True(result.IsValid, string.Join(", ", result.Errors));
     }
 
+    // Tank starts (player + player2 + enemies) must never be packed together — at least the
+    // SpawnTable floor separation apart, whatever the seed (the stuck-inside-each-other bug).
+    [Fact]
+    public void Generate_KeepsTankSpawnsSeparated_ForAnySeed()
+    {
+        for (var seed = 0; seed < 10; seed++)
+        {
+            var arena = new ArenaGenerator().Generate(new ArenaGenParams(32, 32, seed, EnemyCount: 6, PickupCount: 4));
+            var starts = new List<(int X, int Y)> { arena.PlayerSpawn, arena.Player2Spawn };
+            starts.AddRange(arena.EnemySpawns);
+
+            for (var i = 0; i < starts.Count; i++)
+            {
+                for (var j = i + 1; j < starts.Count; j++)
+                {
+                    var d = System.Math.Max(System.Math.Abs(starts[i].X - starts[j].X),
+                        System.Math.Abs(starts[i].Y - starts[j].Y));
+                    Assert.True(d >= SpawnTable.FloorSeparation,
+                        $"seed {seed}: starts {starts[i]} and {starts[j]} are only {d} apart");
+                }
+            }
+        }
+    }
+
     [Fact]
     public void Generate_AtDoubleSize_IsDeterministic_ForAGivenSeed()
     {

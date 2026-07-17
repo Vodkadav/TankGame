@@ -33,8 +33,6 @@ public partial class NetArena3DScene : Node3D
     private const byte HostSlot = 0;
     private const float TeleportPadRadius = 40f; // a tank centred within this of a pad warps (as solo)
 
-    // The guest spawns where the local game's Player 2 does (mirrors the 2D net scene).
-    private static readonly (int X, int Y) GuestSpawn = (25, 7);
     private static readonly NVector2 GridOrigin = NVector2.Zero;
 
     // Camera: the same eyeballed ¾ ortho as Arena3DScene.
@@ -62,7 +60,7 @@ public partial class NetArena3DScene : Node3D
     private IReadOnlyList<TeleportPadLink> _authoredPads = System.Array.Empty<TeleportPadLink>();
     private float _accumulator;
     private byte? _localSlot;
-    private int _matchSeed; // the lobby's match seed: drives the spawn shuffle and per-bot AI seeding
+    private int _matchSeed; // the lobby's match seed: drives spawn placement and per-bot AI seeding
 
     // The loading handshake (issue #2): when we enter during the lobby's "loading" phase we report our
     // arena is built and then hold — no ticks, no snapshots — until the server flips to "started"
@@ -70,12 +68,9 @@ public partial class NetArena3DScene : Node3D
     private bool _awaitingStart;
 
     // The seating plan from the lobby's final roster (placeholder-named AI on empty seats), the
-    // shared four-cell spawn table both roles derive identically, and the host's authoritative
-    // round state.
+    // seeded spawn table both roles derive identically, and the host's authoritative round state.
     private IReadOnlyList<NetRoster.Seat> _roster = System.Array.Empty<NetRoster.Seat>();
     private IReadOnlyList<(int X, int Y)> _spawns = System.Array.Empty<(int, int)>();
-    private (int X, int Y) _primarySpawn;
-    private (int X, int Y) _secondarySpawn;
     private readonly List<(byte Slot, ITank Tank)> _rosterTanks = new();
     private readonly List<(int Team, bool Alive)> _roundStatus = new();
 
@@ -154,18 +149,15 @@ public partial class NetArena3DScene : Node3D
                     var cliffs = CliffsArena.Create();
                     _level = cliffs.Map;
                     sandbags = cliffs.Sandbags;
-                    _primarySpawn = cliffs.PlayerSpawn;
-                    _secondarySpawn = cliffs.EnemySpawns[0];
                     _authoredPads = cliffs.Pads; // the cross-layer valley↔plateau pair (teleport pads T3)
                     break;
                 case NetMapPick.BuiltIn builtIn when ArenaBuilders.TryGet(builtIn.ArenaId, out var builder):
                     // A themed code arena (Forest/Volcano/City/…): every member builds the identical layout
-                    // from its id, so host truth and guest rendering agree without map bytes on the wire.
-                    var themed = builder.Build();
+                    // from its id + the shared match seed, so host truth and guest rendering agree without
+                    // map bytes on the wire.
+                    var themed = builder.Build(lobby.Seed);
                     _level = themed.Map;
                     sandbags = themed.Sandbags;
-                    _primarySpawn = themed.PlayerSpawn;
-                    _secondarySpawn = themed.EnemySpawns[0];
                     _authoredPads = themed.Pads; // themed arenas may author pad pairs too
                     break;
                 default:
@@ -177,8 +169,6 @@ public partial class NetArena3DScene : Node3D
                         new ArenaGenParams(dim, dim, seed, EnemyCount: 0, PickupCount: 0));
                     _level = layout.Map;
                     sandbags = layout.Sandbags;
-                    _primarySpawn = layout.PlayerSpawn;
-                    _secondarySpawn = layout.Player2Spawn;
                     break;
             }
         }
@@ -186,8 +176,6 @@ public partial class NetArena3DScene : Node3D
         {
             _level = LevelMap.Parse(Battlefield01.Text);
             sandbags = new bool[_level.Width, _level.Height];
-            _primarySpawn = (_level.SpawnX, _level.SpawnY);
-            _secondarySpawn = GuestSpawn;
         }
 
         _grid = _level.BuildGrid();
@@ -382,12 +370,13 @@ public partial class NetArena3DScene : Node3D
         _localSlot = slot;
         _roster = NetRoster.Build(
             NetworkSession.StartedLobby, slot, NetworkSession.ActiveCode, LobbyProtocol.MaxPlayers);
-        _spawns = SpawnTable.For(_level.Width, _level.Height, _primarySpawn, _secondarySpawn,
-            (x, y) => _arena.IsBlocked(CellCentre(x, y)));
-        // Shuffle spawn assignment with the shared match seed so no slot is nailed to the same cell every
-        // match (issue #4). Every peer derives the same spawn list + seed, so host and guest agree.
+        // Seeded random placement, min-distance separated: every peer derives the same spawn list from
+        // the shared match seed, so host truth and guest prediction agree — and the seed varies the
+        // cells each match (issue #4). Lava is drivable (IsBlocked false) yet lethal, so spawn
+        // eligibility excludes it explicitly; water already blocks movement.
         _matchSeed = NetworkSession.StartedLobby?.Seed ?? 0;
-        _spawns = Shuffled(_spawns, _matchSeed);
+        _spawns = SpawnTable.For(_level.Width, _level.Height, SpawnTable.MaxSpawns, _matchSeed,
+            (x, y) => _arena.IsBlocked(CellCentre(x, y)) || CellMaterials.IsLethal(_grid.GetCell(x, y).Material));
         foreach (var seat in _roster)
         {
             _netStats.Register(seat.Slot, seat.Name, seat.Team); // both roles book the same rows
@@ -1002,18 +991,4 @@ public partial class NetArena3DScene : Node3D
 
     private static NVector2 CellCentre(int x, int y) =>
         new(GridOrigin.X + ((x + 0.5f) * TileSize), GridOrigin.Y + ((y + 0.5f) * TileSize));
-
-    // Deterministic Fisher-Yates: same list + same seed → same order on every peer.
-    private static IReadOnlyList<(int X, int Y)> Shuffled(IReadOnlyList<(int X, int Y)> spawns, int seed)
-    {
-        var shuffled = new List<(int X, int Y)>(spawns);
-        var rng = new System.Random(seed);
-        for (var i = shuffled.Count - 1; i > 0; i--)
-        {
-            var j = rng.Next(i + 1);
-            (shuffled[i], shuffled[j]) = (shuffled[j], shuffled[i]);
-        }
-
-        return shuffled;
-    }
 }

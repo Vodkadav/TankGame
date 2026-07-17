@@ -19,11 +19,12 @@ public sealed record ArenaLayout(
     GroundTheme GroundTheme);
 
 /// <summary>Builds one built-in arena. A content slice implements this per map (a full themed layout
-/// of ~2x size with eight spawns and powerup pads); the stubs here return a small valid arena so the
-/// game runs and tests pass until then.</summary>
+/// of ~2x size with eight spawns and powerup pads). The <paramref name="seed"/> places the spawns
+/// (seeded random, min-distance separated) and never touches the terrain, so net peers passing the
+/// shared match seed derive identical layouts.</summary>
 public interface IArenaBuilder
 {
-    ArenaLayout Build();
+    ArenaLayout Build(int seed);
 }
 
 /// <summary>Registry of the code-built arenas, keyed by arena id name (matching the Presentation
@@ -69,15 +70,15 @@ public static class ArenaBuilders
 
 // ── Hand-authored themed arenas ───────────────────────────────────────────────────────────────
 // Each map is a ~76x46 steel-ringed field authored with loops and constants only — no Random, Guid, or
-// time — so host and guest calling Build() independently get byte-identical layouts (net-synced).
-// Spawns come from SpawnTable (eight symmetric, well-separated starts, each nudged to open floor); the
+// time — so host and guest calling Build(seed) independently get byte-identical layouts (net-synced).
+// Spawns come from SpawnTable (eight seeded-random, min-distance-separated starts on open floor); the
 // shared ArenaAuthor.Assemble stitches materials + spawns + pickups into an ArenaLayout.
 
 /// <summary>Forest Ambush: open clearings dotted with Mountain hills and bush copses that let an
 /// ambusher lie hidden between the trees.</summary>
 public sealed class ForestArena : IArenaBuilder
 {
-    public ArenaLayout Build()
+    public ArenaLayout Build(int seed)
     {
         var (materials, bushes) = ArenaAuthor.Field();
 
@@ -102,7 +103,7 @@ public sealed class ForestArena : IArenaBuilder
             (PowerupKind.Missile, 6, 6),
         };
 
-        return ArenaAuthor.Assemble(materials, bushes, powerups, GroundTheme.Jungle, (2, 2), (73, 43));
+        return ArenaAuthor.Assemble(materials, bushes, powerups, GroundTheme.Jungle, seed);
     }
 }
 
@@ -110,7 +111,7 @@ public sealed class ForestArena : IArenaBuilder
 /// shots fly over it but destroys any tank that drives onto it — the bridges are the only safe crossings.</summary>
 public sealed class VolcanoArena : IArenaBuilder
 {
-    public ArenaLayout Build()
+    public ArenaLayout Build(int seed)
     {
         var (materials, bushes) = ArenaAuthor.Field();
 
@@ -151,7 +152,7 @@ public sealed class VolcanoArena : IArenaBuilder
             (PowerupKind.SpeedBoost, 70, 22),
         };
 
-        return ArenaAuthor.Assemble(materials, bushes, powerups, GroundTheme.Volcano, (2, 2), (73, 43));
+        return ArenaAuthor.Assemble(materials, bushes, powerups, GroundTheme.Volcano, seed);
     }
 }
 
@@ -162,7 +163,7 @@ public sealed class CityArena : IArenaBuilder
     private const int Period = 12; // one city block (9 wide) plus its 3-wide road
     private const int RoadWidth = 3;
 
-    public ArenaLayout Build()
+    public ArenaLayout Build(int seed)
     {
         var (materials, bushes) = ArenaAuthor.Field();
 
@@ -187,7 +188,7 @@ public sealed class CityArena : IArenaBuilder
             (PowerupKind.Telephone, 1, 23),
         };
 
-        return ArenaAuthor.Assemble(materials, bushes, powerups, GroundTheme.ParkingLot, (1, 1), (73, 43));
+        return ArenaAuthor.Assemble(materials, bushes, powerups, GroundTheme.ParkingLot, seed);
     }
 }
 
@@ -195,7 +196,7 @@ public sealed class CityArena : IArenaBuilder
 /// ponds, each crossed by a Bridge so no pocket is walled off. Long sightlines between the cover.</summary>
 public sealed class FrozenArena : IArenaBuilder
 {
-    public ArenaLayout Build()
+    public ArenaLayout Build(int seed)
     {
         var (materials, bushes) = ArenaAuthor.Field();
 
@@ -228,7 +229,7 @@ public sealed class FrozenArena : IArenaBuilder
             (PowerupKind.Missile, 14, 14),
         };
 
-        return ArenaAuthor.Assemble(materials, bushes, powerups, GroundTheme.Sand, (2, 2), (73, 43));
+        return ArenaAuthor.Assemble(materials, bushes, powerups, GroundTheme.Sand, seed);
     }
 }
 
@@ -236,7 +237,7 @@ public sealed class FrozenArena : IArenaBuilder
 /// raised central mesa (elevation layer 1) reached only by ramps on its four sides.</summary>
 public sealed class CanyonArena : IArenaBuilder
 {
-    public ArenaLayout Build()
+    public ArenaLayout Build(int seed)
     {
         var (materials, bushes) = ArenaAuthor.Field();
         var layers = new int[ArenaAuthor.Width, ArenaAuthor.Height];
@@ -291,7 +292,7 @@ public sealed class CanyonArena : IArenaBuilder
             (PowerupKind.RapidFire, 69, 38),
         };
 
-        return ArenaAuthor.Assemble(materials, bushes, powerups, GroundTheme.Mars, (2, 2), (73, 43), layers, ramps);
+        return ArenaAuthor.Assemble(materials, bushes, powerups, GroundTheme.Mars, seed, layers, ramps);
     }
 }
 
@@ -304,7 +305,7 @@ public sealed class CanyonArena : IArenaBuilder
 /// solid too — every fight orbits the ring, with brick outcrops as the only cover.</summary>
 public sealed class DonutArena : IArenaBuilder
 {
-    public ArenaLayout Build()
+    public ArenaLayout Build(int seed)
     {
         var (materials, bushes) = ArenaAuthor.Field();
 
@@ -334,7 +335,7 @@ public sealed class DonutArena : IArenaBuilder
             (PowerupKind.Missile, 23, 10),
         };
 
-        return ArenaAuthor.Assemble(materials, bushes, powerups, GroundTheme.Mars, (37, 3), (6, 22));
+        return ArenaAuthor.Assemble(materials, bushes, powerups, GroundTheme.Mars, seed);
     }
 }
 
@@ -342,7 +343,7 @@ public sealed class DonutArena : IArenaBuilder
 /// chokepoint) — with the corners outside the plus masked solid Steel.</summary>
 public sealed class CrossArena : IArenaBuilder
 {
-    public ArenaLayout Build()
+    public ArenaLayout Build(int seed)
     {
         var (materials, bushes) = ArenaAuthor.Field();
 
@@ -371,7 +372,7 @@ public sealed class CrossArena : IArenaBuilder
             (PowerupKind.RapidFire, 65, 22),
         };
 
-        return ArenaAuthor.Assemble(materials, bushes, powerups, GroundTheme.ParkingLot, (37, 3), (4, 22));
+        return ArenaAuthor.Assemble(materials, bushes, powerups, GroundTheme.ParkingLot, seed);
     }
 }
 
@@ -379,7 +380,7 @@ public sealed class CrossArena : IArenaBuilder
 /// by single-cell Bridge causeways — hold an island or duel across the open water.</summary>
 public sealed class ArchipelagoArena : IArenaBuilder
 {
-    public ArenaLayout Build()
+    public ArenaLayout Build(int seed)
     {
         var (materials, bushes) = ArenaAuthor.Field();
 
@@ -423,14 +424,15 @@ public sealed class ArchipelagoArena : IArenaBuilder
             (PowerupKind.RapidFire, 62, 31),
         };
 
-        return ArenaAuthor.Assemble(materials, bushes, powerups, GroundTheme.Sand, (13, 10), (62, 10));
+        return ArenaAuthor.Assemble(materials, bushes, powerups, GroundTheme.Sand, seed);
     }
 }
 
 /// <summary>Shared authoring helpers for the built-in themed arenas: a steel-ringed floor field of the
 /// common size, primitive terrain stampers, and the assembler that turns authored terrain into an
-/// <see cref="ArenaLayout"/> with eight <see cref="SpawnTable"/> spawns. Deterministic — loops and
-/// constants only, so a net host and guest build byte-identical maps.</summary>
+/// <see cref="ArenaLayout"/> with eight <see cref="SpawnTable"/> spawns. Terrain is deterministic —
+/// loops and constants only — and the spawns deterministic per seed, so a net host and guest passing
+/// the shared match seed build byte-identical maps.</summary>
 internal static class ArenaAuthor
 {
     public const int Width = 76;
@@ -517,19 +519,18 @@ internal static class ArenaAuthor
         ramps[x, y] = true;
     }
 
-    /// <summary>Stitches authored terrain into a playable <see cref="ArenaLayout"/>: eight symmetric
-    /// spawns from <see cref="SpawnTable"/> (each nudged onto open floor), the player first, the rest as
+    /// <summary>Stitches authored terrain into a playable <see cref="ArenaLayout"/>: eight seeded-random
+    /// min-distance-separated spawns from <see cref="SpawnTable"/>, the player first, the rest as
     /// enemies. Spawn placement treats any non-floor cell as blocked, so no start lands in a wall, on
-    /// lava, or on a bridge.</summary>
+    /// lava, in water, or on a bridge.</summary>
     public static ArenaLayout Assemble(
         CellMaterial[,] materials, bool[,] bushes,
-        (PowerupKind Kind, int X, int Y)[] powerups, GroundTheme theme,
-        (int X, int Y) primary, (int X, int Y) secondary,
+        (PowerupKind Kind, int X, int Y)[] powerups, GroundTheme theme, int seed,
         int[,]? layers = null, bool[,]? ramps = null)
     {
         bool Blocked(int x, int y) => materials[x, y] != CellMaterial.Floor;
 
-        var spawns = SpawnTable.For(Width, Height, primary, secondary, Blocked);
+        var spawns = SpawnTable.For(Width, Height, SpawnTable.MaxSpawns, seed, Blocked);
         var player = spawns[0];
         var enemies = spawns.Skip(1).ToList();
         var sandbags = new bool[Width, Height];
