@@ -812,22 +812,15 @@ public partial class Arena3DScene : Node3D
         AddPadView(padB);
     }
 
-    // Build the teleporter from the authored pad pairs (cells → world centres). The rings are added in
-    // the same link order the Teleporter holds, so the scene can mirror pad state to them by index.
+    // Build the teleporter from the authored pad pairs via the shared derivation (cells → world
+    // centres, layers from the grid) — the same one the networked arena uses, so both resolve the
+    // identical pads from the same map. The rings are added in the Teleporter's link order, so the
+    // scene can mirror pad state to them by index.
     private void BuildAuthoredTeleporter()
     {
-        var links = new List<(TeleportPad, TeleportPad)>(_authoredPads.Count);
-        var pads = new List<TeleportPad>(_authoredPads.Count * 2);
-        foreach (var link in _authoredPads)
-        {
-            var padA = PadAt(link.AX, link.AY);
-            var padB = PadAt(link.BX, link.BY);
-            links.Add((padA, padB));
-            pads.Add(padA);
-            pads.Add(padB);
-        }
-
-        _teleporter = new Teleporter(links, TeleportPadRadius);
+        var (teleporter, pads) = AuthoredTeleporter.Build(
+            _authoredPads, _grid, TileSize, GridOrigin, TeleportPadRadius);
+        _teleporter = teleporter;
         foreach (var pad in pads)
         {
             AddPadView(pad);

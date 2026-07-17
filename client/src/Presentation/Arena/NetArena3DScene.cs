@@ -31,6 +31,7 @@ public partial class NetArena3DScene : Node3D
     private const float PickupRadius = 28f;
     private const int TankMaxHp = 8;
     private const byte HostSlot = 0;
+    private const float TeleportPadRadius = 40f; // a tank centred within this of a pad warps (as solo)
 
     // The guest spawns where the local game's Player 2 does (mirrors the 2D net scene).
     private static readonly (int X, int Y) GuestSpawn = (25, 7);
@@ -51,6 +52,14 @@ public partial class NetArena3DScene : Node3D
 
     private readonly Dictionary<byte, ITank> _tanks = new();
     private readonly Dictionary<byte, Tank3DView> _tankViews = new();
+
+    // The map's teleport pads (Cliffs' cross-layer pair): static map features every member derives
+    // from the same resolved map, so nothing about them travels on the wire. The host's authoritative
+    // tanks consult the Teleporter inside World.Step and the warped positions/layers ride the normal
+    // snapshot; a guest renders the same rings and mirrors the outcomes.
+    private Teleporter _teleporter = null!;
+    private readonly List<TeleportPad3DView> _padViews = new();
+    private IReadOnlyList<TeleportPadLink> _authoredPads = System.Array.Empty<TeleportPadLink>();
     private float _accumulator;
     private byte? _localSlot;
     private int _matchSeed; // the lobby's match seed: drives the spawn shuffle and per-bot AI seeding
@@ -147,6 +156,7 @@ public partial class NetArena3DScene : Node3D
                     sandbags = cliffs.Sandbags;
                     _primarySpawn = cliffs.PlayerSpawn;
                     _secondarySpawn = cliffs.EnemySpawns[0];
+                    _authoredPads = cliffs.Pads; // the cross-layer valley↔plateau pair (teleport pads T3)
                     break;
                 case NetMapPick.BuiltIn builtIn when ArenaBuilders.TryGet(builtIn.ArenaId, out var builder):
                     // A themed code arena (Forest/Volcano/City/…): every member builds the identical layout
@@ -156,6 +166,7 @@ public partial class NetArena3DScene : Node3D
                     sandbags = themed.Sandbags;
                     _primarySpawn = themed.PlayerSpawn;
                     _secondarySpawn = themed.EnemySpawns[0];
+                    _authoredPads = themed.Pads; // themed arenas may author pad pairs too
                     break;
                 default:
                     // Desert War (and the safe fallback for any unrecognised pick): a seeded generation.
@@ -181,6 +192,7 @@ public partial class NetArena3DScene : Node3D
 
         _grid = _level.BuildGrid();
         _arena = new GridArena(_grid, TileSize, GridOrigin);
+        BuildTeleporter(); // before any tank exists — the host's tanks consult it from tick one
 
         BuildEnvironment();
         BuildGround();
@@ -339,7 +351,9 @@ public partial class NetArena3DScene : Node3D
             }
 
             // Host: the world reads every input source (keyboard + relayed + AI) and the session broadcasts.
+            _teleporter.Step(TickSeconds); // pad cooldowns age in sim time (tanks warp inside world.Step)
             _session.Step(TickSeconds);
+            UpdatePadViews();
             EvaluateRound();
             return;
         }
@@ -423,7 +437,7 @@ public partial class NetArena3DScene : Node3D
                 : FireInterval * DifficultyPreset.For(GameSetup.BotDifficulty).FireIntervalScale;
             var tank = new Tank(input, _world, _arena, CellCentre(spawn.X, spawn.Y),
                 TankSpeed, fireInterval, ProjectileSpeed, maxHp: TankMaxHp, team: seat.Team,
-                displayName: seat.Name);
+                teleporter: _teleporter, displayName: seat.Name);
             ai?.Bind(tank);
             _tanks[seat.Slot] = tank;
             _rosterTanks.Add((seat.Slot, tank));
@@ -515,6 +529,40 @@ public partial class NetArena3DScene : Node3D
         {
             _projectileViews.Remove(entity);
             view.QueueFree();
+        }
+    }
+
+    // Both roles derive the map's teleport pads from the shared map resolution (the same derivation
+    // the solo arena uses), so the rings sit identically on every peer with nothing on the wire.
+    // Only the host's tanks consult the Teleporter — a guest's copy exists for the ring views (its
+    // cooldowns never fire, so a guest's rings read "ready"; the warp itself arrives via snapshot).
+    private void BuildTeleporter()
+    {
+        var (teleporter, pads) = AuthoredTeleporter.Build(
+            _authoredPads, _grid, TileSize, GridOrigin, TeleportPadRadius);
+        _teleporter = teleporter;
+        foreach (var pad in pads)
+        {
+            var view = new TeleportPad3DView { Name = "TeleportPad" };
+            view.Configure(GroundProjection.ToWorld(pad.Position, pad.Layer), TeleportPadRadius);
+            AddChild(view);
+            _padViews.Add(view);
+        }
+    }
+
+    // Host only: mirror the authoritative pad cooldowns onto the rings (dim while dormant), in the
+    // shared link order both hold.
+    private void UpdatePadViews()
+    {
+        if (_padViews.Count == 0)
+        {
+            return;
+        }
+
+        var statuses = _teleporter.PadStatuses();
+        for (var i = 0; i < _padViews.Count && i < statuses.Count; i++)
+        {
+            _padViews[i].SetState(statuses[i].Ready, statuses[i].CooldownFraction);
         }
     }
 
@@ -691,6 +739,7 @@ public partial class NetArena3DScene : Node3D
         tank.TurretRotation = _predicted.TurretRotation;
         tank.Hp = _predicted.Hp;
         tank.Team = _predicted.Team;
+        tank.Layer = _predicted.Layer; // a cross-layer teleport must lift the guest's own tank too
         _tankViews[slot].ApplyTeamTint(tank.Team);
     }
 
