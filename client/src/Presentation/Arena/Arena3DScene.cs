@@ -232,8 +232,8 @@ public partial class Arena3DScene : Node3D
         else if (ArenaBuilders.TryGet(GameSetup.Arena.ToString(), out var builder))
         {
             // A themed code arena (Forest/Volcano/City/Frozen/Canyon): the builder seam returns a whole
-            // layout the same shape as Cliffs, so guests and host build the identical level.
-            var layout = builder.Build();
+            // layout the same shape as Cliffs; the per-match arena seed places the spawns.
+            var layout = builder.Build(GameSetup.ArenaSeed);
             level = layout.Map;
             sandbags = layout.Sandbags;
             _playerSpawn = layout.PlayerSpawn;

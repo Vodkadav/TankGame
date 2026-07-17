@@ -71,16 +71,18 @@ public sealed class ArenaGenerator
         // terrain never land on the water or the bridges (the "claim a cell" rule).
         var (riverCells, claimed, approaches) = CarveRiver(p, rng);
 
-        // Spawns first, in opposite corners; then enemies and pickups spread across the field. All are
-        // picked on unclaimed interior floor so walls scatter around them, never on them or the river.
-        var playerSpawn = PickInRegion(p, rng, chosen, claimed, 1, 1, Third(p.Width), Third(p.Height));
-        var player2Spawn = PickInRegion(p, rng, chosen, claimed,
-            p.Width - 1 - Third(p.Width), p.Height - 1 - Third(p.Height), p.Width - 2, p.Height - 2);
-
+        // Tank spawns first, via SpawnTable's seeded min-distance placement (target 10, floor 3), so
+        // no two tanks start packed together; then pickups spread across the field. All land on
+        // unclaimed interior floor so walls scatter around them, never on them or the river.
+        var spawnCells = SpawnTable.For(p.Width, p.Height, 2 + p.EnemyCount, rng,
+            (x, y) => IsBorder(p, x, y) || claimed[x, y]);
+        chosen.AddRange(spawnCells);
+        var playerSpawn = spawnCells[0];
+        var player2Spawn = spawnCells[1];
         var enemySpawns = new List<(int X, int Y)>();
-        for (var i = 0; i < p.EnemyCount; i++)
+        for (var i = 2; i < spawnCells.Count; i++)
         {
-            enemySpawns.Add(PickInRegion(p, rng, chosen, claimed, 1, 1, p.Width - 2, p.Height - 2));
+            enemySpawns.Add(spawnCells[i]);
         }
 
         var pickupCells = new List<(int X, int Y)>();
