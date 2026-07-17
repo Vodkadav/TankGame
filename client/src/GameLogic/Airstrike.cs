@@ -33,7 +33,7 @@ public sealed class Airstrike : IAirstrike
     public Airstrike(IWorld world, IReadOnlyList<Vector2> zones, int callerTeam, float zoneRadius,
         float armWindow, float delay, int damage)
     {
-        Id = Guid.NewGuid();
+        Id = EntityId.Next();
         _world = world;
         _callerTeam = callerTeam;
         _damage = damage;

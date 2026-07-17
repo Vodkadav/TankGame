@@ -14,7 +14,7 @@ public sealed class NetTank : ITank
 {
     public NetTank(int maxHp = 3) => MaxHp = maxHp;
 
-    public Guid Id { get; } = Guid.NewGuid();
+    public Guid Id { get; } = EntityId.Next();
     public Vector2 Position { get; set; }
     public float Rotation { get; set; }
     public float TurretRotation { get; set; }

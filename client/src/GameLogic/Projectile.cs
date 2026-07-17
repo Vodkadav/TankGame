@@ -32,7 +32,7 @@ public sealed class Projectile : IProjectile
         int team = 0, IProjectileBehaviour? behaviour = null, int pierce = 0, Guid owner = default,
         ProjectileStyle style = ProjectileStyle.Normal, int layer = 0)
     {
-        Id = Guid.NewGuid();
+        Id = EntityId.Next();
         Layer = layer;
         _arena = arena;
         _state = new ProjectileState
