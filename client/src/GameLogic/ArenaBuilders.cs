@@ -115,7 +115,9 @@ public sealed class VolcanoArena : IArenaBuilder
     {
         var (materials, bushes) = ArenaAuthor.Field();
 
-        // Two horizontal lava rivers spanning the field, each with four bridge crossings.
+        // Two horizontal lava rivers spanning the field, each with four bridge crossings. Every
+        // crossing is three cells wide — a single cell made brushing lava almost unavoidable
+        // (owner feedback 2026-07-17).
         foreach (var riverY in new[] { 13, 32 })
         {
             for (var x = 3; x <= 72; x++)
@@ -125,7 +127,10 @@ public sealed class VolcanoArena : IArenaBuilder
 
             foreach (var bridgeX in new[] { 12, 28, 46, 62 })
             {
-                materials[bridgeX, riverY] = CellMaterial.Bridge;
+                for (var dx = -1; dx <= 1; dx++)
+                {
+                    materials[bridgeX + dx, riverY] = CellMaterial.Bridge;
+                }
             }
         }
 
@@ -135,7 +140,10 @@ public sealed class VolcanoArena : IArenaBuilder
             materials[38, y] = CellMaterial.Lava;
         }
 
-        materials[38, 22] = CellMaterial.Bridge;
+        for (var y = 21; y <= 23; y++)
+        {
+            materials[38, y] = CellMaterial.Bridge;
+        }
 
         // Basalt outcrops (steel) for hard cover on the rims.
         foreach (var (cx, cy) in new[] { (18, 6), (58, 6), (18, 39), (58, 39), (38, 6), (38, 39) })
