@@ -23,7 +23,7 @@ public class ArenaBuildersTests
     {
         Assert.True(ArenaBuilders.TryGet(arenaId, out var builder), $"{arenaId} must have a builder");
 
-        var layout = builder.Build();
+        var layout = builder.Build(seed: 7);
         var grid = layout.Map.BuildGrid();
 
         // Eight starts (player + seven enemies), all distinct and standing on open, non-blocked ground.
@@ -193,7 +193,8 @@ public class ArenaBuildersTests
         Assert.True(bridgeOverWater, "archipelago causeways must bridge over the water sea");
     }
 
-    // Net sync: host and guest build independently, so two builds must be byte-identical terrain.
+    // Net sync: host and guest build independently from the shared match seed, so two builds with
+    // the same seed must be byte-identical terrain AND the same spawns.
     [Theory]
     [InlineData("Forest")]
     [InlineData("Volcano")]
@@ -220,10 +221,66 @@ public class ArenaBuildersTests
         }
     }
 
-    private static ArenaLayout BuildOrFail(string arenaId)
+    // The seed moves the spawns (no more fixed starts every match) but must never touch the terrain
+    // — the map id alone decides the level a net host and guest both build.
+    [Theory]
+    [InlineData("Forest")]
+    [InlineData("Volcano")]
+    [InlineData("City")]
+    [InlineData("Frozen")]
+    [InlineData("Canyon")]
+    [InlineData("Donut")]
+    [InlineData("Cross")]
+    [InlineData("Archipelago")]
+    public void ThemedArena_SeedMovesTheSpawns_ButNeverTheTerrain(string arenaId)
+    {
+        var a = BuildOrFail(arenaId, seed: 1);
+        var b = BuildOrFail(arenaId, seed: 2);
+
+        Assert.NotEqual(Starts(a), Starts(b));
+        for (var x = 0; x < a.Map.Width; x++)
+        {
+            for (var y = 0; y < a.Map.Height; y++)
+            {
+                Assert.Equal(a.Map.Materials[x, y], b.Map.Materials[x, y]);
+                Assert.Equal(a.Map.Bushes[x, y], b.Map.Bushes[x, y]);
+            }
+        }
+    }
+
+    // Randomised placement must still keep tanks apart — at least the floor separation on every
+    // themed map, whatever the seed (the stuck-inside-each-other bug this scheme replaces).
+    [Theory]
+    [InlineData("Forest")]
+    [InlineData("Volcano")]
+    [InlineData("City")]
+    [InlineData("Frozen")]
+    [InlineData("Canyon")]
+    [InlineData("Donut")]
+    [InlineData("Cross")]
+    [InlineData("Archipelago")]
+    public void ThemedArena_KeepsSpawnsSeparated_ForAnySeed(string arenaId)
+    {
+        for (var seed = 0; seed < 5; seed++)
+        {
+            var starts = Starts(BuildOrFail(arenaId, seed));
+            for (var i = 0; i < starts.Count; i++)
+            {
+                for (var j = i + 1; j < starts.Count; j++)
+                {
+                    var d = System.Math.Max(System.Math.Abs(starts[i].X - starts[j].X),
+                        System.Math.Abs(starts[i].Y - starts[j].Y));
+                    Assert.True(d >= SpawnTable.FloorSeparation,
+                        $"{arenaId} seed {seed}: spawns {starts[i]} and {starts[j]} are only {d} apart");
+                }
+            }
+        }
+    }
+
+    private static ArenaLayout BuildOrFail(string arenaId, int seed = 7)
     {
         Assert.True(ArenaBuilders.TryGet(arenaId, out var builder), $"{arenaId} must have a builder");
-        return builder.Build();
+        return builder.Build(seed);
     }
 
     private static List<(int X, int Y)> Starts(ArenaLayout layout)
