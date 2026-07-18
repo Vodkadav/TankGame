@@ -17,6 +17,24 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # The Android export below is expensive (installs the full Android SDK + NDK and
+  # runs a headless Godot export, ~15 min). Only rebuild the APK when client code
+  # actually changes — a docs/worker/workflow-only merge must not trigger it. The
+  # cheap Cloudflare deploys stay unconditional so the landing-page SHA still
+  # refreshes on every merge.
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      client: ${{ steps.filter.outputs.client }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            client:
+              - 'client/**'
+
   deploy-worker:
     runs-on: ubuntu-latest
     steps:
@@ -87,6 +105,8 @@ jobs:
   # signing secret is needed. arm64-v8a only — C#/.NET Android supports arm64/x86_64
   # (the preset drops armeabi-v7a, which .NET cannot target).
   release-apk:
+    needs: changes
+    if: needs.changes.outputs.client == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: write
