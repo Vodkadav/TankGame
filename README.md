@@ -1,6 +1,6 @@
 # TankGame
 
-TankGame is a real-time multiplayer top-down tank arena built with Godot 4.6 (C#, Android), a Cloudflare Worker (TypeScript) for authoritative server-side simulation via Durable Objects, and Supabase for persistent player progression. Code is MIT-licensed; visual and audio assets are CC0.
+TankGame is a real-time multiplayer top-down tank arena built with Godot 4.6 (C#, Android), a Cloudflare Worker (TypeScript) for authoritative server-side simulation via Durable Objects. Supabase-backed persistent player progression is a planned addition (`server/supabase/` is scaffolded but not yet built out — see `docs/research/progression.md`). Code is MIT-licensed; visual and audio assets are CC0.
 
 ## Repository map
 
@@ -16,9 +16,11 @@ TankGame/
 │   └── tests/               GoDotTest + NetArchTest suites
 ├── server/
 │   ├── worker/              Cloudflare Worker (TypeScript, Wrangler, Vitest)
-│   └── supabase/            Supabase schema migrations
+│   └── supabase/            Reserved for Supabase schema migrations (planned, not yet built)
 ├── shared/
-│   └── protocol/            Binary protocol types mirrored in C# and TypeScript
+│   └── protocol/            Reserved, currently unused — the binary protocol is instead
+│                             hand-mirrored in client/src/Domain/Net/ (C#) and
+│                             server/worker/src/protocol/ (TypeScript)
 ├── docs/
 │   ├── adr/                 Architecture Decision Records (Nygard format)
 │   ├── credits/             Asset attribution files

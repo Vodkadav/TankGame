@@ -34,6 +34,11 @@ dist/
 .claude/plans/
 .claude/worktrees/
 .claude/settings.local.json
+.claude/audit.log
+.claude/decision-audit.jsonl
+.claude/decisions/
+.claude/sentinel-reports/
+.playwright-mcp/
 
 # Art working area + extracted source asset packs (only processed outputs are committed)
 art-wip/
