@@ -29,6 +29,56 @@ TankGame/
 └── .github/workflows/       CI (ci.yml) and deploy (deploy.yml) pipelines
 ```
 
+## Installation
+
+Prerequisites: **Godot 4.6.2 .NET/Mono** (the C# editor build) and the **.NET 9 SDK**.
+The Cloudflare Worker (multiplayer relay) additionally needs **Node 22 + pnpm** — it is
+optional for local single-player and co-op.
+
+```sh
+# 1. Clone
+git clone https://github.com/Vodkadav/TankGame.git
+cd TankGame
+
+# 2. Godot C# client
+dotnet restore client/TankGame.csproj
+# Regenerate .import/.uid/.translation caches (all gitignored) after a fresh pull:
+godot --headless --path client --import
+
+# 3. Cloudflare Worker relay (optional — only for online multiplayer)
+cd server/worker
+pnpm install --frozen-lockfile
+cd ../..
+```
+
+## Usage
+
+```sh
+# --- Play ---
+# Desktop: open the client/ folder in the Godot 4.6.2 .NET editor and press F5,
+# or launch the main scene headlessly from the repo root:
+godot --path client
+
+# --- Build (compile check) ---
+dotnet build client/TankGame.csproj -c Debug
+
+# --- Tests ---
+# Pure-C# xUnit suites (swap in Domain / Infrastructure / Architecture the same way):
+dotnet test client/tests/GameLogic/TankGame.Tests.GameLogic.csproj -c Debug
+# In-engine GoDotTest scene tests (headless Godot; exit code gates CI):
+godot --headless --path client --run-tests --quit-on-finish
+# Cloudflare Worker (Vitest):
+cd server/worker && pnpm test && cd ../..
+
+# --- Export the Android APK (arm64-v8a) ---
+godot --headless --path client --export-release "Android" build/tankgame.apk
+
+# --- Export the browser (WASM) build ---
+# Needs the ComplexRobot C# web-export editor + `dotnet workload install wasm-tools`.
+# Full walkthrough and gotchas: docs/web-export.md
+godot --headless --path client --export-release "Web" build/web/index.html
+```
+
 ## Branches
 
 - **`main`** — primary development line. A fresh clone lands here.
