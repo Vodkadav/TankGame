@@ -1,5 +1,5 @@
 {
-  "description": "Real-time multiplayer top-down tank arena — Godot 4.6 C# client (desktop, Android, browser/WASM) backed by a Cloudflare Worker relay (Durable Objects) and Supabase progression.",
+  "description": "Real-time multiplayer top-down tank arena — Godot 4.6 C# client (desktop, Android, browser/WASM) backed by a Cloudflare Worker relay (Durable Objects); Supabase-backed player progression is planned but not yet built.",
   "install": [
     "dotnet restore client/TankGame.csproj",
     "godot --headless --path client --import",
