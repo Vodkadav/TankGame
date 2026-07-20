@@ -256,16 +256,16 @@ just the editor — static analysis alone can't confirm them, so Fable should dr
 `SettingsOverlay`, `PlatformExit`) and their scene files **exist** and the obvious `:F2` float-culture crash
 is already contained (`SettingsFormat`), so this is **not** a missing-scene problem. Audit hypotheses, in
 likelihood order:
-  - A destination scene **throws in `_Ready()`/`Build()` on the ICU-less WASM runtime** (the exact class of
-    bug #231 fixed for `SettingsOverlay`) → `ChangeSceneToFile` swaps in a scene that immediately errors →
-    looks like "the button did nothing". Suspects still doing culture-sensitive `string.Format` on web:
-    `MetersOverlay.cs:44`, `ScoreOverlay.cs:45`, `ArenaScene.cs:534` — and any `MapSelectScene`/`MapEditor`
-    formatting. Grep every scene's `_Ready` path for culture-sensitive formatting / web-unavailable APIs.
-  - Or the nav works but the destination is **unusable on touch** (Editor is mouse-designed; the old code
-    `Lobby` needs a friend + a keyboard for the code — this one is superseded by the new lobby anyway).
-  - **Deliverable:** a click-through audit of every menu button in the deployed arcade build, each verified
-    to reach a working, touch-usable screen (or fixed). Add a headless/GoDotTest smoke test per scene's
-    `_Ready` so a WASM-fatal scene fails CI instead of the arcade.
+- A destination scene **throws in `_Ready()`/`Build()` on the ICU-less WASM runtime** (the exact class of
+  bug #231 fixed for `SettingsOverlay`) → `ChangeSceneToFile` swaps in a scene that immediately errors →
+  looks like "the button did nothing". Suspects still doing culture-sensitive `string.Format` on web:
+  `MetersOverlay.cs:44`, `ScoreOverlay.cs:45`, `ArenaScene.cs:534` — and any `MapSelectScene`/`MapEditor`
+  formatting. Grep every scene's `_Ready` path for culture-sensitive formatting / web-unavailable APIs.
+- Or the nav works but the destination is **unusable on touch** (Editor is mouse-designed; the old code
+  `Lobby` needs a friend + a keyboard for the code — this one is superseded by the new lobby anyway).
+- **Deliverable:** a click-through audit of every menu button in the deployed arcade build, each verified
+  to reach a working, touch-usable screen (or fixed). Add a headless/GoDotTest smoke test per scene's
+  `_Ready` so a WASM-fatal scene fails CI instead of the arcade.
 
 **2. No on-screen keyboard when renaming the tank on iPad.** The name prompt is a Godot `LineEdit`
 (`TitleScene.BuildNamePrompt` → `_nameEntry.GrabFocus()`). Godot 4's HTML5/iOS Safari export **does not
