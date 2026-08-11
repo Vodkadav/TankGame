@@ -1,0 +1,28 @@
+{
+  "schema_version": "1.0",
+  "id": "security-worker-vitest-pool-migration-20260811",
+  "type": "one-off",
+  "title": "server/worker: 8 high advisories need a @cloudflare/vitest-pool-workers v0.21 migration, not a bump",
+  "created_at": "2026-08-11T00:00:00Z",
+  "due_at": "2026-08-11T00:00:00Z",
+  "completed_at": null,
+  "created_by": "claude",
+  "severity": "medium",
+  "category": "security",
+  "schedule": null,
+  "what": "npm audit in server/worker reports 8 high-severity findings (miniflare, undici, ws, sharp via @cloudflare/vitest-pool-workers; nanoid and postcss transitively; wrangler). All of it is test/build tooling for the Cloudflare Worker — none of it is shipped code, and the .NET/Godot client is clean (dotnet list package --vulnerable finds nothing).",
+  "why": "Attempted 2026-08-11 and deliberately reverted, because the upgrade is a migration rather than a version bump and a half-done one left the repo worse than untouched. The chain: @cloudflare/vitest-pool-workers@0.21 requires vitest ^4.1 (repo is on 3.2), and clearing the last findings needs wrangler ^4.120, which peer-requires @cloudflare/workers-types@^5 (repo is on ^4). With all of that installed npm audit did reach 0 vulnerabilities — but the suite no longer ran at all, so the trade was a worse state, not a better one.",
+  "how": [
+    "Expect two distinct breakages, both real and both hit on the first attempt",
+    "1. vitest.config.ts fails to load: `Missing \"./config\" specifier in \"@cloudflare/vitest-pool-workers\"`. The /config subpath export is gone in 0.21 and defineWorkersProject with it; the new surface is cloudflarePool / cloudflareTest from the package root. The shipped codemod (node node_modules/@cloudflare/vitest-pool-workers/dist/codemods/vitest-v3-to-v4.mjs) ran without output and rewrote nothing, so the config needs porting by hand against the 0.21 docs",
+    "2. npx tsc --noEmit fails inside node_modules/tinybench: @cloudflare/workers-types@5 redefines the global EventTarget with a stricter signature than tinybench's Task subclass expects. Likely fixed by scoping workers-types to the worker's own tsconfig `types` array rather than letting it apply globally — verify, do not assume",
+    "Land it in one commit only when BOTH `npx vitest run` (baseline: 7 files, 86 tests) and `npx tsc --noEmit` are green, then confirm npm audit reports 0",
+    "If the migration stalls, the honest partial is available: `npm audit fix` alone clears nanoid and postcss without touching the pool. Take the partial and re-file the rest rather than leaving a broken suite"
+  ],
+  "risks": [
+    "A green audit number with a suite that cannot run is strictly worse than the advisories — the reverted attempt is the evidence",
+    "This worker is not yet deployed (its deploy script is a placeholder for M0-T6), so the advisories are not currently reachable by anyone; that is a reason to schedule this properly, not a reason to rush a breaking upgrade"
+  ],
+  "links": [],
+  "snooze_count": 0
+}
