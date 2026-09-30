@@ -52,7 +52,7 @@ tree, tests, and even a local run are not the artifact players get.
 
 ## Report format
 
-```
+```text
 Deploy-verify — {date}
 Export:  PASS — index.pck {n} MB
 Deploy:  PASS — {actions run url}
